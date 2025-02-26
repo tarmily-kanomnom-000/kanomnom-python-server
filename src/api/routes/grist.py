@@ -34,9 +34,13 @@ async def grist_status(inquiries: Inquiries) -> dict:
         message_text = (
             f"📩 *New Inquiry Received*\n"
             f"👤 *Customer:* {inquiry.customer_first_name} {inquiry.customer_last_name}\n"
-            f"📦 *Inquiry Type:* {inquiry.inquiry_type.value}\n"
+            f"📦 *Inquiry Type:* {inquiry.inquiry_type.value if inquiry.inquiry_type else 'N/A'}\n"
             f"📝 *Message:* {inquiry.inquiry}\n"
-            f"📅 *Date Needed:* {inquiry.date_needed_by.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"📅 *Date Needed:* {
+                inquiry.date_needed_by.strftime('%Y-%m-%d %H:%M:%S')
+                if inquiry.date_needed_by
+                else 'N/A'
+            }\n"
             f"📌 *Contact Information:*\n{contact_info}"
         )
         messages.append(message_text)

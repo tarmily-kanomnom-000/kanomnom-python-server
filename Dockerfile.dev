@@ -39,5 +39,5 @@ ENV PATH="/root/.local/bin:$PATH"
 # Verify uv installation
 RUN uv --version || (echo "uv verification failed" && exit 1)
 
-ENV PYTHONPATH=/home/kanomnom-python-server/src
+ENV PYTHONPATH=/home/kanomnom-python-server/src:$PYTHONPATH
 

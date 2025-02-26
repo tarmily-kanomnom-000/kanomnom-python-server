@@ -47,15 +47,15 @@ class Inquiry(BaseModel):
     id: int
     manualSort: int
     date: datetime
-    date_needed_by: datetime
+    date_needed_by: Optional[datetime] = None
     status: InquiryStatus
     customer_first_name: str
     customer_last_name: str
     email: Optional[Union[ValidatedEmail, str]] = None
     phone_number: Optional[Union[PhoneNumber, str]] = None
-    preferred_contact_method: PreferredContactMethod
-    products: List[Product]
-    inquiry_type: InquiryType
+    preferred_contact_method: Optional[PreferredContactMethod] = None
+    products: Optional[List[Product]] = None
+    inquiry_type: Optional[InquiryType] = None
     inquiry: str
     last_updated: datetime
     attachments: Optional[str] = None

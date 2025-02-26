@@ -1,45 +1,48 @@
 FROM ubuntu:24.04
 
-# Accept Python version as build argument
 ARG PYTHON_VERSION
 ENV PYTHON_VERSION=${PYTHON_VERSION}
 
-# Avoid prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Update and install essential packages
-RUN apt-get update && apt-get install -y \
+# Install Python and uv, then remove all unnecessary components
+RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Check if Python version is already installed
-RUN if ! command -v python${PYTHON_VERSION} &> /dev/null; then \
-    # Add deadsnakes PPA for Python versions
-    add-apt-repository ppa:deadsnakes/ppa && \
-    # Update package list and check if Python version exists
-    apt-get update && \
-    if ! apt-cache show python${PYTHON_VERSION}; then \
-        echo "Python version ${PYTHON_VERSION} not found in repositories" && \
-        exit 1; \
-    fi && \
-    # Install Python and python3-full if version check passed
-    apt-get install -y \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
         python${PYTHON_VERSION} \
-        && rm -rf /var/lib/apt/lists/*; \
-fi
+    && curl -LsSf https://astral.sh/uv/install.sh | sh \
+    \
+    # Remove package manager and all unnecessary files
+    && apt-get purge -y curl software-properties-common \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt /etc/apt /var/lib/dpkg /var/lib/cache /var/lib/log \
+    \
+    # Remove unnecessary user, group, and system files
+    && rm -rf /usr/share/locale /usr/share/i18n /usr/lib/locale \
+    && rm -rf /usr/share/info /usr/share/man /usr/share/groff /usr/share/lintian /usr/share/linda \
+    \
+    # Remove static libraries not needed at runtime
+    && find /usr/lib /usr/local/lib -name "*.a" -type f -delete \
+    \
+    # Remove Python cache and compiled files
+    && find / -type d -name "__pycache__" -exec rm -rf {} + \
+    && find / -type f -name "*.pyc" -delete \
+    \
+    # Remove unused user directories
+    && rm -rf /root/.cache /root/.config /root/.local/share \
+    \
+    # Strip unneeded symbols from shared libraries
+    && find /usr/lib /usr/local/lib -type f -exec strip --strip-unneeded {} 2>/dev/null \; || true
 
-# Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh || \
-    (echo "uv installation failed" && exit 1)
-
-# Add uv to PATH
 ENV PATH="/root/.local/bin:$PATH"
 
-# Verify uv installation
 RUN uv --version || (echo "uv verification failed" && exit 1)
 
-ENV PYTHONPATH=/home/kanomnom-python-server/src
+ENV PYTHONPATH="/home/kanomnom-python-server/src:$PYTHONPATH"
 
 COPY pyproject.toml uv.lock /home/kanomnom-python-server/
 COPY src /home/kanomnom-python-server/src
