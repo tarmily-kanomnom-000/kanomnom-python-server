@@ -1,0 +1,48 @@
+FROM ubuntu:24.04
+
+# Accept Python version as build argument
+ARG PYTHON_VERSION
+ENV PYTHON_VERSION=${PYTHON_VERSION}
+
+# Avoid prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Update and install essential packages
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Check if Python version is already installed
+RUN if ! command -v python${PYTHON_VERSION} &> /dev/null; then \
+    # Add deadsnakes PPA for Python versions
+    add-apt-repository ppa:deadsnakes/ppa && \
+    # Update package list and check if Python version exists
+    apt-get update && \
+    if ! apt-cache show python${PYTHON_VERSION}; then \
+        echo "Python version ${PYTHON_VERSION} not found in repositories" && \
+        exit 1; \
+    fi && \
+    # Install Python and python3-full if version check passed
+    apt-get install -y \
+        python${PYTHON_VERSION} \
+        && rm -rf /var/lib/apt/lists/*; \
+fi
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh || \
+    (echo "uv installation failed" && exit 1)
+
+# Add uv to PATH
+ENV PATH="/root/.local/bin:$PATH"
+
+# Verify uv installation
+RUN uv --version || (echo "uv verification failed" && exit 1)
+
+ENV PYTHONPATH=/home/kanomnom-python-server/src
+
+COPY pyproject.toml uv.lock /home/kanomnom-python-server/
+COPY src /home/kanomnom-python-server/src
+WORKDIR /home/kanomnom-python-server
+
+ENTRYPOINT ["uv", "run", "src/app.py"]

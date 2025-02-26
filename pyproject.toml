@@ -1,0 +1,20 @@
+[project]
+name = "kanomnom-python-server"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.8",
+    "phonenumbers>=8.13.55",
+    "pydantic-extra-types>=2.10.2",
+    "pydantic[email]>=2.10.6",
+    "python-telegram-bot>=21.10",
+    "uvicorn>=0.34.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.394",
+    "ruff>=0.9.7",
+]

@@ -1,0 +1,18 @@
+services:
+  kanomnom-python-server:
+    container_name: kanomnom-python-server
+    build:
+      context: .
+      dockerfile: ./Dockerfile.prod
+      args:
+        - PYTHON_VERSION=3.13
+    ports:
+      - "6969:6969"
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - database
+networks:
+  database:
+    external: true
