@@ -12,8 +12,6 @@ from email_validator import (
 from phonenumbers import PhoneNumber
 from pydantic import BaseModel, ConfigDict, RootModel, field_validator
 
-# from pydantic_extra_types.phone_numbers import PhoneNumber
-
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -49,6 +47,7 @@ class Inquiry(BaseModel):
     id: int
     manualSort: int
     date: datetime
+    date_needed_by: datetime
     status: InquiryStatus
     customer_first_name: str
     customer_last_name: str
@@ -83,7 +82,7 @@ class Inquiry(BaseModel):
             logger.warning(f"⚠️ Warning: Invalid phone number received: {v}")
             return str(v)
 
-    @field_validator("date", "last_updated", mode="before")
+    @field_validator("date", "last_updated", "date_needed_by", mode="before")
     @classmethod
     def convert_timestamp(cls, v):
         if isinstance(v, (int, float)):

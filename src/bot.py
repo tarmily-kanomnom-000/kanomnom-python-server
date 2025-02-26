@@ -10,6 +10,8 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 
+TELEGRAM_INQURY_GROUP_CHAT_ID = "-1002388242169"
+
 # Load bot token securely
 # This token should be the one associated with @kanomnom_internal_bot
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")

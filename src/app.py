@@ -1,12 +1,16 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 import uvicorn
-from fastapi import FastAPI
+from cachetools import TTLCache
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from api.routes import grist
-from bot import telegram_app
+from bot import TELEGRAM_INQURY_GROUP_CHAT_ID, telegram_app
 
 # Configure logging
 logging.basicConfig(
@@ -44,6 +48,46 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+validation_error_cache = TTLCache(maxsize=1000, ttl=600)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handles validation errors but ensures only one Telegram alert per request within a short period."""
+
+    exc_str = f"{exc}".replace("\n", " ").replace("   ", " ")
+    logging.error(f"Validation error on {request.url}: {exc_str}")
+
+    # Create a unique request identifier (IP + route)
+    request_id = f"{request.url.path}-{request.client.host}"
+
+    if (
+        request.url.path.startswith("/grist")
+        and request_id not in validation_error_cache
+    ):
+        validation_error_cache[request_id] = (
+            True  # Store request to prevent duplicate alerts
+        )
+
+        error_message = (
+            f"🚨 *Validation Error in Webhook*\n"
+            f"❌ *Error:* {exc_str}\n"
+            f"📅 *Time:* {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+
+        await telegram_app.bot.send_message(
+            chat_id=TELEGRAM_INQURY_GROUP_CHAT_ID,
+            text=error_message,
+            parse_mode="Markdown",
+        )
+
+    content = {"status_code": 10422, "message": exc_str, "data": None}
+    return JSONResponse(
+        content=content, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
+    )
+
 
 app.include_router(grist.router)
 

@@ -1,11 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
-from bot import telegram_app
+from bot import TELEGRAM_INQURY_GROUP_CHAT_ID, telegram_app
 from models.customer_inquiry_model import Inquiries
 
 router = APIRouter(prefix="/grist", tags=["grist"])
-
-TELEGRAM_GROUP_CHAT_ID = "-4720956440"
 
 
 @router.post("/new_inquiry_webhook")
@@ -38,14 +36,14 @@ async def grist_status(inquiries: Inquiries) -> dict:
             f"👤 *Customer:* {inquiry.customer_first_name} {inquiry.customer_last_name}\n"
             f"📦 *Inquiry Type:* {inquiry.inquiry_type.value}\n"
             f"📝 *Message:* {inquiry.inquiry}\n"
-            f"📅 *Received On:* {inquiry.date.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"📅 *Date Needed:* {inquiry.date_needed_by.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"📌 *Contact Information:*\n{contact_info}"
         )
         messages.append(message_text)
 
     for message in messages:
         await telegram_app.bot.send_message(
-            chat_id=TELEGRAM_GROUP_CHAT_ID, text=message, parse_mode="Markdown"
+            chat_id=TELEGRAM_INQURY_GROUP_CHAT_ID, text=message, parse_mode="Markdown"
         )
 
     return {"status": "messages sent", "count": len(messages)}
