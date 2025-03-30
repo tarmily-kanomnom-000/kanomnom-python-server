@@ -1,7 +1,9 @@
 import asyncio
+import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 
 import uvicorn
 from cachetools import TTLCache
@@ -53,9 +55,13 @@ app = FastAPI(
 validation_error_cache = TTLCache(maxsize=1000, ttl=600)
 
 
+# Directory to store request dumps
+DUMP_DIR = Path("request_dumps")
+DUMP_DIR.mkdir(exist_ok=True)
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handles validation errors but ensures only one Telegram alert per request within a short period."""
+    """Handles validation errors, ensures one Telegram alert per request, and dumps request info to file."""
 
     exc_str = f"{exc}".replace("\n", " ").replace("   ", " ")
     logging.error(f"Validation error on {request.url}: {exc_str}")
@@ -63,13 +69,31 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     # Create a unique request identifier (IP + route)
     request_id = f"{request.url.path}-{request.client.host}"
 
+    # Dump request details to file for later inspection
+    try:
+        body = await request.body()
+        request_dump = {
+            "url": str(request.url),
+            "method": request.method,
+            "headers": dict(request.headers),
+            "query_params": dict(request.query_params),
+            "client": request.client.host,
+            "body": body.decode("utf-8", errors="replace"),
+            "error": exc_str,
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+        filename = f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S')}_{request.client.host.replace('.', '_')}.json"
+        with open(DUMP_DIR / filename, "w", encoding="utf-8") as f:
+            json.dump(request_dump, f, indent=2)
+    except Exception as e:
+        logging.exception("Failed to dump request data")
+
+    # Send alert via Telegram if not already done
     if (
         request.url.path.startswith("/grist")
         and request_id not in validation_error_cache
     ):
-        validation_error_cache[request_id] = (
-            True  # Store request to prevent duplicate alerts
-        )
+        validation_error_cache[request_id] = True
 
         error_message = (
             f"🚨 *Validation Error in Webhook*\n"

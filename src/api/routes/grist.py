@@ -13,8 +13,6 @@ async def grist_status(inquiries: Inquiries) -> dict:
     messages = []
 
     for inquiry in inquiries.root:
-        preferred_contact = inquiry.preferred_contact_method.value
-
         email_info = (
             f"📧 *Email:* {inquiry.email.ascii_email}"
             if inquiry.email
@@ -26,10 +24,14 @@ async def grist_status(inquiries: Inquiries) -> dict:
             else "📞 *Phone:* N/A"
         )
 
-        if preferred_contact == "email":
-            contact_info = f"{email_info} _(Preferred)_\n{phone_info}"
+        if inquiry.preferred_contact_method:
+            preferred_contact = inquiry.preferred_contact_method.value
+            if preferred_contact == "email":
+                contact_info = f"{email_info} _(Preferred)_\n{phone_info}"
+            else:
+                contact_info = f"{phone_info} _(Preferred)_\n{email_info}"
         else:
-            contact_info = f"{phone_info} _(Preferred)_\n{email_info}"
+            contact_info = f"{phone_info}\n{email_info}"
 
         message_text = (
             f"📩 *New Inquiry Received*\n"

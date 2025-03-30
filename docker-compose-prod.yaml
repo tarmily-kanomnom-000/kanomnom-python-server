@@ -13,6 +13,8 @@ services:
     restart: unless-stopped
     networks:
       - database
+    volumes:
+      - /home/tarmily/kanomnom-server/kanomnom-python-server/request_dumps:/home/kanomnom-python-server/request_dumps
 networks:
   database:
     external: true

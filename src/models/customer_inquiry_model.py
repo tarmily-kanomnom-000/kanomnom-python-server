@@ -59,6 +59,13 @@ class Inquiry(BaseModel):
     inquiry: str
     last_updated: datetime
     attachments: Optional[str] = None
+    
+    @field_validator("preferred_contact_method", mode="before")
+    @classmethod
+    def clean_preferred_contact_method(cls, v):
+        if v == "":
+            return None
+        return v
 
     @field_validator("email", mode="before")
     @classmethod
