@@ -1,2 +1,3 @@
 .env
 *.pyc
+request_dumps/*

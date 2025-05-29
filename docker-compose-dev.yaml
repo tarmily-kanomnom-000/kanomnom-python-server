@@ -1,6 +1,6 @@
 services:
-  kanomnom-python-server:
-    container_name: kanomnom-python-server
+  kanomnom-python-server-dev:
+    container_name: kanomnom-python-server-dev
     build:
       context: .
       dockerfile: ./Dockerfile.dev

@@ -35,12 +35,6 @@ class PreferredContactMethod(str, Enum):
     EMAIL = "email"
 
 
-class Product(str, Enum):
-    VELA_CAKE = "vela-cake"
-    OTHER = "other"
-    L = "L"  # why tf does grist add an L?
-
-
 class Inquiry(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -54,7 +48,6 @@ class Inquiry(BaseModel):
     email: Optional[Union[ValidatedEmail, str]] = None
     phone_number: Optional[Union[PhoneNumber, str]] = None
     preferred_contact_method: Optional[PreferredContactMethod] = None
-    products: Optional[List[Product]] = None
     inquiry_type: Optional[InquiryType] = None
     inquiry: str
     last_updated: datetime
@@ -94,6 +87,20 @@ class Inquiry(BaseModel):
     def convert_timestamp(cls, v):
         if isinstance(v, (int, float)):
             return datetime.fromtimestamp(v, tz=UTC)
+        return v
+
+    @field_validator("inquiry_type", mode="before")
+    @classmethod
+    def clean_inquiry_type(cls, v):
+        if v == "":
+            return None
+        return v
+
+    @field_validator("inquiry", mode="before")
+    @classmethod
+    def clean_inquiry(cls, v):
+        if v is None:
+            return ""
         return v
 
 
