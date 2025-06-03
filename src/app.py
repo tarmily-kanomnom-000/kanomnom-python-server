@@ -26,8 +26,6 @@ logging.basicConfig(
 async def lifespan(app: FastAPI):
     """Handles startup and shutdown tasks."""
     logging.info("Starting Telegram bot inside FastAPI lifespan...")
-
-    # Initialize bot
     await telegram_app.initialize()
 
     # ✅ Start fetching updates in a background task
@@ -43,7 +41,6 @@ async def lifespan(app: FastAPI):
     logging.info("Telegram bot stopped.")
 
 
-# Create FastAPI app with lifespan
 app = FastAPI(
     title="My FastAPI Service",
     description="Python server to watch over services running for ka-nom nom like grist and medusa",

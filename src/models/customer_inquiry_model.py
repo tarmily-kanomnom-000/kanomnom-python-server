@@ -31,7 +31,7 @@ class InquiryType(str, Enum):
 
 
 class PreferredContactMethod(str, Enum):
-    PHONE = "phone"
+    TEXT = "text"
     EMAIL = "email"
 
 
