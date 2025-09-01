@@ -13,15 +13,9 @@ async def grist_status(inquiries: Inquiries) -> dict:
     messages = []
 
     for inquiry in inquiries.root:
-        email_info = (
-            f"📧 *Email:* {inquiry.email.ascii_email}"
-            if inquiry.email
-            else "📧 *Email:* N/A"
-        )
+        email_info = f"📧 *Email:* {inquiry.email.ascii_email}" if inquiry.email else "📧 *Email:* N/A"
         phone_info = (
-            f"📞 *Phone:* {inquiry.phone_number.national_number}"
-            if inquiry.phone_number
-            else "📞 *Phone:* N/A"
+            f"📞 *Phone:* {inquiry.phone_number.national_number}" if inquiry.phone_number else "📞 *Phone:* N/A"
         )
 
         if inquiry.preferred_contact_method:
@@ -48,8 +42,6 @@ async def grist_status(inquiries: Inquiries) -> dict:
         messages.append(message_text)
 
     for message in messages:
-        await telegram_app.bot.send_message(
-            chat_id=TELEGRAM_INQURY_GROUP_CHAT_ID, text=message, parse_mode="Markdown"
-        )
+        await telegram_app.bot.send_message(chat_id=TELEGRAM_INQURY_GROUP_CHAT_ID, text=message, parse_mode="Markdown")
 
     return {"status": "messages sent", "count": len(messages)}

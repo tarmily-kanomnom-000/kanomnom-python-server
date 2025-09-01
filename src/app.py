@@ -9,10 +9,15 @@ import uvicorn
 from cachetools import TTLCache
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from flet.fastapi import app as flet_fastapi
 
 from api.routes import grist
 from bot import TELEGRAM_INQURY_GROUP_CHAT_ID, telegram_app
+from flet_app import main as flet_main
+from setup import initialize_server
+
+initialize_server()
 
 # Configure logging
 logging.basicConfig(
@@ -21,7 +26,7 @@ logging.basicConfig(
 )
 
 
-# ✅ Correctly Start and Stop the Telegram Bot
+# Start and Stop the Telegram Bot
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handles startup and shutdown tasks."""
@@ -45,9 +50,8 @@ app = FastAPI(
     title="My FastAPI Service",
     description="Python server to watch over services running for ka-nom nom like grist and medusa",
     version="1.0.0",
-    lifespan=lifespan,
+    # lifespan=lifespan,
 )
-
 
 validation_error_cache = TTLCache(maxsize=1000, ttl=600)
 
@@ -55,6 +59,7 @@ validation_error_cache = TTLCache(maxsize=1000, ttl=600)
 # Directory to store request dumps
 DUMP_DIR = Path("request_dumps")
 DUMP_DIR.mkdir(exist_ok=True)
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -86,10 +91,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         logging.exception("Failed to dump request data")
 
     # Send alert via Telegram if not already done
-    if (
-        request.url.path.startswith("/grist")
-        and request_id not in validation_error_cache
-    ):
+    if request.url.path.startswith("/grist") and request_id not in validation_error_cache:
         validation_error_cache[request_id] = True
 
         error_message = (
@@ -105,13 +107,21 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         )
 
     content = {"status_code": 10422, "message": exc_str, "data": None}
-    return JSONResponse(
-        content=content, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
-    )
+    return JSONResponse(content=content, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+
+# Mount Flet app to FastAPI
+flet_app = flet_fastapi(session_handler=flet_main)
+app.mount("/flet", flet_app)
+
+
+@app.get("/calculate_ingredients")
+async def redirect_to_flet():
+    """Redirect to Flet app"""
+    return RedirectResponse(url="/calculate_raw_ingredients")
 
 
 app.include_router(grist.router)
-
 
 @app.get("/")
 async def root():
@@ -127,4 +137,5 @@ async def health_check():
 
 if __name__ == "__main__":
     logging.info("Starting FastAPI server...")
+    logging.info("Flet app available at: http://localhost:6969/flet")
     uvicorn.run(app, host="0.0.0.0", port=6969)

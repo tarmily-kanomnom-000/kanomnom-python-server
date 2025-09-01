@@ -1,20 +1,14 @@
 import logging
 from datetime import UTC, datetime
 from enum import Enum
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import phonenumbers
-from email_validator import (
-    EmailNotValidError,
-    ValidatedEmail,
-    validate_email,
-)
+from email_validator import EmailNotValidError, ValidatedEmail, validate_email
 from phonenumbers import PhoneNumber
 from pydantic import BaseModel, ConfigDict, RootModel, field_validator
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -25,10 +19,12 @@ class InquiryStatus(str, Enum):
 
 
 class InquiryType(str, Enum):
+    BULK_ORDER_INQUIRY = "Bulk Order Inquiry"
+    CATERING = "Catering"
+    CUSTOM = "Custom"
     GENERAL_INQUIRY = "General Inquiry"
     ORDER_REQUEST = "Order Request"
-    BULK_ORDER_INQUIRY = "Bulk Order Inquiry"
-
+    
 
 class PreferredContactMethod(str, Enum):
     TEXT = "text"
@@ -52,7 +48,7 @@ class Inquiry(BaseModel):
     inquiry: str
     last_updated: datetime
     attachments: Optional[str] = None
-    
+
     @field_validator("preferred_contact_method", mode="before")
     @classmethod
     def clean_preferred_contact_method(cls, v):
@@ -104,5 +100,5 @@ class Inquiry(BaseModel):
         return v
 
 
-class Inquiries(RootModel[List[Inquiry]]):
+class Inquiries(RootModel[list[Inquiry]]):
     pass

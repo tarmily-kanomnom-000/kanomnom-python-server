@@ -10,7 +10,7 @@ services:
     env_file:
       - .env
     ports:
-      - "6969:6969"
+      - "6970:6969"
     restart: unless-stopped
     networks:
       - database
