@@ -30,7 +30,7 @@ RUN if ! command -v python${PYTHON_VERSION} &> /dev/null; then \
         && rm -rf /var/lib/apt/lists/*; \
 fi
 
-RUN npm install -g @anthropic-ai/claude-code
+RUN npm install -g @anthropic-ai/claude-code @openai/codex
 
 # Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh || \

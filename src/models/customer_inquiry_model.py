@@ -24,7 +24,7 @@ class InquiryType(str, Enum):
     CUSTOM = "Custom"
     GENERAL_INQUIRY = "General Inquiry"
     ORDER_REQUEST = "Order Request"
-    
+
 
 class PreferredContactMethod(str, Enum):
     TEXT = "text"

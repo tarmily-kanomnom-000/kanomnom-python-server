@@ -4,6 +4,7 @@ import flet as ft
 
 from pages.calculate_ingredients.page import IngredientsCalculatorContent
 from pages.calculate_product_costs.page import ProductCostsCalculatorContent
+from pages.material_purchase_runs.page import MaterialPurchaseRunsContent
 
 # Configure logging for debugging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -42,9 +43,22 @@ def home_view():
                                                 "Raw Ingredients Calculator", size=18, weight=ft.FontWeight.BOLD
                                             ),
                                             subtitle=ft.Text("Calculate raw ingredients from product recipes"),
-                                            on_click=lambda _: None,  # Will be set by main app
-                                            data="/ingredients",
-                                        )
+                                            on_click=lambda e: e.page.go("/calculate_ingredients"),
+                                        ),
+                                        ft.ListTile(
+                                            leading=ft.Icon(ft.Icons.ATTACH_MONEY, size=40),
+                                            title=ft.Text(
+                                                "Product Cost Calculator", size=18, weight=ft.FontWeight.BOLD
+                                            ),
+                                            subtitle=ft.Text("Review material costs by recipe"),
+                                            on_click=lambda e: e.page.go("/calculate_product_costs"),
+                                        ),
+                                        ft.ListTile(
+                                            leading=ft.Icon(ft.Icons.INVENTORY, size=40),
+                                            title=ft.Text("Material Purchase Runs", size=18, weight=ft.FontWeight.BOLD),
+                                            subtitle=ft.Text("Forecast upcoming supply runs"),
+                                            on_click=lambda e: e.page.go("/material_purchase_runs"),
+                                        ),
                                     ]
                                 ),
                                 padding=20,
@@ -100,6 +114,10 @@ def main(page: ft.Page):
             calculator = ProductCostsCalculatorContent(page)
             calculator.build_content()
             page.views.append(ft.View("/calculate_product_costs", [calculator], scroll=ft.ScrollMode.AUTO))
+        elif page.route == "/material_purchase_runs":
+            analysis = MaterialPurchaseRunsContent(page)
+            analysis.build_content()
+            page.views.append(ft.View("/material_purchase_runs", [analysis], scroll=ft.ScrollMode.AUTO))
         elif page.route == "/" or page.route == "":
             # Home page with navigation
             home_content = ft.Column(
@@ -120,7 +138,20 @@ def main(page: ft.Page):
                         "💰 Calculate Product Costs",
                         on_click=lambda _: page.go("/calculate_product_costs"),
                         style=ft.ButtonStyle(
-                            bgcolor=ft.Colors.SECONDARY, color=ft.Colors.ON_SECONDARY, padding=ft.Padding(20, 15, 20, 15)
+                            bgcolor=ft.Colors.SECONDARY,
+                            color=ft.Colors.ON_SECONDARY,
+                            padding=ft.Padding(20, 15, 20, 15),
+                        ),
+                        width=300,
+                        height=60,
+                    ),
+                    ft.ElevatedButton(
+                        "📦 Material Purchase Runs",
+                        on_click=lambda _: page.go("/material_purchase_runs"),
+                        style=ft.ButtonStyle(
+                            bgcolor=ft.Colors.TEAL,
+                            color=ft.Colors.WHITE,
+                            padding=ft.Padding(20, 15, 20, 15),
                         ),
                         width=300,
                         height=60,

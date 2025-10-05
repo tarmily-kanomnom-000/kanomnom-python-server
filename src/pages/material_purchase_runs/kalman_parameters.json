@@ -1,0 +1,6 @@
+{
+  "initial_measurement_variance": 0.19972640778830497,
+  "initial_process_variance": 0.010015973909908939,
+  "max_em_iterations": 10,
+  "target_sample_size": 4
+}

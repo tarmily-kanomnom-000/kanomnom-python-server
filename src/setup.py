@@ -11,6 +11,7 @@ def get_tandoor_token():
     """Get Tandoor authentication token using TandoorService."""
     try:
         from shared.tandoor_service import get_tandoor_service
+
         tandoor_service = get_tandoor_service()
         return tandoor_service.get_token()
     except Exception as e:
@@ -21,11 +22,11 @@ def get_tandoor_token():
 def initialize_server():
     """Initialize server with unified cache warming."""
     from core.cache.cache_service import get_cache_service
-    
+
     # Initialize cache service and warm caches
     cache_service = get_cache_service()
     cache_service.warm_caches()
-    
+
     # Verify token is available
     token = get_tandoor_token()
     if token:

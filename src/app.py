@@ -87,7 +87,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         filename = f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S')}_{request.client.host.replace('.', '_')}.json"
         with open(DUMP_DIR / filename, "w", encoding="utf-8") as f:
             json.dump(request_dump, f, indent=2)
-    except Exception as e:
+    except Exception:
         logging.exception("Failed to dump request data")
 
     # Send alert via Telegram if not already done
@@ -122,6 +122,7 @@ async def redirect_to_flet():
 
 
 app.include_router(grist.router)
+
 
 @app.get("/")
 async def root():

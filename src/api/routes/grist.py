@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 
 from bot import TELEGRAM_INQURY_GROUP_CHAT_ID, telegram_app
 from models.customer_inquiry_model import Inquiries
@@ -33,9 +33,7 @@ async def grist_status(inquiries: Inquiries) -> dict:
             f"📦 *Inquiry Type:* {inquiry.inquiry_type.value if inquiry.inquiry_type else 'N/A'}\n"
             f"📝 *Message:* {inquiry.inquiry}\n"
             f"📅 *Date Needed:* {
-                inquiry.date_needed_by.strftime('%Y-%m-%d %H:%M:%S')
-                if inquiry.date_needed_by
-                else 'N/A'
+                inquiry.date_needed_by.strftime('%Y-%m-%d %H:%M:%S') if inquiry.date_needed_by else 'N/A'
             }\n"
             f"📌 *Contact Information:*\n{contact_info}"
         )

@@ -1,14 +1,13 @@
-"""
-Constants for the product costs calculator.
-Consolidates UI dimensions, styling, and application constants.
-"""
+"""Constants for the product costs calculator."""
 
-# UI Layout Constants
-COLUMN_SPACING = 20
-CONTAINER_PADDING = 20
-CONTAINER_BORDER_RADIUS = 10
-BUTTON_SPACING = 10
-TEXT_FIELD_WIDTH = 100
+from shared.ui.constants import COMMON_UI_LAYOUT
+
+# UI Layout Constants (shared baseline values)
+COLUMN_SPACING: int = COMMON_UI_LAYOUT.column_spacing
+CONTAINER_PADDING: int = COMMON_UI_LAYOUT.container_padding
+CONTAINER_BORDER_RADIUS: int = COMMON_UI_LAYOUT.container_border_radius
+BUTTON_SPACING: int = COMMON_UI_LAYOUT.button_spacing
+TEXT_FIELD_WIDTH: int = COMMON_UI_LAYOUT.text_field_width
 
 # Button and Component Sizes
 PRODUCT_BUTTON_WIDTH = 250

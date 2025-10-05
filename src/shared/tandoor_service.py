@@ -36,22 +36,17 @@ class TandoorService:
         if not self.token:
             logger.info("No token cached, fetching new token...")
             self.token = self._get_tandoor_token()
-        
+
         if self.token:
-            return {
-                "Authorization": f"Bearer {self.token}",
-                "Content-Type": "application/json"
-            }
+            return {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
         else:
             logger.error("No token available for authentication")
-            return {
-                "Content-Type": "application/json"
-            }
-    
+            return {"Content-Type": "application/json"}
+
     def get_token(self) -> Optional[str]:
         """Get the Tandoor authentication token."""
         return self._get_tandoor_token()
-    
+
     def _get_tandoor_token(self) -> Optional[str]:
         """Fetch the Tandoor authentication token, refreshing if expired or near expiration."""
         # Try to get valid token from cache first
@@ -60,37 +55,38 @@ class TandoorService:
         if token:
             logger.info("Found valid token in cache")
             return token
-        
+
         logger.info("No valid token in cache, fetching new token from Tandoor...")
 
         # Token not in cache or expired, fetch new one
         username = os.getenv("TANDOOR_USERNAME")
         password = os.getenv("TANDOOR_PASSWORD")
-        
+
         if not username or not password:
             logger.error("TANDOOR_USERNAME or TANDOOR_PASSWORD environment variables not set")
             return None
-        
+
         payload = {
             "username": username,
             "password": password,
         }
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         auth_url = f"{self.base_url}/api-token-auth/"
-        
+
         logger.info(f"Attempting authentication to {auth_url} with username: {username}")
-        
+
         try:
             auth_response = requests.post(url=auth_url, data=payload, headers=headers)
             if auth_response.status_code == 200:
                 resp_json = auth_response.json()
                 token = resp_json.get("token")
                 expires_str = resp_json.get("expires")
-                
+
                 if token and expires_str:
                     from datetime import datetime
+
                     expires = datetime.fromisoformat(expires_str.replace("Z", "+00:00"))
-                    
+
                     # Cache the new token
                     self.cache_service.token_cache.save_token(token, expires)
                     logger.info("Successfully obtained and cached Tandoor token")
@@ -103,27 +99,27 @@ class TandoorService:
                 logger.error(f"Response: {auth_response.text}")
         except Exception as e:
             logger.error(f"Error during Tandoor authentication: {e}")
-        
+
         return None
 
     def test_token_validity(self) -> bool:
         """Test if the current token is valid by making a simple API call."""
         if not self.token:
             self.token = self._get_tandoor_token()
-        
+
         if not self.token:
             logger.error("No token available for testing")
             return False
-        
+
         # Test with a simple endpoint that should always work
         test_url = f"{self.base_url}/api/user/"
         headers = self.get_auth_headers()
-        
+
         try:
             logger.info(f"🧪 Testing token validity with: {test_url}")
             response = requests.get(test_url, headers=headers)
             logger.info(f"🧪 Token test response: {response.status_code}")
-            
+
             if response.status_code == 200:
                 logger.info("✅ Token is valid")
                 return True
@@ -136,7 +132,7 @@ class TandoorService:
             else:
                 logger.warning(f"⚠️ Unexpected response: {response.status_code}")
                 return False
-                
+
         except Exception as e:
             logger.error(f"Error testing token validity: {e}")
             return False
@@ -145,10 +141,10 @@ class TandoorService:
         """
         Get all recipes from Tandoor.
         Uses cache when available, fetches from API when needed.
-        
+
         Args:
             force_refresh: If True, bypass cache and fetch from API
-            
+
         Returns:
             list of Recipe objects
         """
@@ -168,17 +164,17 @@ class TandoorService:
                 if not self.test_token_validity():
                     logger.error("Token validation failed, cannot fetch recipes")
                     return []
-                
+
                 # Fetch from API
                 logger.info("Fetching recipes from Tandoor API...")
                 self._recipes = self._fetch_all_recipes_from_api()
-                
+
                 if self._recipes:
                     # Save to cache (convert Recipe objects back to dict for caching)
                     recipes_data = [recipe.to_cache_dict() for recipe in self._recipes]
                     self.cache_service.recipe_cache.save_recipes(recipes_data)
                     logger.info(f"Saved {len(self._recipes)} recipes to cache")
-                    
+
                     # Notify dependency manager that recipe cache has been updated
                     self.cache_service.invalidate_dependent_caches("recipe")
                 else:
@@ -196,10 +192,10 @@ class TandoorService:
     def get_product_recipes(self, force_refresh: bool = False) -> list[Recipe]:
         """
         Get recipes marked as products.
-        
+
         Args:
             force_refresh: If True, reload all recipes first
-            
+
         Returns:
             list of Recipe objects with 'product' keyword
         """
@@ -208,17 +204,17 @@ class TandoorService:
 
         all_recipes = self.get_recipes(force_refresh)
         self._product_recipes = [recipe for recipe in all_recipes if "product" in recipe.keywords]
-        
+
         logger.info(f"Found {len(self._product_recipes)} product recipes out of {len(all_recipes)} total")
         return self._product_recipes
 
     def get_recipe_by_name(self, name: str) -> Optional[Recipe]:
         """
         Get a specific recipe by name.
-        
+
         Args:
             name: Recipe name to search for
-            
+
         Returns:
             Recipe object if found, None otherwise
         """
@@ -231,22 +227,21 @@ class TandoorService:
     def search_recipes(self, keyword: str) -> list[Recipe]:
         """
         Search recipes by keyword in name or keywords.
-        
+
         Args:
             keyword: Keyword to search for
-            
+
         Returns:
             list of matching Recipe objects
         """
         recipes = self.get_recipes()
         keyword_lower = keyword.lower()
-        
+
         matching_recipes = []
         for recipe in recipes:
-            if (keyword_lower in recipe.name.lower() or 
-                any(keyword_lower in kw for kw in recipe.keywords)):
+            if keyword_lower in recipe.name.lower() or any(keyword_lower in kw for kw in recipe.keywords):
                 matching_recipes.append(recipe)
-        
+
         logger.info(f"Found {len(matching_recipes)} recipes matching '{keyword}'")
         return matching_recipes
 
@@ -254,43 +249,45 @@ class TandoorService:
         """Fetch all recipes from Tandoor API with pagination support."""
         recipes = []
         page_num = 1
-        
+
         # Start with the first page
         url = f"{self.base_url}/api/recipe/?limit=100"
-        
+
         # Step 1: Fetch all recipe stubs using Tandoor's pagination
         while url:
             logger.info(f"Fetching recipes page {page_num}...")
-            
+
             try:
                 headers = self.get_auth_headers()
                 response = requests.get(url, headers=headers)
                 response.raise_for_status()
                 data = response.json()
-                
+
                 # Debug pagination info
-                total_count = data.get('count', 'unknown')
-                next_url = data.get('next')
-                results_count = len(data.get('results', []))
-                
+                total_count = data.get("count", "unknown")
+                next_url = data.get("next")
+                results_count = len(data.get("results", []))
+
                 logger.info(f"📊 API response: total={total_count}, results={results_count}, has_next={bool(next_url)}")
-                
+
                 # Parse basic recipes from this page
-                page_recipes = [self._parse_recipe(recipe_data) for recipe_data in data.get('results', [])]
+                page_recipes = [self._parse_recipe(recipe_data) for recipe_data in data.get("results", [])]
                 recipes.extend(page_recipes)
-                
-                logger.info(f"Fetched {len(page_recipes)} recipe stubs from page {page_num} (total so far: {len(recipes)})")
-                
+
+                logger.info(
+                    f"Fetched {len(page_recipes)} recipe stubs from page {page_num} (total so far: {len(recipes)})"
+                )
+
                 # Use the next URL provided by Tandoor
                 url = next_url
                 page_num += 1
-                
+
             except requests.RequestException as e:
                 logger.error(f"Error fetching recipes from page {page_num}: {e}")
                 break
-        
+
         logger.info(f"Total recipe stubs fetched: {len(recipes)}")
-        
+
         # Step 2: Populate details for each recipe
         logger.info("Populating recipe details...")
         for i, recipe in enumerate(recipes):
@@ -300,7 +297,7 @@ class TandoorService:
                     logger.info(f"Populated details for {i + 1}/{len(recipes)} recipes")
             except Exception as e:
                 logger.error(f"Error populating details for recipe {recipe.id} ({recipe.name}): {e}")
-        
+
         logger.info(f"Total recipes fully populated: {len(recipes)}")
         return recipes
 
@@ -308,41 +305,41 @@ class TandoorService:
         """Parse basic recipe data from Tandoor API list response into Recipe model."""
         # Only parse basic data available from the list endpoint
         recipe_stub = {
-            'id': recipe_data.get('id'),
-            'name': recipe_data.get('name', ''),
-            'description': recipe_data.get('description', '')
+            "id": recipe_data.get("id"),
+            "name": recipe_data.get("name", ""),
+            "description": recipe_data.get("description", ""),
         }
-        
+
         return Recipe(recipe_stub)
 
     def _populate_recipe_details(self, recipe: Recipe):
         """Fetch and populate detailed recipe information."""
         detail_url = f"{self.base_url}/api/recipe/{recipe.id}/"
-        
+
         try:
             response = requests.get(detail_url, headers=self.get_auth_headers())
             response.raise_for_status()
             recipe_details = response.json()
-            
+
             # Use the existing parse_recipe_details method from the Recipe class
             recipe.parse_recipe_details(recipe_details)
-            
+
         except requests.RequestException as e:
             logger.error(f"Error fetching details for recipe {recipe.id}: {e}")
             raise
 
     def _parse_ingredient(self, ingredient_data: dict) -> Optional[Ingredient]:
         """Parse ingredient data from Tandoor API response into Ingredient model."""
-        food_data = ingredient_data.get('food', {})
-        unit_data = ingredient_data.get('unit', {})
-        
+        food_data = ingredient_data.get("food", {})
+        unit_data = ingredient_data.get("unit", {})
+
         if not food_data:
             return None
-        
+
         return Ingredient(
-            name=food_data.get('name', ''),
-            quantity=ingredient_data.get('amount', 0),
-            unit=Unit(unit_data.get('name', 'g'))
+            name=food_data.get("name", ""),
+            quantity=ingredient_data.get("amount", 0),
+            unit=Unit(unit_data.get("name", "g")),
         )
 
     def invalidate_cache(self):
