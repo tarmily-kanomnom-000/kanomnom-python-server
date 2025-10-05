@@ -96,6 +96,13 @@ def _persist_grist_response(payload: dict[str, Any]) -> Path | None:
 
     try:
         target_directory.mkdir(parents=True, exist_ok=True)
+        for existing_dump in target_directory.glob("grist_material_purchases_*.json"):
+            if existing_dump == target_path or not existing_dump.is_file():
+                continue
+            try:
+                existing_dump.unlink()
+            except OSError as delete_error:
+                logger.warning("Unable to delete stale Grist dump %s: %s", existing_dump, delete_error)
         target_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
         logger.info("Persisted Grist response for debugging: %s", target_path)
         return target_path
