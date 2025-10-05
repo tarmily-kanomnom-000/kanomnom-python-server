@@ -15,8 +15,8 @@ from cachetools import LRUCache, cachedmethod
 from dateutil.relativedelta import relativedelta
 
 from core.cache.cache_dependency_manager import get_cache_dependency_manager
+from shared.grist_material_transformer import normalize_material_purchase_dataframe
 from shared.grist_schema import MaterialPurchaseSchema
-from shared.polars_cleaners import sanitize_numeric_columns, sanitize_string_columns
 from shared.unit_converter import get_liquid_density, get_special_conversion_factor
 
 from .openai_client import APIBackend, create_openai_client
@@ -293,105 +293,72 @@ class MaterialCostCalculator:
             logger.warning("No data available for cost basis calculation")
             return {}
 
-        df = dataframe.clone()
-
-        logger.debug(
-            "Cost basis start: %d rows with columns %s",
-            df.height,
-            sorted(df.columns),
-        )
+        logger.debug("Cost basis start: %d rows with columns %s", dataframe.height, sorted(dataframe.columns))
 
         try:
-            resolved = self._schema.resolve(df)
+            normalized = normalize_material_purchase_dataframe(dataframe.clone(), self._schema)
         except KeyError:
             logger.exception("Unable to resolve Grist schema columns")
             return {}
-
-        try:
-            df = self._sanitize_dataframe(df, resolved)
-            package_col = resolved["package_size"]
-            quantity_col = resolved["quantity"]
-
-            package_series = df.get_column(package_col)
-            quantity_series = df.get_column(quantity_col)
-            logger.debug(
-                "Input series stats: package_size nulls=%d dtype=%s, quantity nulls=%d dtype=%s",
-                int(package_series.is_null().sum()),
-                package_series.dtype,
-                int(quantity_series.is_null().sum()),
-                quantity_series.dtype,
-            )
-
-            df = self._add_total_amount_column(df, package_col, quantity_col)
-            df = self._add_total_cost_column(df, resolved, package_col, quantity_col)
-
-            total_cost_series = df.get_column("__total_cost")
-            logger.debug(
-                "Total cost dtype=%s nulls=%d preview=%s",
-                total_cost_series.dtype,
-                int(total_cost_series.is_null().sum()),
-                total_cost_series.head().to_list(),
-            )
-
-            filtered = self._build_filtered_cost_rows(df, resolved)
-
-            logger.debug(
-                "Cost basis rows after filtering: %d (dropped %d)",
-                filtered.height,
-                df.height - filtered.height,
-            )
-
-            filtered_null_counts = {
-                column: int(count) for column, count in zip(filtered.columns, filtered.null_count().row(0))
-            }
-            logger.debug(
-                "Filtered dtypes: %s", {column: str(dtype) for column, dtype in zip(filtered.columns, filtered.dtypes)}
-            )
-            logger.debug("Filtered NA counts: %s", filtered_null_counts)
-
-            if filtered.is_empty():
-                logger.warning("No valid rows available for cost basis calculation after filtering")
-                return {}
-
-            grouped = (
-                filtered.group_by(["material", "unit"])
-                .agg(
-                    [
-                        pl.col("total_amount_bought").sum().alias("total_amount_bought"),
-                        pl.col("total_cost").sum().alias("total_cost"),
-                    ]
-                )
-                .with_columns((pl.col("total_cost") / pl.col("total_amount_bought")).alias("cost_per_unit"))
-            )
-
-            grouped_null_counts = {
-                column: int(count) for column, count in zip(grouped.columns, grouped.null_count().row(0))
-            }
-            logger.debug("Grouped NA counts: %s", grouped_null_counts)
-
-            cost_per_unit_series = grouped.get_column("cost_per_unit")
-            if bool(cost_per_unit_series.is_null().any()):
-                problematic = grouped.filter(pl.col("cost_per_unit").is_null()).select(
-                    ["material", "unit", "total_cost", "total_amount_bought"]
-                )
-                logger.warning(
-                    "NaN cost_per_unit detected for rows: %s",
-                    problematic.to_dicts(),
-                )
-                grouped = grouped.filter(pl.col("cost_per_unit").is_not_null())
-
-            cost_basis: dict[str, dict[str, float]] = {}
-            for row in grouped.iter_rows(named=True):
-                material = row["material"]
-                unit = row["unit"]
-                cost_per_unit = float(row["cost_per_unit"])
-                cost_basis.setdefault(material, {})[unit] = cost_per_unit
-
-            return cost_basis
-
         except Exception:  # noqa: BLE001
-            logger.exception("Error calculating cost basis")
+            logger.exception("Failed to normalize material purchase dataframe")
             return {}
+
+        filtered = normalized.with_columns(
+            [
+                pl.col("material").fill_null("").alias("material"),
+                pl.col("unit").fill_null("").alias("unit"),
+                pl.col("units_purchased").fill_null(0.0).alias("units_purchased"),
+                pl.col("total_cost").fill_null(0.0).alias("total_cost"),
+            ]
+        ).filter(
+            (pl.col("material").str.len_chars() > 0)
+            & (pl.col("unit").str.len_chars() > 0)
+            & (pl.col("units_purchased") > 0)
+        )
+
+        logger.debug(
+            "Cost basis rows after filtering: %d (dropped %d)",
+            filtered.height,
+            normalized.height - filtered.height,
+        )
+
+        if filtered.is_empty():
+            logger.warning("No valid rows available for cost basis calculation after filtering")
+            return {}
+
+        grouped = (
+            filtered.group_by(["material", "unit"])
+            .agg(
+                [
+                    pl.col("units_purchased").sum().alias("total_amount_bought"),
+                    pl.col("total_cost").sum().alias("total_cost"),
+                ]
+            )
+            .with_columns(
+                pl.when(pl.col("total_amount_bought") > 0)
+                .then(pl.col("total_cost") / pl.col("total_amount_bought"))
+                .otherwise(None)
+                .alias("cost_per_unit")
+            )
+        )
+
+        cost_per_unit_series = grouped.get_column("cost_per_unit")
+        if bool(cost_per_unit_series.is_null().any()):
+            problematic = grouped.filter(pl.col("cost_per_unit").is_null()).select(
+                ["material", "unit", "total_cost", "total_amount_bought"]
+            )
+            logger.warning("NaN cost_per_unit detected for rows: %s", problematic.to_dicts())
+            grouped = grouped.filter(pl.col("cost_per_unit").is_not_null())
+
+        cost_basis: dict[str, dict[str, float]] = {}
+        for row in grouped.iter_rows(named=True):
+            material = row["material"]
+            unit = row["unit"]
+            cost_per_unit = float(row["cost_per_unit"])
+            cost_basis.setdefault(material, {})[unit] = cost_per_unit
+
+        return cost_basis
 
     def calculate_cost_basis_for_window_at_date(
         self, selected_date: datetime, trailing_months: int
@@ -417,154 +384,6 @@ class MaterialCostCalculator:
             return {}
 
         return self._calculate_cost_basis_from_dataframe(window_data)
-
-    def _add_total_amount_column(self, dataframe: pl.DataFrame, package_col: str, quantity_col: str) -> pl.DataFrame:
-        """Add a normalized total amount column based on package size and quantity."""
-        dataframe = dataframe.with_columns(
-            (pl.col(package_col).fill_null(0.0) * pl.col(quantity_col).fill_null(0.0)).alias("__total_amount_candidate")
-        )
-        dataframe = dataframe.with_columns(
-            pl.when(pl.col("__total_amount_candidate") > 0)
-            .then(pl.col("__total_amount_candidate"))
-            .otherwise(pl.col(quantity_col).fill_null(0.0))
-            .fill_null(0.0)
-            .alias("__total_amount")
-        )
-        return dataframe.drop("__total_amount_candidate")
-
-    def _add_total_cost_column(
-        self,
-        dataframe: pl.DataFrame,
-        resolved: dict[str, str],
-        package_size_col: str,
-        quantity_col: str,
-    ) -> pl.DataFrame:
-        """Derive total cost for each row using available pricing columns."""
-
-        candidate_columns: list[str] = []
-        candidate_exprs: list[pl.Expr] = []
-
-        def add_candidate(name: str, expr: pl.Expr) -> None:
-            candidate_columns.append(name)
-            candidate_exprs.append(expr.alias(name))
-
-        total_cost_col = resolved.get("total_cost")
-        if total_cost_col and total_cost_col in dataframe.columns:
-            add_candidate(
-                "__candidate_total_cost",
-                pl.when(pl.col(total_cost_col) > 0).then(pl.col(total_cost_col)).otherwise(None),
-            )
-
-        purchase_unit_price_col = resolved.get("purchase_unit_price")
-        if purchase_unit_price_col and purchase_unit_price_col in dataframe.columns:
-            add_candidate(
-                "__candidate_purchase_unit_price",
-                pl.when(pl.col(purchase_unit_price_col) > 0)
-                .then(pl.col(purchase_unit_price_col) * pl.col(package_size_col) * pl.col(quantity_col))
-                .otherwise(None),
-            )
-
-        purchase_price_per_item_col = resolved.get("purchase_price_per_item")
-        if purchase_price_per_item_col and purchase_price_per_item_col in dataframe.columns:
-            add_candidate(
-                "__candidate_purchase_price_per_item",
-                pl.when(pl.col(purchase_price_per_item_col) > 0)
-                .then(pl.col(purchase_price_per_item_col) * pl.col(quantity_col))
-                .otherwise(None),
-            )
-
-        purchase_price_per_item2_col = resolved.get("purchase_price_per_item2")
-        if purchase_price_per_item2_col and purchase_price_per_item2_col in dataframe.columns:
-            add_candidate(
-                "__candidate_purchase_price_per_item2",
-                pl.when(pl.col(purchase_price_per_item2_col) > 0)
-                .then(pl.col(purchase_price_per_item2_col) * pl.col(quantity_col))
-                .otherwise(None),
-            )
-
-        total_unit_cost_col = resolved.get("total_unit_cost")
-        if total_unit_cost_col and total_unit_cost_col in dataframe.columns:
-            add_candidate(
-                "__candidate_total_unit_cost",
-                pl.when(pl.col(total_unit_cost_col) > 0)
-                .then(pl.col(total_unit_cost_col) * pl.col(package_size_col) * pl.col(quantity_col))
-                .otherwise(None),
-            )
-
-        if candidate_exprs:
-            dataframe = dataframe.with_columns(candidate_exprs)
-            dataframe = dataframe.with_columns(
-                pl.coalesce([pl.col(name) for name in candidate_columns]).fill_null(0.0).alias("__total_cost")
-            )
-            dataframe = dataframe.drop(candidate_columns)
-        else:
-            dataframe = dataframe.with_columns(pl.lit(0.0).alias("__total_cost"))
-
-        total_cost_series = dataframe.get_column("__total_cost")
-        if bool((total_cost_series == 0).all()):
-            logger.warning("Unable to derive total_cost from available columns")
-            diagnostic_roles = [
-                role
-                for role in (
-                    "material_name",
-                    "unit",
-                    "package_size",
-                    "quantity",
-                    "purchase_unit_price",
-                    "purchase_price_per_item",
-                    "purchase_price_per_item2",
-                    "total_unit_cost",
-                    "total_cost",
-                )
-                if resolved.get(role) and resolved[role] in dataframe.columns
-            ]
-            selected_columns = [resolved[role] for role in diagnostic_roles]
-            sample = dataframe.select(selected_columns).head(5).to_dicts()
-            logger.debug("total_cost diagnostic sample: %s", sample)
-
-        return dataframe
-
-    def _build_filtered_cost_rows(self, dataframe: pl.DataFrame, resolved: dict[str, str]) -> pl.DataFrame:
-        """Filter rows to those with usable material, unit, and totals."""
-        material_col = resolved["material_name"]
-        unit_col = resolved["unit"]
-
-        return dataframe.filter(
-            (pl.col(material_col).str.len_chars() > 0)
-            & (pl.col(unit_col).str.len_chars() > 0)
-            & (pl.col("__total_amount") > 0)
-        ).select(
-            [
-                pl.col(material_col).alias("material"),
-                pl.col(unit_col).alias("unit"),
-                pl.col("__total_amount").alias("total_amount_bought"),
-                pl.col("__total_cost").alias("total_cost"),
-            ]
-        )
-
-    def _sanitize_dataframe(self, dataframe: pl.DataFrame, resolved: dict[str, str]) -> pl.DataFrame:
-        """Sanitize string and numeric columns used for cost calculations."""
-        string_columns = tuple(
-            column
-            for column in (resolved.get("material_name"), resolved.get("unit"))
-            if column and column in dataframe.columns
-        )
-        dataframe = sanitize_string_columns(dataframe, string_columns)
-
-        numeric_roles = (
-            "package_size",
-            "quantity",
-            "purchase_unit_price",
-            "purchase_price_per_item",
-            "purchase_price_per_item2",
-            "total_unit_cost",
-            "total_cost",
-        )
-        numeric_columns = [
-            resolved[role] for role in numeric_roles if resolved.get(role) and resolved[role] in dataframe.columns
-        ]
-        dataframe = sanitize_numeric_columns(dataframe, numeric_columns)
-        return dataframe
 
     def _register_with_dependency_manager(self) -> None:
         """Register this calculator's cache with the dependency manager."""

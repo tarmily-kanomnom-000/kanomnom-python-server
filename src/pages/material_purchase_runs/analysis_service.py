@@ -10,6 +10,7 @@ from typing import Iterable, Sequence
 
 import polars as pl
 
+from shared.grist_material_transformer import normalize_material_purchase_dataframe
 from shared.grist_schema import MaterialPurchaseSchema
 
 from .usage_estimation import (
@@ -123,80 +124,26 @@ class MaterialPurchaseAnalyticsService:
         return MaterialPurchaseAnalyticsResult(datetime.now(), projections, low_supply, supply_run_groups)
 
     def _normalize_dataframe(self, dataframe: pl.DataFrame) -> pl.DataFrame:
-        resolved = self._schema.resolve(dataframe)
+        normalized = normalize_material_purchase_dataframe(dataframe, self._schema)
 
-        required_roles = {"material_name", "purchase_date", "package_size", "quantity", "unit"}
-        missing_roles = [role for role in required_roles if role not in resolved]
-        if missing_roles:
-            raise KeyError(f"Missing required Grist columns: {', '.join(sorted(missing_roles))}")
+        required_columns = ["material", "purchase_date", "package_size", "quantity", "unit"]
+        missing = [column for column in required_columns if column not in normalized.columns]
+        if missing:
+            raise KeyError(f"Missing required normalized columns: {', '.join(sorted(missing))}")
 
-        material_col = resolved["material_name"]
-        purchase_date_col = resolved["purchase_date"]
-        package_size_col = resolved["package_size"]
-        quantity_col = resolved["quantity"]
-        unit_col = resolved["unit"]
-        total_cost_col = resolved.get("total_cost")
-        unit_cost_col = resolved.get("total_unit_cost")
-        purchase_source_col = resolved.get("purchase_source")
-
-        selected_columns = [material_col, purchase_date_col, package_size_col, quantity_col, unit_col]
-        if total_cost_col:
-            selected_columns.append(total_cost_col)
-        if unit_cost_col:
-            selected_columns.append(unit_cost_col)
-        if purchase_source_col:
-            selected_columns.append(purchase_source_col)
-
-        df = dataframe.select(selected_columns)
-        rename_map = {
-            material_col: "material",
-            purchase_date_col: "purchase_date",
-            package_size_col: "package_size",
-            quantity_col: "quantity",
-            unit_col: "unit",
-        }
-        if total_cost_col:
-            rename_map[total_cost_col] = "total_cost"
-        if unit_cost_col:
-            rename_map[unit_cost_col] = "unit_cost"
-        if purchase_source_col:
-            rename_map[purchase_source_col] = "purchase_source"
-
-        df = df.rename(rename_map)
-
-        cast_expressions: list[pl.Expr] = [
-            pl.col("package_size").cast(pl.Float64, strict=False),
-            pl.col("quantity").cast(pl.Float64, strict=False),
+        selected_order = [
+            "material",
+            "purchase_date",
+            "package_size",
+            "quantity",
+            "unit",
+            "units_purchased",
+            "total_cost",
+            "unit_cost",
+            "purchase_source",
         ]
-        if "total_cost" in df.columns:
-            cast_expressions.append(pl.col("total_cost").cast(pl.Float64, strict=False))
-        if "unit_cost" in df.columns:
-            cast_expressions.append(pl.col("unit_cost").cast(pl.Float64, strict=False))
-
-        df = df.with_columns(cast_expressions)
-
-        df = df.with_columns(
-            (pl.col("package_size").fill_null(0.0) * pl.col("quantity").fill_null(0.0)).alias("units_purchased")
-        )
-
-        if "unit_cost" not in df.columns and "total_cost" in df.columns:
-            df = df.with_columns(
-                pl.when(pl.col("units_purchased") > 0)
-                .then(pl.col("total_cost") / pl.col("units_purchased"))
-                .otherwise(None)
-                .alias("unit_cost")
-            )
-        elif "unit_cost" in df.columns:
-            df = df.with_columns(
-                pl.when(
-                    pl.col("unit_cost").is_null() & pl.col("total_cost").is_not_null() & (pl.col("units_purchased") > 0)
-                )
-                .then(pl.col("total_cost") / pl.col("units_purchased"))
-                .otherwise(pl.col("unit_cost"))
-                .alias("unit_cost")
-            )
-
-        return df
+        existing = [column for column in selected_order if column in normalized.columns]
+        return normalized.select(existing)
 
     def _derive_best_sources(self, records: Sequence[dict[str, object]]) -> dict[str, tuple[str | None, float | None]]:
         best_sources: dict[str, tuple[str | None, float | None]] = {}

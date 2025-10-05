@@ -29,6 +29,19 @@ class MaterialPurchaseSchema:
                 "total_cost": ["total_cost_USD"],
                 "total_unit_cost": ["total_unit_cost_USD"],
                 "purchase_source": ["purchase_source"],
+                "purchase_unit_price": [
+                    "purchase_unit_price",
+                    "purchase_unit_price_USD",
+                ],
+                "purchase_price_per_item": [
+                    "purchase_price_per_item",
+                    "purchase_price_per_item_USD",
+                    "purchase_price_per_item_original",
+                ],
+                "purchase_price_per_item2": [
+                    "purchase_price_per_item2",
+                    "purchase_price_per_item2_USD",
+                ],
             },
             required_roles={"material_name", "unit", "package_size", "quantity", "total_cost"},
         )
