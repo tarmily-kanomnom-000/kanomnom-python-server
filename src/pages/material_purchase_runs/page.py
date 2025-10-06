@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import datetime
 
 import flet as ft
@@ -26,25 +27,26 @@ class MaterialPurchaseRunsContent(ft.Container):
         self.state = MaterialPurchaseRunsState()
         self.data_manager = DataFilterManager()
         usage_config = AdaptiveUsageConfig()
-        run_config = SupplyRunConfig()
-        self.analytics_service = MaterialPurchaseAnalyticsService(usage_config, run_config)
+        self.run_config = SupplyRunConfig()
+        self.analytics_service = MaterialPurchaseAnalyticsService(usage_config, self.run_config)
         self.ui_builder = MaterialPurchaseRunsUIBuilder()
 
         self.loading_indicator: ft.ProgressRing | None = None
         self.summary_section = ft.Column([])
-        self.low_supply_section = ft.Column([])
-        self.supply_groups_section = ft.Column([])
+        self.cadence_schedule_section = ft.Column([])
         self.table_section = ft.Column([])
         self.date_filter_container: ft.Container | None = None
         self.start_date_field: ft.TextField | None = None
         self.end_date_field: ft.TextField | None = None
         self.min_purchases_field: ft.TextField | None = None
-        self.min_purchase_threshold: int = 3
+        self.run_interval_field: ft.TextField | None = None
+        self.min_purchase_threshold: int = 6
+        self.run_interval_days: int = self.run_config.target_run_interval_days
 
     def build_content(self) -> "MaterialPurchaseRunsContent":
         logger.info("Initializing Material Purchase Runs page")
         self._setup_ui()
-        self._load_initial_data()
+        self._refresh_analytics(reload_data=True)
         return self
 
     def update(self) -> None:
@@ -62,8 +64,7 @@ class MaterialPurchaseRunsContent(ft.Container):
         self.date_filter_container = self._create_date_filter_section()
 
         self.summary_section.controls = [ft.Text("Loading analytics...", color=ft.Colors.GREY)]
-        self.low_supply_section.controls = [ft.Text("Waiting for data...", color=ft.Colors.GREY)]
-        self.supply_groups_section.controls = [ft.Text("Waiting for data...", color=ft.Colors.GREY)]
+        self.cadence_schedule_section.controls = [ft.Text("Waiting for schedule...", color=ft.Colors.GREY)]
         self.table_section.controls = []
 
         main_column = ft.Column(
@@ -71,8 +72,7 @@ class MaterialPurchaseRunsContent(ft.Container):
                 header_row,
                 self.date_filter_container,
                 self.summary_section,
-                self.low_supply_section,
-                self.supply_groups_section,
+                self.cadence_schedule_section,
                 self.table_section,
             ],
             spacing=20,
@@ -105,11 +105,24 @@ class MaterialPurchaseRunsContent(ft.Container):
             on_change=self.on_min_purchases_change,
         )
 
+        self.run_interval_field = ft.TextField(
+            label="Run Cadence (days)",
+            value=str(self.run_interval_days),
+            width=160,
+            on_change=self.on_run_interval_change,
+        )
+
         apply_button = ft.ElevatedButton("Apply Filter", on_click=self.apply_date_filter)
 
         return ft.Container(
             content=ft.Row(
-                controls=[self.start_date_field, self.end_date_field, self.min_purchases_field, apply_button],
+                controls=[
+                    self.start_date_field,
+                    self.end_date_field,
+                    self.min_purchases_field,
+                    self.run_interval_field,
+                    apply_button,
+                ],
                 spacing=16,
             ),
             padding=16,
@@ -117,25 +130,41 @@ class MaterialPurchaseRunsContent(ft.Container):
             border_radius=8,
         )
 
-    def _load_initial_data(self) -> None:
+    def _with_loading(self, operation: Callable[[], None]) -> None:
         if self.loading_indicator:
             self.loading_indicator.visible = True
             self.update()
 
         try:
-            self.data_manager.load_grist_data()
-            filtered = self.data_manager.get_filtered_data()
-            analytics = self.analytics_service.analyze(filtered, self.min_purchase_threshold)
-            self.state.set_analytics(analytics)
-            self._render_analytics()
-        except Exception:  # noqa: BLE001
-            logger.exception("Failed to load material purchase analytics")
-            self.state.set_error("Failed to load data from Grist")
-            self._render_error()
+            operation()
         finally:
             if self.loading_indicator:
                 self.loading_indicator.visible = False
             self.update()
+
+    def _refresh_analytics(self, *, reload_data: bool) -> None:
+        action_label = "load data" if reload_data else "apply filter"
+        error_message = "Failed to load data from Grist" if reload_data else "Failed to apply filter"
+
+        def _execute() -> None:
+            try:
+                if reload_data:
+                    logger.info("Loading material purchases from Grist")
+                    self.data_manager.load_grist_data()
+                else:
+                    logger.info("Re-applying data filter for material purchase runs")
+                    self.data_manager.apply_time_filter()
+
+                filtered = self.data_manager.get_filtered_data()
+                analytics = self.analytics_service.analyze(filtered, self.min_purchase_threshold)
+                self.state.set_analytics(analytics)
+                self._render_analytics()
+            except Exception:  # noqa: BLE001
+                logger.exception("Failed to %s for material purchase analytics", action_label)
+                self.state.set_error(error_message)
+                self._render_error()
+
+        self._with_loading(_execute)
 
     def on_start_date_change(self, event: ControlEvent) -> None:
         value = event.control.value or ""
@@ -167,26 +196,24 @@ class MaterialPurchaseRunsContent(ft.Container):
             self.min_purchases_field.value = str(self.min_purchase_threshold)
             self.update()
 
-    def apply_date_filter(self, _event: ControlEvent) -> None:
-        logger.info("Applying date filter for material purchase runs")
-        if self.loading_indicator:
-            self.loading_indicator.visible = True
+    def on_run_interval_change(self, event: ControlEvent) -> None:
+        value = event.control.value or ""
+        try:
+            parsed_value = int(value)
+        except ValueError:
+            logger.warning("Invalid run cadence: %s", value)
+            parsed_value = self.run_interval_days
+
+        self.run_interval_days = parsed_value if parsed_value >= 1 else 1
+        self.run_config.target_run_interval_days = self.run_interval_days
+
+        if self.run_interval_field and self.run_interval_field.value != str(self.run_interval_days):
+            self.run_interval_field.value = str(self.run_interval_days)
             self.update()
 
-        try:
-            self.data_manager.apply_time_filter()
-            filtered = self.data_manager.get_filtered_data()
-            analytics = self.analytics_service.analyze(filtered, self.min_purchase_threshold)
-            self.state.set_analytics(analytics)
-            self._render_analytics()
-        except Exception:  # noqa: BLE001
-            logger.exception("Failed to apply filter")
-            self.state.set_error("Failed to apply filter")
-            self._render_error()
-        finally:
-            if self.loading_indicator:
-                self.loading_indicator.visible = False
-            self.update()
+    def apply_date_filter(self, _event: ControlEvent) -> None:
+        logger.info("Applying date filter for material purchase runs")
+        self._refresh_analytics(reload_data=False)
 
     def _render_analytics(self) -> None:
         analytics = self.state.analytics
@@ -195,9 +222,12 @@ class MaterialPurchaseRunsContent(ft.Container):
             return
 
         self.summary_section.controls = [self.ui_builder.create_summary_section(analytics)]
-        self.low_supply_section.controls = [self.ui_builder.create_low_supply_section(analytics.low_supply)]
-        self.supply_groups_section.controls = [
-            self.ui_builder.create_supply_run_groups_section(analytics.supply_run_groups)
+        self.cadence_schedule_section.controls = [
+            self.ui_builder.create_cadence_schedule_section(
+                analytics.cadence_schedule,
+                interval_days=analytics.run_interval_days,
+                low_supply={projection.material for projection in analytics.low_supply},
+            )
         ]
         self.table_section.controls = [self.ui_builder.create_projection_table(analytics.projections)]
 
@@ -205,8 +235,7 @@ class MaterialPurchaseRunsContent(ft.Container):
         if self.state.error_message:
             error_text = ft.Text(self.state.error_message, color=ft.Colors.RED)
             self.summary_section.controls = [error_text]
-            self.low_supply_section.controls = []
-            self.supply_groups_section.controls = []
+            self.cadence_schedule_section.controls = []
             self.table_section.controls = []
 
     def _format_date_input(self, value: datetime | None) -> str:

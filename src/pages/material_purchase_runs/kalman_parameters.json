@@ -1,6 +1,20 @@
 {
-  "initial_measurement_variance": 0.19972640778830497,
-  "initial_process_variance": 0.010015973909908939,
-  "max_em_iterations": 10,
-  "target_sample_size": 4
+  "confidence_volume_floor": 1.0,
+  "confidence_volume_sensitivity": 1.5,
+  "confidence_volume_weight": 0.3,
+  "convergence_tolerance": 0.0001,
+  "initial_measurement_variance": 0.12765659895744078,
+  "initial_process_variance": 0.07777512526293173,
+  "max_em_iterations": 4,
+  "measurement_volume_exponent": 1.0,
+  "measurement_volume_floor": 1.0,
+  "min_intervals": 2,
+  "minimum_measurement_variance": 0.0001,
+  "minimum_process_variance": 1e-05,
+  "process_gap_alpha": 0.5,
+  "process_gap_reference": 14.0,
+  "process_scale_ceiling": 5.0,
+  "process_volume_alpha": 0.75,
+  "process_volume_floor": 1.0,
+  "target_sample_size": 5
 }

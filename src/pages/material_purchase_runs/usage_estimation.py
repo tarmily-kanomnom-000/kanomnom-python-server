@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Sequence
 
+import numpy as np
+from numpy.linalg import LinAlgError
+from statsmodels.tsa.statespace.kalman_filter import KalmanFilter as StatsmodelsKalmanFilter
+
+from .kalman_em import run_local_level_em, smooth_local_level
+
 _EPS = 1e-9
 
-_PARAM_KEYS = {
+_CONFIG_PATH = Path(__file__).with_name("kalman_parameters.json")
+_REQUIRED_CONFIG_KEYS = {
     "initial_process_variance",
     "initial_measurement_variance",
     "max_em_iterations",
@@ -20,48 +28,133 @@ _PARAM_KEYS = {
     "convergence_tolerance",
     "minimum_process_variance",
     "minimum_measurement_variance",
+    "measurement_volume_floor",
+    "measurement_volume_exponent",
+    "process_volume_floor",
+    "process_volume_alpha",
+    "process_scale_ceiling",
+    "process_gap_alpha",
+    "process_gap_reference",
+    "confidence_volume_weight",
+    "confidence_volume_floor",
+    "confidence_volume_sensitivity",
 }
 
-DEFAULT_KALMAN_PARAMS: dict[str, float | int | None] = {
-    "initial_process_variance": 0.05,
-    "initial_measurement_variance": 0.1,
-    "max_em_iterations": 12,
-    "target_sample_size": 6,
-}
 
-_CONFIG_PATH = Path(__file__).with_name("kalman_parameters.json")
+@dataclass(slots=True)
+class KalmanFilterConfig:
+    """Configuration payload for the statsmodels-based Kalman estimator."""
+
+    min_intervals: int
+    max_em_iterations: int
+    convergence_tolerance: float
+    initial_process_variance: float
+    initial_measurement_variance: float
+    minimum_process_variance: float
+    minimum_measurement_variance: float
+    target_sample_size: int
+    measurement_volume_floor: float
+    measurement_volume_exponent: float
+    process_volume_floor: float
+    process_volume_alpha: float
+    process_scale_ceiling: float
+    process_gap_alpha: float
+    process_gap_reference: float
+    confidence_volume_weight: float
+    confidence_volume_floor: float
+    confidence_volume_sensitivity: float
+
+    @classmethod
+    def from_mapping(cls, data: dict[str, object]) -> "KalmanFilterConfig":
+        missing = _REQUIRED_CONFIG_KEYS.difference(data.keys())
+        if missing:
+            joined = ", ".join(sorted(missing))
+            raise KeyError(f"Missing Kalman configuration keys: {joined}")
+
+        def _require_float(name: str) -> float:
+            value = data.get(name)
+            if isinstance(value, bool):  # bool is subclass of int; reject explicitly
+                raise TypeError(f"Configuration value '{name}' must be numeric, received bool")
+            if not isinstance(value, (int, float)):
+                raise TypeError(f"Configuration value '{name}' must be numeric, received {type(value).__name__}")
+            return float(value)
+
+        def _require_int(name: str) -> int:
+            numeric = data.get(name)
+            if isinstance(numeric, bool):
+                raise TypeError(f"Configuration value '{name}' must be integer, received bool")
+            if isinstance(numeric, int):
+                return numeric
+            if isinstance(numeric, float) and numeric.is_integer():
+                return int(numeric)
+            raise TypeError(f"Configuration value '{name}' must be integer, received {type(numeric).__name__}")
+
+        minimum_process_variance = max(_require_float("minimum_process_variance"), _EPS)
+        minimum_measurement_variance = max(_require_float("minimum_measurement_variance"), _EPS)
+
+        process_scale_ceiling = max(_require_float("process_scale_ceiling"), 1.0)
+        measurement_volume_floor = max(_require_float("measurement_volume_floor"), _EPS)
+        measurement_volume_exponent = max(_require_float("measurement_volume_exponent"), 0.0)
+        process_volume_floor = max(_require_float("process_volume_floor"), _EPS)
+        process_volume_alpha = max(_require_float("process_volume_alpha"), 0.0)
+        process_gap_alpha = max(_require_float("process_gap_alpha"), 0.0)
+        process_gap_reference = max(_require_float("process_gap_reference"), _EPS)
+        confidence_volume_weight = max(0.0, min(1.0, _require_float("confidence_volume_weight")))
+        confidence_volume_floor = max(_require_float("confidence_volume_floor"), _EPS)
+        confidence_volume_sensitivity = max(_require_float("confidence_volume_sensitivity"), 0.0)
+
+        return cls(
+            min_intervals=max(1, _require_int("min_intervals")),
+            max_em_iterations=max(0, _require_int("max_em_iterations")),
+            convergence_tolerance=max(_EPS, _require_float("convergence_tolerance")),
+            initial_process_variance=max(_require_float("initial_process_variance"), minimum_process_variance),
+            initial_measurement_variance=max(
+                _require_float("initial_measurement_variance"), minimum_measurement_variance
+            ),
+            minimum_process_variance=minimum_process_variance,
+            minimum_measurement_variance=minimum_measurement_variance,
+            target_sample_size=max(1, _require_int("target_sample_size")),
+            measurement_volume_floor=measurement_volume_floor,
+            measurement_volume_exponent=measurement_volume_exponent,
+            process_volume_floor=process_volume_floor,
+            process_volume_alpha=process_volume_alpha,
+            process_scale_ceiling=process_scale_ceiling,
+            process_gap_alpha=process_gap_alpha,
+            process_gap_reference=process_gap_reference,
+            confidence_volume_weight=confidence_volume_weight,
+            confidence_volume_floor=confidence_volume_floor,
+            confidence_volume_sensitivity=confidence_volume_sensitivity,
+        )
+
+    def to_dict(self) -> dict[str, float | int]:
+        """Return a JSON-serialisable dictionary of the configuration values."""
+
+        return asdict(self)
 
 
-def load_kalman_parameters(config_path: Path | None = None) -> dict[str, float | int | None]:
-    """Load Kalman estimator parameters from JSON if available."""
+def load_kalman_parameters(config_path: Path | None = None) -> KalmanFilterConfig:
+    """Load the Kalman configuration from JSON."""
 
     target_path = config_path or _CONFIG_PATH
-    if target_path.exists():
-        try:
-            data = json.loads(target_path.read_text())
-            if isinstance(data, dict):
-                filtered: dict[str, float | int | None] = {}
-                for key, value in data.items():
-                    if key not in _PARAM_KEYS:
-                        continue
-                    if key == "max_em_iterations" and value is None:
-                        filtered[key] = None
-                    elif isinstance(value, (int, float)):
-                        filtered[key] = value
-                if filtered:
-                    params = DEFAULT_KALMAN_PARAMS.copy()
-                    params.update(filtered)
-                    return params
-        except Exception:  # noqa: BLE001 - fallback to defaults
-            pass
-    return DEFAULT_KALMAN_PARAMS.copy()
+    if not target_path.exists():
+        raise FileNotFoundError(f"Kalman configuration file not found at {target_path}")
+
+    try:
+        raw = json.loads(target_path.read_text())
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Kalman configuration at {target_path} is not valid JSON") from error
+
+    if not isinstance(raw, dict):
+        raise TypeError(f"Kalman configuration at {target_path} must be a JSON object")
+
+    return KalmanFilterConfig.from_mapping(raw)
 
 
 def create_default_kalman_estimator(config_path: Path | None = None) -> "KalmanUsageEstimator":
     """Instantiate a Kalman usage estimator using configured parameters."""
 
-    params = load_kalman_parameters(config_path)
-    return KalmanUsageEstimator(**params)
+    config = load_kalman_parameters(config_path)
+    return KalmanUsageEstimator(config=config)
 
 
 @dataclass(slots=True)
@@ -106,6 +199,7 @@ class UsageEstimate:
     """Result of a usage estimation strategy."""
 
     usage_per_day: float | None
+    usage_variance: float | None
     confidence: float
     samples: int
     process_variance: float | None
@@ -122,28 +216,10 @@ class MaterialUsageEstimator:
 
 
 class KalmanUsageEstimator(MaterialUsageEstimator):
-    """Kalman filter with EM variance updates for usage estimation."""
+    """Material usage estimator backed by statsmodels' KalmanFilter."""
 
-    def __init__(
-        self,
-        *,
-        min_intervals: int = 2,
-        max_em_iterations: int = 12,
-        convergence_tolerance: float = 1e-4,
-        initial_process_variance: float = 0.05,
-        initial_measurement_variance: float = 0.1,
-        minimum_process_variance: float = 1e-5,
-        minimum_measurement_variance: float = 1e-4,
-        target_sample_size: int = 6,
-    ) -> None:
-        self._min_intervals = min_intervals
-        self._max_em_iterations = max_em_iterations
-        self._tolerance = convergence_tolerance
-        self._initial_process_variance = max(initial_process_variance, minimum_process_variance)
-        self._initial_measurement_variance = max(initial_measurement_variance, minimum_measurement_variance)
-        self._minimum_process_variance = minimum_process_variance
-        self._minimum_measurement_variance = minimum_measurement_variance
-        self._target_sample_size = max(1, target_sample_size)
+    def __init__(self, *, config: KalmanFilterConfig) -> None:
+        self._config = config
 
     def estimate(self, intervals: Sequence[UsageInterval]) -> UsageEstimate:
         valid_intervals = [interval for interval in intervals if interval.usage_per_day is not None]
@@ -153,6 +229,7 @@ class KalmanUsageEstimator(MaterialUsageEstimator):
             fallback = intervals[-1].usage_per_day if intervals else None
             return UsageEstimate(
                 usage_per_day=fallback,
+                usage_variance=None,
                 confidence=0.0,
                 samples=sample_count,
                 process_variance=None,
@@ -165,6 +242,7 @@ class KalmanUsageEstimator(MaterialUsageEstimator):
             confidence = 0.15 if usage is not None else 0.0
             return UsageEstimate(
                 usage_per_day=usage,
+                usage_variance=None,
                 confidence=confidence,
                 samples=sample_count,
                 process_variance=None,
@@ -172,49 +250,28 @@ class KalmanUsageEstimator(MaterialUsageEstimator):
                 bias_days=None,
             )
 
-        if sample_count < self._min_intervals:
+        if sample_count < self._config.min_intervals:
             usage = valid_intervals[-1].usage_per_day
             confidence = 0.2 if usage is not None else 0.0
             return UsageEstimate(
                 usage_per_day=usage,
+                usage_variance=None,
                 confidence=confidence,
                 samples=sample_count,
                 process_variance=None,
                 measurement_variance=None,
             )
 
-        observations = [interval.usage_per_day or 0.0 for interval in valid_intervals]
-        durations = [max(interval.duration_days, 1.0) for interval in valid_intervals]
+        observations = np.array([interval.usage_per_day or 0.0 for interval in valid_intervals], dtype=float)
+        units = np.array([interval.units for interval in valid_intervals], dtype=float)
+        durations = np.array([interval.duration_days for interval in valid_intervals], dtype=float)
 
-        process_var = self._initial_process_variance
-        measurement_var = self._initial_measurement_variance
-
-        previous_log_likelihood = None
-        kalman_result = None
-
-        for _ in range(self._max_em_iterations):
-            kalman_result = self._run_kalman_smoother(observations, durations, process_var, measurement_var)
-            if kalman_result is None:
-                break
-
-            process_var_new, measurement_var_new, log_likelihood = self._em_update(
-                observations, durations, kalman_result, process_var, measurement_var
-            )
-
-            if measurement_var_new is not None:
-                measurement_var = max(self._minimum_measurement_variance, measurement_var_new)
-            if process_var_new is not None:
-                process_var = max(self._minimum_process_variance, process_var_new)
-
-            if previous_log_likelihood is not None and log_likelihood is not None:
-                if abs(log_likelihood - previous_log_likelihood) < self._tolerance:
-                    break
-            previous_log_likelihood = log_likelihood
-
-        if kalman_result is None:
-            usage = observations[-1]
+        result = self._smooth_usage(observations, units, durations)
+        if result is None:
+            usage = float(observations[-1])
             return UsageEstimate(
                 usage_per_day=usage,
+                usage_variance=None,
                 confidence=0.2,
                 samples=sample_count,
                 process_variance=None,
@@ -222,145 +279,238 @@ class KalmanUsageEstimator(MaterialUsageEstimator):
                 bias_days=None,
             )
 
-        usage = kalman_result.smoothed_means[-1]
-        variance = max(kalman_result.smoothed_variances[-1], 0.0)
+        (
+            usage,
+            variance,
+            base_process_variance,
+            base_measurement_variance,
+            final_measurement_variance,
+        ) = result
         usage = usage if usage > 0 else None
 
         if usage is None:
             return UsageEstimate(
                 usage_per_day=None,
+                usage_variance=None,
                 confidence=0.0,
                 samples=sample_count,
-                process_variance=process_var,
-                measurement_variance=measurement_var,
+                process_variance=base_process_variance,
+                measurement_variance=base_measurement_variance,
                 bias_days=None,
             )
 
-        confidence = self._derive_confidence(usage, variance, measurement_var, sample_count)
+        confidence = self._derive_confidence(
+            usage,
+            variance,
+            final_measurement_variance,
+            sample_count,
+            units,
+        )
 
         return UsageEstimate(
             usage_per_day=usage,
+            usage_variance=max(variance, _EPS),
             confidence=confidence,
             samples=sample_count,
-            process_variance=process_var,
-            measurement_variance=measurement_var,
+            process_variance=base_process_variance,
+            measurement_variance=base_measurement_variance,
             bias_days=None,
         )
 
-    @dataclass(slots=True)
-    class _KalmanResult:
-        filtered_means: list[float]
-        filtered_variances: list[float]
-        predicted_means: list[float]
-        predicted_variances: list[float]
-        smoothed_means: list[float]
-        smoothed_variances: list[float]
-        cross_covariances: list[float]
-        log_likelihood: float
-
-    def _run_kalman_smoother(
+    def _smooth_usage(
         self,
-        observations: Sequence[float],
-        durations: Sequence[float],
-        process_var: float,
-        measurement_var: float,
-    ) -> "KalmanUsageEstimator._KalmanResult" | None:
-        n = len(observations)
-        if n == 0:
+        observations: np.ndarray,
+        units: np.ndarray,
+        durations: np.ndarray,
+    ) -> tuple[float, float, float, float, float] | None:
+        if observations.size == 0:
             return None
 
-        filtered_means: list[float] = [0.0] * n
-        filtered_variances: list[float] = [0.0] * n
-        predicted_means: list[float] = [0.0] * n
-        predicted_variances: list[float] = [0.0] * n
-        log_likelihood = 0.0
+        if observations.size == 0 or units.size != observations.size or durations.size != observations.size:
+            return None
 
-        prior_mean = observations[0]
-        prior_variance = max(measurement_var, self._minimum_process_variance)
+        config = self._config
+        kf = StatsmodelsKalmanFilter(
+            k_endog=1,
+            k_states=1,
+            nobs=int(observations.size),
+            time_varying_obs_cov=True,
+            time_varying_state_cov=True,
+        )
+        kf.bind(observations)
 
-        for index, observation in enumerate(observations):
-            if index == 0:
-                pred_mean = prior_mean
-                pred_variance = prior_variance
+        # Set up a simple local-level model.
+        kf.design[:] = 1.0
+        kf.transition[:] = 1.0
+        kf.selection[:] = 1.0
+        kf.state_cov[:] = config.initial_process_variance
+        kf.obs_cov[:] = config.initial_measurement_variance
+
+        initial_covariance = max(config.initial_measurement_variance, config.minimum_process_variance)
+        initial_state = np.array([np.squeeze(observations[0])], dtype=float)
+        kf.initialize_known(initial_state, np.array([[initial_covariance]], dtype=float))
+
+        base_process_variance = config.initial_process_variance
+        base_measurement_variance = config.initial_measurement_variance
+
+        if config.max_em_iterations > 0:
+            if hasattr(kf, "em"):
+                try:
+                    em_kwargs = self._build_em_kwargs(kf)
+                    kf.em(observations, **em_kwargs)
+                    base_process_variance = float(np.squeeze(kf.state_cov))
+                    base_measurement_variance = float(np.squeeze(kf.obs_cov))
+                except (LinAlgError, ValueError, RuntimeError):
+                    return None
             else:
-                q = process_var * max(durations[index], 1.0)
-                pred_mean = filtered_means[index - 1]
-                pred_variance = filtered_variances[index - 1] + q
+                base_process_variance, base_measurement_variance = run_local_level_em(
+                    observations,
+                    durations,
+                    base_process_variance,
+                    base_measurement_variance,
+                    min_process_variance=self._config.minimum_process_variance,
+                    min_measurement_variance=self._config.minimum_measurement_variance,
+                    max_iterations=self._config.max_em_iterations,
+                    tolerance=self._config.convergence_tolerance,
+                )
 
-            predicted_means[index] = pred_mean
-            predicted_variances[index] = pred_variance
+        kf.state_cov[:] = base_process_variance
+        kf.obs_cov[:] = base_measurement_variance
 
-            innovation_variance = pred_variance + measurement_var
-            if innovation_variance <= _EPS:
+        measurement_multipliers = self._measurement_multipliers(units)
+        process_multipliers = self._process_multipliers(units, durations)
+
+        measurement_cov = (base_measurement_variance * measurement_multipliers).reshape(1, 1, -1)
+        process_cov = (base_process_variance * process_multipliers).reshape(1, 1, -1)
+
+        kf.obs_cov = measurement_cov
+        kf.state_cov = process_cov
+
+        measurement_vars = measurement_cov[0, 0, :]
+        process_vars = process_cov[0, 0, :]
+
+        if hasattr(kf, "smooth"):
+            try:
+                smoother = kf.smooth(observations)
+                smoothed_state = float(smoother.smoothed_state[0, -1])
+                smoothed_variance = float(smoother.smoothed_state_cov[0, 0, -1])
+            except (LinAlgError, ValueError, RuntimeError):
                 return None
-            kalman_gain = pred_variance / innovation_variance
-            resid = observation - pred_mean
-            filtered_mean = pred_mean + kalman_gain * resid
-            filtered_variance = (1 - kalman_gain) * pred_variance
-
-            filtered_means[index] = filtered_mean
-            filtered_variances[index] = max(filtered_variance, _EPS)
-
-            log_likelihood += -0.5 * (math.log(2 * math.pi * innovation_variance) + (resid**2) / innovation_variance)
-
-        smoothed_means = filtered_means[:]
-        smoothed_variances = filtered_variances[:]
-        cross_covariances: list[float] = [0.0] * (n - 1 if n > 1 else 0)
-
-        for index in reversed(range(n - 1)):
-            pred_variance_next = predicted_variances[index + 1]
-            if pred_variance_next <= _EPS:
-                continue
-            smoothing_gain = filtered_variances[index] / pred_variance_next
-            diff = smoothed_means[index + 1] - predicted_means[index + 1]
-            smoothed_means[index] = filtered_means[index] + smoothing_gain * diff
-            smoothed_variances[index] = filtered_variances[index] + (
-                smoothing_gain**2 * (smoothed_variances[index + 1] - pred_variance_next)
+        else:
+            smoother_result = smooth_local_level(
+                observations,
+                process_vars,
+                measurement_vars,
+                min_process_variance=config.minimum_process_variance,
             )
-            smoothed_variances[index] = max(smoothed_variances[index], _EPS)
-            cross_covariances[index] = smoothed_variances[index + 1] * smoothing_gain
+            if smoother_result is None:
+                return None
+            smoothed_means, smoothed_variances = smoother_result
+            smoothed_state = float(smoothed_means[-1])
+            smoothed_variance = float(smoothed_variances[-1])
 
-        return KalmanUsageEstimator._KalmanResult(
-            filtered_means=filtered_means,
-            filtered_variances=filtered_variances,
-            predicted_means=predicted_means,
-            predicted_variances=predicted_variances,
-            smoothed_means=smoothed_means,
-            smoothed_variances=smoothed_variances,
-            cross_covariances=cross_covariances,
-            log_likelihood=log_likelihood,
+        process_var = max(float(base_process_variance), config.minimum_process_variance)
+        measurement_var = max(float(base_measurement_variance), config.minimum_measurement_variance)
+
+        final_measurement_variance = max(float(measurement_vars[-1]), config.minimum_measurement_variance)
+
+        return (
+            smoothed_state,
+            max(smoothed_variance, _EPS),
+            process_var,
+            measurement_var,
+            final_measurement_variance,
         )
 
-    def _em_update(
-        self,
-        observations: Sequence[float],
-        durations: Sequence[float],
-        result: "KalmanUsageEstimator._KalmanResult",
-        process_var: float,
-        measurement_var: float,
-    ) -> tuple[float | None, float | None, float | None]:
-        n = len(observations)
-        if n == 0:
-            return (None, None, None)
+    def _build_em_kwargs(self, filter_instance: StatsmodelsKalmanFilter) -> dict[str, object]:
+        """Construct EM keyword arguments compatible with the runtime statsmodels version."""
 
-        measurement_terms = [
-            (observations[i] - result.smoothed_means[i]) ** 2 + result.smoothed_variances[i] for i in range(n)
-        ]
-        measurement_var_new = sum(measurement_terms) / n
-
-        process_terms: list[float] = []
-        for index in range(1, n):
-            delta = max(durations[index], 1.0)
-            diff = result.smoothed_means[index] - result.smoothed_means[index - 1]
-            var_sum = (
-                result.smoothed_variances[index]
-                + result.smoothed_variances[index - 1]
-                - 2 * result.cross_covariances[index - 1]
+        if not hasattr(filter_instance, "em"):
+            raise RuntimeError(
+                "statsmodels.KalmanFilter.em is unavailable; upgrade statsmodels to support EM variance fitting."
             )
-            process_terms.append((diff**2 + var_sum) / delta)
-        process_var_new = sum(process_terms) / (len(process_terms) or 1)
 
-        return (process_var_new, measurement_var_new, result.log_likelihood)
+        parameters = inspect.signature(filter_instance.em).parameters
+        kwargs: dict[str, object] = {}
+
+        if "em_vars" in parameters:
+            kwargs["em_vars"] = ["state_cov", "obs_cov"]
+
+        iteration_keys = ("maxiter", "em_iter", "n_iter", "niter")
+        for key in iteration_keys:
+            if key in parameters:
+                kwargs[key] = self._config.max_em_iterations
+                break
+
+        tolerance_keys = ("tol", "em_tol")
+        for key in tolerance_keys:
+            if key in parameters:
+                kwargs[key] = self._config.convergence_tolerance
+                break
+
+        return kwargs
+
+    def _measurement_multipliers(self, units: np.ndarray) -> np.ndarray:
+        floor = self._config.measurement_volume_floor
+        exponent = self._config.measurement_volume_exponent
+        if exponent <= 0.0:
+            return np.ones_like(units, dtype=float)
+
+        safe_units = np.where(np.isfinite(units), units, floor)
+        safe_units = np.maximum(safe_units, floor)
+        positive_units = safe_units[safe_units > 0]
+        if positive_units.size > 0:
+            dynamic_floor = float(np.median(positive_units))
+            floor = max(floor, dynamic_floor)
+
+        safe_units = np.maximum(safe_units, floor)
+        normalized = safe_units / floor
+        multipliers = np.power(normalized, -exponent, dtype=float)
+        return np.clip(multipliers, 0.1, 10.0)
+
+    def _process_multipliers(self, units: np.ndarray, durations: np.ndarray) -> np.ndarray:
+        alpha = self._config.process_volume_alpha
+        gap_alpha = self._config.process_gap_alpha
+        if units.size == 0:
+            return np.ones_like(units, dtype=float)
+
+        safe_units = np.where(np.isfinite(units), units, self._config.process_volume_floor)
+        safe_units = np.maximum(safe_units, self._config.process_volume_floor)
+        multipliers = np.ones_like(safe_units, dtype=float)
+
+        if alpha > 0.0 and safe_units.size > 1:
+            prev = safe_units[:-1]
+            delta = np.abs(safe_units[1:] - prev)
+            denom = np.maximum(prev, self._config.process_volume_floor)
+            relative_change = delta / denom
+            ceiling = max(self._config.process_scale_ceiling, 1.0)
+            multipliers[1:] = np.clip(1.0 + alpha * relative_change, 1.0, ceiling)
+
+        if gap_alpha > 0.0 and durations.size == multipliers.size:
+            reference = max(self._config.process_gap_reference, _EPS)
+            safe_durations = np.where(np.isfinite(durations), durations, reference)
+            safe_durations = np.maximum(safe_durations, _EPS)
+            ratios = safe_durations / reference
+            gap_adjustment = 1.0 + gap_alpha * np.maximum(0.0, ratios - 1.0)
+            ceiling = max(self._config.process_scale_ceiling, 1.0)
+            multipliers = np.clip(multipliers * gap_adjustment, 1.0, ceiling)
+
+        return multipliers
+
+    def _volume_consistency(self, units: np.ndarray) -> float:
+        if units.size <= 1:
+            return 0.5
+
+        safe_units = np.where(np.isfinite(units), units, 0.0)
+        mean_units = float(np.mean(safe_units))
+        if mean_units <= 0.0:
+            return 0.5
+
+        std_units = float(np.std(safe_units))
+        cv = std_units / max(mean_units, self._config.confidence_volume_floor)
+        sensitivity = self._config.confidence_volume_sensitivity
+        factor = 1.0 / (1.0 + sensitivity * cv)
+        return max(0.0, min(1.0, factor))
 
     def _derive_confidence(
         self,
@@ -368,12 +518,17 @@ class KalmanUsageEstimator(MaterialUsageEstimator):
         variance: float,
         measurement_var: float,
         sample_count: int,
+        units: np.ndarray,
     ) -> float:
         posterior_std = math.sqrt(max(variance, _EPS))
         measurement_std = math.sqrt(max(measurement_var, _EPS))
         signal = abs(usage)
         denom = signal + posterior_std + measurement_std
         base_conf = signal / denom if denom > 0 else 0.0
-        sample_factor = min(1.0, sample_count / self._target_sample_size)
-        confidence = max(0.0, min(1.0, 0.6 * base_conf + 0.4 * sample_factor))
+        sample_factor = min(1.0, sample_count / self._config.target_sample_size)
+        combined = 0.6 * base_conf + 0.4 * sample_factor
+        volume_weight = self._config.confidence_volume_weight
+        volume_factor = self._volume_consistency(units)
+        confidence = (1.0 - volume_weight) * combined + volume_weight * volume_factor
+        confidence = max(0.0, min(1.0, confidence))
         return round(confidence, 3)

@@ -15,7 +15,14 @@ from pages.material_purchase_runs.analysis_service import (
     MaterialPurchaseAnalyticsService,
     SupplyRunConfig,
 )
-from pages.material_purchase_runs.usage_estimation import KalmanUsageEstimator, UsageInterval
+from pages.material_purchase_runs.usage_estimation import (
+    KalmanFilterConfig,
+    KalmanUsageEstimator,
+    MaterialUsageEstimator,
+    UsageEstimate,
+    UsageInterval,
+    load_kalman_parameters,
+)
 from shared.grist_schema import MaterialPurchaseSchema
 from shared.grist_service import DataFilterManager
 
@@ -41,8 +48,89 @@ def _build_constant_usage_intervals(units_per_purchase: float, interval_days: in
     return intervals
 
 
+class _StubEstimator(MaterialUsageEstimator):
+    def estimate(self, intervals: Sequence[UsageInterval]) -> UsageEstimate:
+        return UsageEstimate(
+            usage_per_day=None,
+            usage_variance=None,
+            confidence=0.0,
+            samples=len(intervals),
+            process_variance=None,
+            measurement_variance=None,
+        )
+
+
+def test_usage_interval_builder_merges_same_day_purchases() -> None:
+    service = MaterialPurchaseAnalyticsService(
+        AdaptiveUsageConfig(),
+        SupplyRunConfig(),
+        usage_estimator=_StubEstimator(),
+    )
+
+    purchase_day = datetime(2025, 1, 1)
+    records = [
+        {
+            "purchase_date": purchase_day,
+            "units_purchased": 10.0,
+        },
+        {
+            "purchase_date": purchase_day,
+            "units_purchased": 5.0,
+        },
+        {
+            "purchase_date": purchase_day + timedelta(days=10),
+            "units_purchased": 8.0,
+        },
+    ]
+
+    intervals = service._build_usage_intervals(records)
+
+    assert len(intervals) == 1
+    interval = intervals[0]
+    assert interval.units == 15.0
+    assert interval.duration_days >= service._usage_config.minimum_interval_days
+
+
+def test_analysis_produces_probabilistic_supply_window() -> None:
+    rows = _generate_purchase_rows(purchase_count=6, interval_days=10)
+    history_rows = rows[:-1]
+    dataframe = pl.DataFrame(history_rows)
+
+    estimator = KalmanUsageEstimator(config=load_kalman_parameters(KALMAN_CONFIG_PATH))
+    service = MaterialPurchaseAnalyticsService(AdaptiveUsageConfig(), SupplyRunConfig(), usage_estimator=estimator)
+
+    reference_date = history_rows[-1]["Purchase_Date"]
+    result = service.analyze(
+        dataframe,
+        min_purchases=3,
+        reference_date=reference_date,
+    )
+
+    projection = next((item for item in result.projections if item.material == "Test Material"), None)
+    assert projection is not None
+
+    window = projection.remaining_supply_window
+    assert window is not None
+    assert window.lower_days is not None
+    assert window.upper_days is not None
+    assert window.lower_days < window.upper_days
+    assert window.confidence == pytest.approx(0.8, rel=1e-6)
+    assert window.lower_date is not None
+    assert window.upper_date is not None
+
+    assert result.cadence_schedule
+    assert result.run_interval_days == 14
+    assert any(run.assignments for run in result.cadence_schedule)
+    today_run = result.cadence_schedule[0]
+    assignment = next(item for item in today_run.assignments if item.projection.material == "Test Material")
+    assert assignment.recommended_purchase_units is not None
+    assert assignment.recommended_purchase_units > 0
+    assert assignment.recommended_purchase_cost is not None
+
+
 def test_kalman_estimator_tracks_constant_usage() -> None:
-    estimator = KalmanUsageEstimator()
+    config = load_kalman_parameters(KALMAN_CONFIG_PATH)
+    estimator = KalmanUsageEstimator(config=config)
     intervals = _build_constant_usage_intervals(units_per_purchase=50.0, interval_days=10, count=6)
 
     estimate = estimator.estimate(intervals)
@@ -51,6 +139,32 @@ def test_kalman_estimator_tracks_constant_usage() -> None:
     assert abs(estimate.usage_per_day - 5.0) < 0.2
     assert estimate.confidence > 0.6
 
+
+def test_cadence_schedule_highlights_short_lived_materials() -> None:
+    rows = _generate_purchase_rows(purchase_count=6, interval_days=5)
+    history_rows = rows[:-1]
+    dataframe = pl.DataFrame(history_rows)
+
+    config = load_kalman_parameters(KALMAN_CONFIG_PATH)
+    estimator = KalmanUsageEstimator(config=config)
+    run_config = SupplyRunConfig(target_run_interval_days=14)
+    service = MaterialPurchaseAnalyticsService(AdaptiveUsageConfig(), run_config, usage_estimator=estimator)
+
+    reference_date = history_rows[-1]["Purchase_Date"]
+    result = service.analyze(
+        dataframe,
+        min_purchases=3,
+        reference_date=reference_date,
+    )
+
+    assert result.cadence_schedule
+    warnings = [assignment for assignment in result.cadence_warnings if assignment.projection.material == "Test Material"]
+    assert warnings
+    assert warnings[0].violates_cadence
+    assert warnings[0].lower_days_available is not None
+    assert warnings[0].lower_days_available < run_config.target_run_interval_days
+    assert warnings[0].recommended_purchase_units is not None
+    assert warnings[0].recommended_purchase_units > 0
 
 def _generate_purchase_rows(purchase_count: int, interval_days: int) -> list[dict[str, object]]:
     """Create synthetic purchase history with an additional future purchase for evaluation."""
@@ -88,16 +202,25 @@ def _evaluate_prediction_accuracy(
 
     minimum_history = min_purchases
     total_rows = len(purchase_rows)
+    config = load_kalman_parameters(KALMAN_CONFIG_PATH)
 
     for history_size in range(minimum_history, total_rows):
         history_rows = purchase_rows[:history_size]
         actual_next_purchase = purchase_rows[history_size]["Purchase_Date"]
 
         dataframe = pl.DataFrame(history_rows)
-        estimator = KalmanUsageEstimator()
+        estimator = KalmanUsageEstimator(config=config)
         service = MaterialPurchaseAnalyticsService(usage_config, run_config, usage_estimator=estimator)
 
-        result = service.analyze(dataframe, min_purchases=minimum_history)
+        reference_date = history_rows[-1]["Purchase_Date"]
+        if not isinstance(reference_date, datetime):
+            continue
+
+        result = service.analyze(
+            dataframe,
+            min_purchases=minimum_history,
+            reference_date=reference_date,
+        )
         projection = next((proj for proj in result.projections if proj.material == "Test Material"), None)
 
         predicted_runout = projection.estimated_runout_date if projection else None
@@ -251,13 +374,21 @@ def _evaluate_real_materials(
             if history_window.height < min_purchases:
                 continue
 
+            history_end = history_window.get_column(purchase_col).max()
+            if not isinstance(history_end, datetime):
+                continue
+
             service = MaterialPurchaseAnalyticsService(
                 usage_config,
                 run_config,
                 usage_estimator=estimator_factory(),
             )
 
-            result = service.analyze(history_window, min_purchases=min_purchases)
+            result = service.analyze(
+                history_window,
+                min_purchases=min_purchases,
+                reference_date=history_end,
+            )
             if not result.projections:
                 continue
 
@@ -272,7 +403,7 @@ def _evaluate_real_materials(
                     "material": material,
                     "history_size": history_window.height,
                     "history_start": window_start,
-                    "history_end": history_window.get_column(purchase_col).max(),
+                    "history_end": history_end,
                     "predicted_next_purchase": predicted_runout,
                     "actual_next_purchase": actual_next_purchase,
                     "abs_error_days": abs_error_days,
@@ -297,21 +428,25 @@ def _run_optuna_parameter_search(
 
     trial_records: list[dict[str, object]] = []
 
+    base_config = load_kalman_parameters(KALMAN_CONFIG_PATH)
+
     def objective(trial: optuna.Trial) -> float:
         process_var = trial.suggest_float("initial_process_variance", 0.01, 0.2, log=True)
         measurement_var = trial.suggest_float("initial_measurement_variance", 0.05, 0.2, log=True)
         sample_target = trial.suggest_int("target_sample_size", 3, 10)
         max_em = trial.suggest_int("max_em_iterations", 4, 16)
 
-        estimator_params: dict[str, float | int] = {
+        overrides: dict[str, float | int] = {
             "initial_process_variance": process_var,
             "initial_measurement_variance": measurement_var,
             "target_sample_size": sample_target,
             "max_em_iterations": max_em,
         }
+        config_mapping = {**base_config.to_dict(), **overrides}
+        estimator_config = KalmanFilterConfig.from_mapping(config_mapping)
 
-        def estimator_factory(params: dict[str, float | int] = estimator_params) -> KalmanUsageEstimator:
-            return KalmanUsageEstimator(**params)
+        def estimator_factory(config: KalmanFilterConfig = estimator_config) -> KalmanUsageEstimator:
+            return KalmanUsageEstimator(config=config)
 
         metrics = _evaluate_real_materials(
             dataframe,
@@ -372,14 +507,16 @@ def _run_optuna_parameter_search(
     if best_record is None:
         best_record = summary_frame.sort("mae_days").row(0)
 
-    best_params = {
+    best_overrides = {
         "initial_process_variance": best_trial.params["initial_process_variance"],
         "initial_measurement_variance": best_trial.params["initial_measurement_variance"],
         "target_sample_size": int(best_trial.params["target_sample_size"]),
         "max_em_iterations": int(best_trial.params["max_em_iterations"]),
     }
+    best_config_mapping = {**base_config.to_dict(), **best_overrides}
+    best_config = KalmanFilterConfig.from_mapping(best_config_mapping)
 
-    return summary_frame, best_params, best_record
+    return summary_frame, best_config, best_record
 
 
 @pytest.mark.integration
@@ -394,7 +531,7 @@ def test_kalman_estimator_on_grist_data() -> None:
     usage_config = AdaptiveUsageConfig()
     run_config = SupplyRunConfig(minimum_purchase_count=min_purchases)
 
-    summary_frame, best_params, best_record = _run_optuna_parameter_search(
+    summary_frame, best_config, best_record = _run_optuna_parameter_search(
         dataframe,
         min_purchases=min_purchases,
         trailing_days=trailing_days,
@@ -420,6 +557,6 @@ def test_kalman_estimator_on_grist_data() -> None:
     summary_path = artifact_dir / "kalman_parameter_sweep_summary.csv"
     summary_frame.write_csv(summary_path)
 
-    best_params_json = json.dumps(best_params, indent=2, sort_keys=True)
+    best_params_json = json.dumps(best_config.to_dict(), indent=2, sort_keys=True)
     KALMAN_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     KALMAN_CONFIG_PATH.write_text(best_params_json)
