@@ -1,7 +1,8 @@
 import logging
 from typing import Optional, List, Dict, Any
 import diskcache as dc
-import os
+
+from core.cache.cache_paths import resolve_cache_path
 
 logger = logging.getLogger(__name__)
 
@@ -11,8 +12,8 @@ class RecipeCacheManager:
 
     def __init__(self, cache_duration_seconds: int = 3600):  # 1 hour default
         self.cache_duration_seconds = cache_duration_seconds
-        cache_dir = os.path.expanduser("~/.cache/kanomnom/recipes")
-        self.cache = dc.Cache(cache_dir)
+        cache_dir = resolve_cache_path("recipes")
+        self.cache = dc.Cache(str(cache_dir))
         logger.info(f"Initialized RecipeCacheManager with {cache_duration_seconds/3600}h TTL at {cache_dir}")
 
     def save_recipes(self, recipes_data: List[Dict[str, Any]]):
@@ -41,6 +42,24 @@ class RecipeCacheManager:
         if "tandoor_recipes" in self.cache:
             del self.cache["tandoor_recipes"]
             logger.info("Cleared recipe cache")
+
+    def has_valid_cache(self) -> bool:
+        """Return True when cached recipe data exists and contains entries."""
+        try:
+            recipes_data = self.cache.get("tandoor_recipes")
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"Error inspecting recipe cache: {exc}")
+            return False
+
+        if not recipes_data:
+            logger.debug("Recipe cache is empty or missing data")
+            return False
+
+        if not isinstance(recipes_data, list):
+            logger.info("Recipe cache contains unexpected data type %s", type(recipes_data))
+            return False
+
+        return True
 
     def cache_info(self):
         """Get cache information for debugging."""

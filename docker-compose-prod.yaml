@@ -12,9 +12,12 @@ services:
       - .env
     restart: unless-stopped
     networks:
+      - proxy
       - database
     volumes:
       - /home/tarmily/kanomnom-server/kanomnom-python-server/request_dumps:/home/kanomnom-python-server/request_dumps
 networks:
+  proxy:
+    external: true
   database:
     external: true

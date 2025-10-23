@@ -6,7 +6,7 @@ from typing import Optional, Union
 import phonenumbers
 from email_validator import EmailNotValidError, ValidatedEmail, validate_email
 from phonenumbers import PhoneNumber
-from pydantic import BaseModel, ConfigDict, RootModel, field_validator
+from pydantic import BaseModel, ConfigDict, RootModel, field_validator, model_validator
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -30,7 +30,6 @@ class PreferredContactMethod(str, Enum):
     TEXT = "text"
     EMAIL = "email"
 
-
 class Inquiry(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -47,7 +46,8 @@ class Inquiry(BaseModel):
     inquiry_type: Optional[InquiryType] = None
     inquiry: str
     last_updated: datetime
-    attachments: Optional[str] = None
+    location: str
+    attachments: Optional[list] = None
 
     @field_validator("preferred_contact_method", mode="before")
     @classmethod
@@ -98,6 +98,20 @@ class Inquiry(BaseModel):
         if v is None:
             return ""
         return v
+
+    @field_validator("attachments", mode="before")
+    @classmethod
+    def normalize_attachments(cls, value):
+        if value is None:
+            return None
+        if isinstance(value, (list, tuple)):
+            if not value:
+                return []
+            first_item = value[0]
+            if isinstance(first_item, (list, tuple, dict)):
+                return list(value)
+            return [value]
+        raise TypeError(f"Unsupported attachments payload: {type(value)!r}")
 
 
 class Inquiries(RootModel[list[Inquiry]]):

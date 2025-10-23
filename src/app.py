@@ -14,6 +14,13 @@ from flet.fastapi import app as flet_fastapi
 
 from api.routes import grist
 from bot import TELEGRAM_INQURY_GROUP_CHAT_ID, telegram_app
+from core.cache.cache_service import get_cache_service
+from core.cache.grist_cache_refresher import GristCacheRefresher, GristCacheRefresherConfig
+from core.cache.tandoor_cache_refresher import (
+    TandoorCacheRefresher,
+    TandoorCacheRefresherConfig,
+    default_tandoor_service_factory,
+)
 from flet_app import main as flet_main
 from setup import initialize_server
 
@@ -33,24 +40,43 @@ async def lifespan(app: FastAPI):
     logging.info("Starting Telegram bot inside FastAPI lifespan...")
     await telegram_app.initialize()
 
-    # ✅ Start fetching updates in a background task
+    cache_service = get_cache_service()
+    grist_cache_refresher = GristCacheRefresher(
+        cache_service=cache_service,
+        config=GristCacheRefresherConfig.default(),
+    )
+    tandoor_cache_refresher = TandoorCacheRefresher(
+        cache_service=cache_service,
+        config=TandoorCacheRefresherConfig.default(),
+        service_factory=default_tandoor_service_factory,
+    )
+
+    try:
+        await grist_cache_refresher.start()
+        await tandoor_cache_refresher.start()
+    except Exception:
+        await grist_cache_refresher.stop()
+        raise
+
     bot_task = asyncio.create_task(telegram_app.updater.start_polling())
     await telegram_app.start()
 
-    yield  # Continue running FastAPI
-
-    # Stop bot gracefully on shutdown
-    await telegram_app.updater.stop()
-    await telegram_app.stop()
-    bot_task.cancel()
-    logging.info("Telegram bot stopped.")
+    try:
+        yield  # Continue running FastAPI
+    finally:
+        await tandoor_cache_refresher.stop()
+        await grist_cache_refresher.stop()
+        await telegram_app.updater.stop()
+        await telegram_app.stop()
+        bot_task.cancel()
+        logging.info("Telegram bot stopped.")
 
 
 app = FastAPI(
     title="My FastAPI Service",
     description="Python server to watch over services running for ka-nom nom like grist and medusa",
     version="1.0.0",
-    # lifespan=lifespan,
+    lifespan=lifespan,
 )
 
 validation_error_cache = TTLCache(maxsize=1000, ttl=600)

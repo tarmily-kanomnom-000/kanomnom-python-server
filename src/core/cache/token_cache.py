@@ -1,8 +1,9 @@
 import logging
 from typing import Optional, Dict, Any
 import diskcache as dc
-import os
 from datetime import datetime
+
+from core.cache.cache_paths import resolve_cache_path
 
 logger = logging.getLogger(__name__)
 
@@ -11,8 +12,8 @@ class TokenCacheManager:
     """Manages caching of authentication tokens using DiskCache."""
 
     def __init__(self):
-        cache_dir = os.path.expanduser("~/.cache/kanomnom/tokens")
-        self.cache = dc.Cache(cache_dir)
+        cache_dir = resolve_cache_path("tokens")
+        self.cache = dc.Cache(str(cache_dir))
         logger.info(f"Initialized TokenCacheManager at {cache_dir}")
 
     def save_token(self, token: str, expires: datetime):
