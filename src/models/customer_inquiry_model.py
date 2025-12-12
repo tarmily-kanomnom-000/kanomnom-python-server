@@ -30,6 +30,7 @@ class PreferredContactMethod(str, Enum):
     TEXT = "text"
     EMAIL = "email"
 
+
 class Inquiry(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

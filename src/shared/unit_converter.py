@@ -36,11 +36,7 @@ LIQUID_DENSITIES = {
 
 # Special unit conversions for specific material-ingredient pairs
 # Maps material name to conversion factors between units
-SPECIAL_UNIT_CONVERSIONS = {
-    "fresh mango": {
-        "count_to_g": 181.8  # 1 fresh mango yields 181.8g chunks
-    }
-}
+SPECIAL_UNIT_CONVERSIONS = {"fresh mango": {"count_to_g": 181.8}}  # 1 fresh mango yields 181.8g chunks
 
 
 def get_special_conversion_factor(material_name: str, from_unit: str, to_unit: str) -> float:

@@ -13,9 +13,12 @@ services:
       - "6970:6969"
     restart: unless-stopped
     networks:
+      - proxy
       - database
     volumes:
         - .:/home/kanomnom-python-server
 networks:
+  proxy:
+    external: true
   database:
     external: true

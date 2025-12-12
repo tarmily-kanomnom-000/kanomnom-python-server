@@ -158,13 +158,16 @@ def test_cadence_schedule_highlights_short_lived_materials() -> None:
     )
 
     assert result.cadence_schedule
-    warnings = [assignment for assignment in result.cadence_warnings if assignment.projection.material == "Test Material"]
+    warnings = [
+        assignment for assignment in result.cadence_warnings if assignment.projection.material == "Test Material"
+    ]
     assert warnings
     assert warnings[0].violates_cadence
     assert warnings[0].lower_days_available is not None
     assert warnings[0].lower_days_available < run_config.target_run_interval_days
     assert warnings[0].recommended_purchase_units is not None
     assert warnings[0].recommended_purchase_units > 0
+
 
 def _generate_purchase_rows(purchase_count: int, interval_days: int) -> list[dict[str, object]]:
     """Create synthetic purchase history with an additional future purchase for evaluation."""

@@ -11,7 +11,11 @@ from flet.core.control_event import ControlEvent
 
 from shared.grist_service import DataFilterManager
 
-from .analysis_service import AdaptiveUsageConfig, MaterialPurchaseAnalyticsService, SupplyRunConfig
+from .analysis_service import (
+    AdaptiveUsageConfig,
+    MaterialPurchaseAnalyticsService,
+    SupplyRunConfig,
+)
 from .state_manager import MaterialPurchaseRunsState
 from .ui_components import MaterialPurchaseRunsUIBuilder
 

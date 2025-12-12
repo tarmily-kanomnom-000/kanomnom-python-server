@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 
 import uvicorn
@@ -11,17 +11,29 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from flet.fastapi import app as flet_fastapi
+from zoneinfo import ZoneInfo
 
-from api.routes import grist
+from api.routes import grist, grocy
 from bot import TELEGRAM_INQURY_GROUP_CHAT_ID, telegram_app
 from core.cache.cache_service import get_cache_service
-from core.cache.grist_cache_refresher import GristCacheRefresher, GristCacheRefresherConfig
+from core.cache.grist_cache_refresher import (
+    GristCacheRefresher,
+    GristCacheRefresherConfig,
+)
 from core.cache.tandoor_cache_refresher import (
     TandoorCacheRefresher,
     TandoorCacheRefresherConfig,
     default_tandoor_service_factory,
 )
 from flet_app import main as flet_main
+from services.weather.config import (
+    DEFAULT_DATABASE_CONFIG,
+    DEFAULT_LOCATIONS,
+    WEATHER_FETCH_TIME,
+    weather_scheduler_timezone,
+)
+from services.weather.utils import seconds_until_next_run
+from services.weather.job import WeatherIngestJob
 from setup import initialize_server
 
 initialize_server()
@@ -58,12 +70,25 @@ async def lifespan(app: FastAPI):
         await grist_cache_refresher.stop()
         raise
 
+    weather_stop_event: asyncio.Event | None = None
+    weather_task: asyncio.Task | None = None
+
     bot_task = asyncio.create_task(telegram_app.updater.start_polling())
     await telegram_app.start()
+
+    weather_stop_event = asyncio.Event()
+    weather_task = asyncio.create_task(_weather_ingest_loop(weather_stop_event))
 
     try:
         yield  # Continue running FastAPI
     finally:
+        if weather_stop_event:
+            weather_stop_event.set()
+        if weather_task:
+            try:
+                await weather_task
+            except asyncio.CancelledError:
+                logging.info("Weather ingest scheduler cancelled during shutdown.")
         await tandoor_cache_refresher.stop()
         await grist_cache_refresher.stop()
         await telegram_app.updater.stop()
@@ -85,6 +110,37 @@ validation_error_cache = TTLCache(maxsize=1000, ttl=600)
 # Directory to store request dumps
 DUMP_DIR = Path("request_dumps")
 DUMP_DIR.mkdir(exist_ok=True)
+
+async def _weather_ingest_loop(stop_event: asyncio.Event) -> None:
+    tz = weather_scheduler_timezone()
+    job = WeatherIngestJob(
+        db_config=DEFAULT_DATABASE_CONFIG,
+        locations=DEFAULT_LOCATIONS,
+    )
+    while not stop_event.is_set():
+        wait_seconds = seconds_until_next_run(datetime.now(tz), WEATHER_FETCH_TIME, tz)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=wait_seconds)
+            break
+        except asyncio.TimeoutError:
+            pass
+
+        previous_day_iso = (datetime.now(tz) - timedelta(days=1)).date().isoformat()
+        logging.info(
+            "Starting scheduled weather ingest for %s (timezone=%s)",
+            previous_day_iso,
+            getattr(tz, "key", str(tz)),
+        )
+        try:
+            await asyncio.to_thread(
+                job.run,
+                start_date=previous_day_iso,
+                end_date=previous_day_iso,
+                dry_run=False,
+            )
+            logging.info("Finished scheduled weather ingest for %s", previous_day_iso)
+        except Exception:
+            logging.exception("Weather ingest job failed for %s", previous_day_iso)
 
 
 @app.exception_handler(RequestValidationError)
@@ -148,6 +204,7 @@ async def redirect_to_flet():
 
 
 app.include_router(grist.router)
+app.include_router(grocy.router)
 
 
 @app.get("/")

@@ -12,7 +12,9 @@ from typing import Sequence
 
 import numpy as np
 from numpy.linalg import LinAlgError
-from statsmodels.tsa.statespace.kalman_filter import KalmanFilter as StatsmodelsKalmanFilter
+from statsmodels.tsa.statespace.kalman_filter import (
+    KalmanFilter as StatsmodelsKalmanFilter,
+)
 
 from .kalman_em import run_local_level_em, smooth_local_level
 

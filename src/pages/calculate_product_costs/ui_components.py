@@ -11,7 +11,12 @@ from flet.core.control_event import ControlEvent
 
 from shared.ui.layout import default_layout_config, styled_container
 
-from .constants import BUTTON_SPACING, COST_DISPLAY_PRECISION, DATE_FIELD_WIDTH, INGREDIENT_DISPLAY_PRECISION
+from .constants import (
+    BUTTON_SPACING,
+    COST_DISPLAY_PRECISION,
+    DATE_FIELD_WIDTH,
+    INGREDIENT_DISPLAY_PRECISION,
+)
 
 SortedIngredient = tuple[str, float, str, Optional[float], Optional[float], dict]
 

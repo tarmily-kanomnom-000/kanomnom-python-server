@@ -21,7 +21,6 @@ from .usage_estimation import (
     create_default_kalman_estimator,
 )
 
-
 PROBABILITY_INTERVAL = (0.1, 0.9)
 
 
@@ -370,8 +369,7 @@ class MaterialPurchaseAnalyticsService:
                     units_purchased=total_units,
                     usage_mean=usage_per_day,
                     usage_variance=usage_variance,
-                    days_since_last_purchase=
-                        days_since_last_purchase if days_since_last_purchase is not None else 0.0,
+                    days_since_last_purchase=days_since_last_purchase if days_since_last_purchase is not None else 0.0,
                     bias_days=bias_days,
                     now=now,
                 )

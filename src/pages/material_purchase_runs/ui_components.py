@@ -70,9 +70,7 @@ class MaterialPurchaseRunsUIBuilder:
             unit_text = f"Unit: {unit_value}" if unit_value else ""
             runout_text = f"Runout: {runout_date_text}" if runout_date_text != "-" else ""
             subtitle_parts = [
-                part
-                for part in [unit_text, days_text, window_text, runout_text, source_text, confidence_text]
-                if part
+                part for part in [unit_text, days_text, window_text, runout_text, source_text, confidence_text] if part
             ]
             subtitle = " • ".join(subtitle_parts)
             tiles.append(
@@ -96,7 +94,9 @@ class MaterialPurchaseRunsUIBuilder:
         if not schedule_list:
             return self._panel(
                 title="Cadence Supply Schedule",
-                controls=[ft.Text("No materials require ordering within the configured horizon.", color=ft.Colors.GREEN)],
+                controls=[
+                    ft.Text("No materials require ordering within the configured horizon.", color=ft.Colors.GREEN)
+                ],
             )
 
         tiles: list[ft.Control] = []
@@ -110,6 +110,7 @@ class MaterialPurchaseRunsUIBuilder:
             subtitle = ft.Text(summary, size=12, color=ft.Colors.GREY)
 
             rows: list[ft.DataRow] = []
+
             def _assignment_sort_key(item: SupplyRunAssignment) -> tuple[int, float, str]:
                 safe = item.lower_days_available
                 safe_value = safe if safe is not None else float("inf")
@@ -151,8 +152,8 @@ class MaterialPurchaseRunsUIBuilder:
                         cells=[
                             ft.DataCell(ft.Text(projection.material)),
                             ft.DataCell(ft.Text(self._format_unit(projection) or "-")),
-                        ft.DataCell(ft.Text(source_text)),
-                        ft.DataCell(ft.Text(on_hand_text)),
+                            ft.DataCell(ft.Text(source_text)),
+                            ft.DataCell(ft.Text(on_hand_text)),
                             ft.DataCell(ft.Text(purchase_text)),
                             ft.DataCell(ft.Text(cost_text)),
                             ft.DataCell(ft.Text(safe_text)),
@@ -226,7 +227,9 @@ class MaterialPurchaseRunsUIBuilder:
         rows: list[ft.DataRow] = []
         for assignment in sorted(warning_list, key=lambda item: item.projection.material.lower()):
             projection = assignment.projection
-            run_label, run_date = schedule_lookup.get(id(assignment), (f"Run @ {assignment.run_offset_days:.0f}d", None))
+            run_label, run_date = schedule_lookup.get(
+                id(assignment), (f"Run @ {assignment.run_offset_days:.0f}d", None)
+            )
             reason = self._format_assignment_warning(assignment, interval_days)
             purchase_text = self._format_quantity(assignment.recommended_purchase_units, projection.unit)
             cost_text = self._format_currency(assignment.recommended_purchase_cost)

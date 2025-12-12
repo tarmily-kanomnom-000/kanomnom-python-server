@@ -1,0 +1,11 @@
+address:
+  city: Philadelphia
+  country: United States of America
+  line 1: 4000 Gypsy Ln
+  line 2: Unit 728
+  postal code: '19129'
+  state: PA
+api_key: ydwR48LjoYiWi6etx61Fgi3htbLVztdqy7ZJntFkXcu64B018R
+grocy_url: http://grocy-home:80
+location_name: Home
+location_types: [ "Warehouse", "Factory" ]

@@ -1,7 +1,9 @@
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
+
 import diskcache as dc
 
+from core.cache.cache_config import get_cache_timeouts
 from core.cache.cache_paths import resolve_cache_path
 
 logger = logging.getLogger(__name__)
@@ -10,11 +12,16 @@ logger = logging.getLogger(__name__)
 class RecipeCacheManager:
     """Manages caching of recipe data using DiskCache."""
 
-    def __init__(self, cache_duration_seconds: int = 3600):  # 1 hour default
-        self.cache_duration_seconds = cache_duration_seconds
+    def __init__(self):
+        timeouts = get_cache_timeouts()
+        self.cache_duration_seconds = timeouts.recipe_seconds
         cache_dir = resolve_cache_path("recipes")
         self.cache = dc.Cache(str(cache_dir))
-        logger.info(f"Initialized RecipeCacheManager with {cache_duration_seconds/3600}h TTL at {cache_dir}")
+        logger.info(
+            "Initialized RecipeCacheManager with %.2fh TTL at %s",
+            self.cache_duration_seconds / 3600,
+            cache_dir,
+        )
 
     def save_recipes(self, recipes_data: List[Dict[str, Any]]):
         """Save recipe data to cache."""
