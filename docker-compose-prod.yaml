@@ -3,13 +3,14 @@ services:
     container_name: kanomnom-python-server
     build:
       context: .
-      dockerfile: ./Dockerfile.prod
+      dockerfile: Dockerfile.prod
       args:
         - PYTHON_VERSION=3.13
     ports:
       - "6969:6969"
+      - "6968:3000"
     env_file:
-      - .env
+      - ./apps/api/.env
     restart: unless-stopped
     networks:
       - proxy

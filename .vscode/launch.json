@@ -7,7 +7,7 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "src.app:app",
+                "apps.api.src.app:app",
                 "--host",
                 "0.0.0.0",
                 "--port",
@@ -18,4 +18,4 @@
             "justMyCode": true
         }
     ]
-} 
+}

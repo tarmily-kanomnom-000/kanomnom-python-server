@@ -9,6 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     curl \
+    npm \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -42,10 +43,11 @@ ENV PATH="/root/.local/bin:$PATH"
 
 RUN uv --version || (echo "uv verification failed" && exit 1)
 
-ENV PYTHONPATH="/home/kanomnom-python-server/src:$PYTHONPATH"
+ENV PYTHONPATH="/home/kanomnom-python-server/apps/api/src:$PYTHONPATH"
 
-COPY pyproject.toml uv.lock /home/kanomnom-python-server/
-COPY src /home/kanomnom-python-server/src
+COPY pyproject.toml uv.lock /home/kanomnom-python-server/apps/api/src
+COPY apps /home/kanomnom-python-server/apps
+COPY scripts /home/kanomnom-python-server/scripts
 WORKDIR /home/kanomnom-python-server
 
-ENTRYPOINT ["uv", "run", "src/app.py"]
+ENTRYPOINT ["./scripts/run-stack-prod.sh"]

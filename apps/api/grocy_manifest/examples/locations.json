@@ -1,0 +1,26 @@
+[
+    {
+        "id": 3,
+        "name": "Upright Fridge",
+        "description": "For relatively small, quick access, and frequent materials",
+        "row_created_timestamp": "2025-11-16 22:03:34",
+        "is_freezer": 0,
+        "active": 1
+    },
+    {
+        "id": 4,
+        "name": "Undercounter Freezer",
+        "description": "For small quick access and frequent usage",
+        "row_created_timestamp": "2025-11-16 22:04:26",
+        "is_freezer": 1,
+        "active": 1
+    },
+    {
+        "id": 7,
+        "name": "Cabinets - Market at the Fareway",
+        "description": null,
+        "row_created_timestamp": "2025-11-20 17:56:26",
+        "is_freezer": 0,
+        "active": 1
+    }
+]

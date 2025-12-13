@@ -7,14 +7,15 @@ It’s intentionally opinionated, designed for clarity, reliability, and maintai
 
 ## Project Snapshot
 
-- `src/` is the root of the FastAPI-based Python server and holds all runtime modules.
-- `src/api/` contains the FastAPI route definitions and request/response plumbing.
-- `src/core/` captures foundational services such as caching and other cross-cutting logic.
-- `src/pages/` implements the Flet UI pages that drive the interactive experience.
-- `src/models/` defines typed payloads and helpers used across API requests and responses.
-- `src/shared/` hosts reusable utilities that support multiple features without being core infrastructure.
+- `apps/` holds every runtime (FastAPI API, future dashboards, background workers). Each runtime keeps its own toolchain and `src/` tree under `apps/<runtime>/`.
+- `apps/api/` contains the FastAPI-based Python server and is the only runtime today.
+- `apps/api/src/api/` defines the FastAPI routes and request/response plumbing.
+- `apps/api/src/core/` captures foundational Grocy services (caching, synchronization, etc.).
+- `apps/api/src/pages/` implements the Flet UI pages that drive the interactive experience.
+- `apps/api/src/models/` defines typed payloads used across API requests and responses.
+- `apps/api/src/shared/` hosts reusable utilities that support multiple features without being core infrastructure.
 
-Keep this mental map current whenever you add new modules or move functionality—future contributors rely on it to navigate quickly.
+Keep this mental map current whenever you add new modules or runtimes—future contributors rely on it to navigate quickly.
 
 ---
 

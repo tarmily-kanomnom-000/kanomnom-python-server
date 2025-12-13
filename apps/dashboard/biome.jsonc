@@ -1,0 +1,57 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
+  "files": {
+    "includes": ["src/**/*.{js,jsx,ts,tsx}"]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 80
+  },
+  "linter": {
+    "rules": {
+      "nursery": {
+        "useExplicitType": "off",
+        "noSecrets": "off",
+        "useUniqueElementIds": "off"
+      },
+      "style": {
+        "useBlockStatements": "on",
+        "useNodejsImportProtocol": "off",
+        "useImportType": "off",
+        "noDefaultExport": "off",
+        "useNamingConvention": "off",
+        "useFilenamingConvention": "off",
+        "useSelfClosingElements": "off",
+        "useConsistentBuiltinInstantiation": "off",
+        "noUselessElse": "off",
+        "noNegationElse": "off"
+      },
+      "correctness": {
+        "noNodejsModules": "off",
+        "noUndeclaredVariables": "off",
+        "useImportExtensions": "off",
+        "noUnusedVariables": "off",
+        "noUnusedFunctionParameters": "off"
+      },
+      "suspicious": {
+        "noReactSpecificProps": "off",
+        "noConsole": "off",
+        "noExplicitAny": "off",
+        "noEmptyBlockStatements": "off",
+        "noEvolvingTypes": "off"
+      },
+      "performance": {
+        "useTopLevelRegex": "off",
+        "noImgElement": "off"
+      },
+      "complexity": {
+        "useSimplifiedLogicExpression": "off",
+        "useArrowFunction": "off",
+        "noExcessiveCognitiveComplexity": "off",
+        "noUselessFragments": "off"
+      },
+      "a11y": "off"
+    }
+  }
+}

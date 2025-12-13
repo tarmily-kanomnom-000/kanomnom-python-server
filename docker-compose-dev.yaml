@@ -3,20 +3,21 @@ services:
     container_name: kanomnom-python-server-dev
     build:
       context: .
-      dockerfile: ./Dockerfile.dev
+      dockerfile: Dockerfile.dev
       args:
         - PYTHON_VERSION=3.13
     command: "tail -f /dev/null"
     env_file:
-      - .env
+      - ./apps/api/.env
     ports:
       - "6970:6969"
+      - "6971:3000"
     restart: unless-stopped
     networks:
       - proxy
       - database
     volumes:
-        - .:/home/kanomnom-python-server
+      - .:/home/kanomnom-python-server
 networks:
   proxy:
     external: true

@@ -1,0 +1,92 @@
+[
+    {
+        "id": 6,
+        "name": "piece",
+        "description": null,
+        "row_created_timestamp": "2025-11-16 22:14:31",
+        "name_plural": "pieces",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "id": 11,
+        "name": "gram",
+        "description": null,
+        "row_created_timestamp": "2025-11-16 22:15:32",
+        "name_plural": "grams",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "id": 13,
+        "name": "gallon",
+        "description": null,
+        "row_created_timestamp": "2025-11-16 22:18:36",
+        "name_plural": "gallons",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "id": 15,
+        "name": "roll",
+        "description": null,
+        "row_created_timestamp": "2025-11-16 22:20:22",
+        "name_plural": "rolls",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "id": 16,
+        "name": "mL",
+        "description": null,
+        "row_created_timestamp": "2025-11-20 20:31:22",
+        "name_plural": "mL",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "id": 17,
+        "name": "stack",
+        "description": null,
+        "row_created_timestamp": "2025-11-23 17:48:55",
+        "name_plural": "stacks",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "id": 18,
+        "name": "liter",
+        "description": null,
+        "row_created_timestamp": "2025-12-02 17:10:58",
+        "name_plural": "liters",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "id": 19,
+        "name": "pound",
+        "description": null,
+        "row_created_timestamp": "2025-12-02 17:15:40",
+        "name_plural": "pounds",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "id": 20,
+        "name": "kilogram",
+        "description": null,
+        "row_created_timestamp": "2025-12-02 17:15:48",
+        "name_plural": "kilograms",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "id": 21,
+        "name": "box",
+        "description": null,
+        "row_created_timestamp": "2025-12-07 16:43:33",
+        "name_plural": "boxes",
+        "plural_forms": null,
+        "active": 1
+    }
+]

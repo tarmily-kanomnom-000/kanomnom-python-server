@@ -1,0 +1,21 @@
+{
+  "name": "Ka-Nom Nom Dashboard",
+  "short_name": "Ka-Nom Nom",
+  "description": "Internal dashboard for managing Ka-Nom Nom data and workflows.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f4",
+  "theme_color": "#111827",
+  "icons": [
+    {
+      "src": "/logo.webp",
+      "sizes": "192x192",
+      "type": "image/webp"
+    },
+    {
+      "src": "/logo.webp",
+      "sizes": "512x512",
+      "type": "image/webp"
+    }
+  ]
+}

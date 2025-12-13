@@ -1,0 +1,4 @@
+history_size,predicted_next_purchase,actual_next_purchase,abs_error_days,usage_per_day,usage_confidence
+3,2025-09-20 15:07:59,2025-09-20 15:07:59,0.0,5.0,0.817
+4,2025-09-30 15:07:59,2025-09-30 15:07:59,0.0,5.0,0.873
+5,2025-10-10 15:07:59,2025-10-10 15:07:59,0.0,5.0,0.929

@@ -1,5 +1,6 @@
 .env
 *.pyc
-request_dumps/*
+apps/api/request_dumps/*
 *cache*
 tests/artifacts/*
+apps/dashboard/node_modules/*

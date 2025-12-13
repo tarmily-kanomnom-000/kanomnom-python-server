@@ -1,0 +1,170 @@
+[
+    {
+        "id": 1,
+        "name": "Fresh Fruits",
+        "description": null,
+        "row_created_timestamp": "2025-11-16 22:25:02",
+        "active": 1
+    },
+    {
+        "id": 2,
+        "name": "Frozen Fruits",
+        "description": null,
+        "row_created_timestamp": "2025-11-16 22:25:08",
+        "active": 1
+    },
+    {
+        "id": 3,
+        "name": "Dairy",
+        "description": null,
+        "row_created_timestamp": "2025-11-16 22:26:02",
+        "active": 1
+    },
+    {
+        "id": 4,
+        "name": "Packaging",
+        "description": null,
+        "row_created_timestamp": "2025-11-16 22:26:10",
+        "active": 1
+    },
+    {
+        "id": 5,
+        "name": "Flavorings & Extracts",
+        "description": null,
+        "row_created_timestamp": "2025-11-16 22:26:57",
+        "active": 1
+    },
+    {
+        "id": 6,
+        "name": "Sugars",
+        "description": null,
+        "row_created_timestamp": "2025-11-16 22:27:03",
+        "active": 1
+    },
+    {
+        "id": 7,
+        "name": "Fruit Juices/Purees",
+        "description": null,
+        "row_created_timestamp": "2025-11-16 22:27:28",
+        "active": 1
+    },
+    {
+        "id": 8,
+        "name": "Powders",
+        "description": null,
+        "row_created_timestamp": "2025-11-16 22:27:46",
+        "active": 1
+    },
+    {
+        "id": 10,
+        "name": "Chocolates",
+        "description": null,
+        "row_created_timestamp": "2025-11-20 17:59:18",
+        "active": 1
+    },
+    {
+        "id": 11,
+        "name": "Baking Essentials",
+        "description": null,
+        "row_created_timestamp": "2025-11-20 20:15:14",
+        "active": 1
+    },
+    {
+        "id": 12,
+        "name": "General Dry Goods",
+        "description": null,
+        "row_created_timestamp": "2025-11-20 20:22:03",
+        "active": 1
+    },
+    {
+        "id": 13,
+        "name": "Canned Goods",
+        "description": null,
+        "row_created_timestamp": "2025-11-20 20:27:07",
+        "active": 1
+    },
+    {
+        "id": 14,
+        "name": "Flours & Starches",
+        "description": null,
+        "row_created_timestamp": "2025-11-20 20:37:27",
+        "active": 1
+    },
+    {
+        "id": 15,
+        "name": "Fats and Oils",
+        "description": null,
+        "row_created_timestamp": "2025-11-23 16:08:09",
+        "active": 1
+    },
+    {
+        "id": 16,
+        "name": "Kitchen Consumables",
+        "description": null,
+        "row_created_timestamp": "2025-11-23 16:22:29",
+        "active": 1
+    },
+    {
+        "id": 17,
+        "name": "Cleaning & Janitorial",
+        "description": null,
+        "row_created_timestamp": "2025-11-23 16:22:48",
+        "active": 1
+    },
+    {
+        "id": 18,
+        "name": "Decorations",
+        "description": null,
+        "row_created_timestamp": "2025-11-23 17:01:56",
+        "active": 1
+    },
+    {
+        "id": 19,
+        "name": "Eggs & Egg Products",
+        "description": null,
+        "row_created_timestamp": "2025-11-23 17:05:56",
+        "active": 1
+    },
+    {
+        "id": 20,
+        "name": "Soy / Plant Proteins",
+        "description": null,
+        "row_created_timestamp": "2025-11-23 17:30:50",
+        "active": 1
+    },
+    {
+        "id": 21,
+        "name": "Derived Intermediate Products",
+        "description": null,
+        "row_created_timestamp": "2025-11-30 14:09:20",
+        "active": 1
+    },
+    {
+        "id": 22,
+        "name": "Drinks",
+        "description": null,
+        "row_created_timestamp": "2025-11-30 16:31:52",
+        "active": 1
+    },
+    {
+        "id": 23,
+        "name": "Drink Toppings",
+        "description": null,
+        "row_created_timestamp": "2025-11-30 16:31:59",
+        "active": 1
+    },
+    {
+        "id": 24,
+        "name": "Supplies",
+        "description": null,
+        "row_created_timestamp": "2025-12-06 11:56:02",
+        "active": 1
+    },
+    {
+        "id": 25,
+        "name": "Prepared Ingredients",
+        "description": null,
+        "row_created_timestamp": "2025-12-07 10:24:52",
+        "active": 1
+    }
+]
