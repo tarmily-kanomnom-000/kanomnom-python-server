@@ -1,6 +1,6 @@
 ## Overview
 
-`apps/api/grocy_manifest/` is the central source of truth for bootstrapping and maintaining several Grocy instances. Each instance lives in its own subdirectory and a `universal/` folder provides shared configuration that should be present everywhere (currently quantity units).
+`apps/api/grocy_manifest/` is the central source of truth for bootstrapping and maintaining several Grocy instances. Each instance lives in its own subdirectory and a `universal/` folder provides shared configuration that should be present everywhere (currently quantity units and product groups).
 
 ```
 apps/api/grocy_manifest/
@@ -31,6 +31,7 @@ Fields:
 `apps/api/grocy_manifest/universal/` stores semantic definitions that are expected everywhere:
 
 - `quantity_units.json`: unit definitions keyed by their names, no database ids.
+- `product_groups.json`: product group definitions keyed by their names, no database ids.
 
 The FastAPI Grocy route resolves each name to the actual ids returned by Grocy, ensuring inserts remain consistent even when Grocy assigns new identifiers.
 
@@ -45,10 +46,10 @@ POST /grocy/{instance_index}/initialize
 The route:
 1. Reads `metadata.yaml` for the target index via the `InstanceMetadataRepository`.
 2. Loads the universal manifest definitions from disk.
-3. Fetches existing quantity units from Grocy.
+3. Fetches existing product groups and quantity units from Grocy.
 4. Creates only the missing ones, returning their identifiers.
 
-Re-running it is safe—the route checks semantically (by unit name) before posting.
+Re-running it is safe—the route checks semantically (by entity name) before posting.
 
 ## Manual Prerequisites (per instance)
 

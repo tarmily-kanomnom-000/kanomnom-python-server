@@ -6,6 +6,7 @@ services:
       dockerfile: Dockerfile.prod
       args:
         - PYTHON_VERSION=3.13
+        - NODE_MAJOR=24
     ports:
       - "6969:6969"
       - "6968:3000"

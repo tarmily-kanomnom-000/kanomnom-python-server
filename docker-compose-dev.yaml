@@ -6,6 +6,7 @@ services:
       dockerfile: Dockerfile.dev
       args:
         - PYTHON_VERSION=3.13
+        - NODE_MAJOR=24
     command: "tail -f /dev/null"
     env_file:
       - ./apps/api/.env

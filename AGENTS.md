@@ -7,13 +7,10 @@ It’s intentionally opinionated, designed for clarity, reliability, and maintai
 
 ## Project Snapshot
 
-- `apps/` holds every runtime (FastAPI API, future dashboards, background workers). Each runtime keeps its own toolchain and `src/` tree under `apps/<runtime>/`.
-- `apps/api/` contains the FastAPI-based Python server and is the only runtime today.
-- `apps/api/src/api/` defines the FastAPI routes and request/response plumbing.
-- `apps/api/src/core/` captures foundational Grocy services (caching, synchronization, etc.).
-- `apps/api/src/pages/` implements the Flet UI pages that drive the interactive experience.
-- `apps/api/src/models/` defines typed payloads used across API requests and responses.
-- `apps/api/src/shared/` hosts reusable utilities that support multiple features without being core infrastructure.
+- `apps/` holds every runtime (FastAPI API, Next.js dashboard, background workers). Each runtime keeps its own toolchain and `src/` tree under `apps/<runtime>/`.
+- `apps/api/` contains the FastAPI-based Python server. `src/api/` defines HTTP routes, `src/core/` houses Grocy-specific services/caches, and `src/models/` contains typed payloads exposed to clients.
+- `apps/dashboard/` is the Next.js UI runtime. `src/app/` implements routes and API proxies, while `src/components/`, `src/hooks/`, `src/lib/`, `src/queries/`, and `src/utils/` organize reusable UI logic for Grocy features (inventory, purchases, etc.).
+- `apps/api/grocy_manifest/` stores instance manifests plus shared universal definitions that seed Grocy instances.
 
 Keep this mental map current whenever you add new modules or runtimes—future contributors rely on it to navigate quickly.
 

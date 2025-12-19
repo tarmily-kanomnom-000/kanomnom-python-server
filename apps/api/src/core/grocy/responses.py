@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, tzinfo
 from typing import Any
 
 
@@ -75,7 +75,7 @@ def _optional_str(raw: Any) -> str | None:
     return value if value else None
 
 
-def _require_timestamp(raw: Any, field: str) -> datetime:
+def _require_timestamp(raw: Any, field: str, source_timezone: tzinfo | None) -> datetime:
     if raw is None:
         raise GrocyResponseError(f"Expected timestamp for '{field}', received None")
     cleaned = str(raw).strip().replace(" ", "T")
@@ -84,14 +84,16 @@ def _require_timestamp(raw: Any, field: str) -> datetime:
     except ValueError as exc:
         raise GrocyResponseError(f"Invalid timestamp for '{field}': {raw!r}") from exc
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        localized = parsed.replace(tzinfo=source_timezone or timezone.utc)
+    else:
+        localized = parsed
+    return localized.astimezone(timezone.utc)
 
 
-def _optional_timestamp(raw: Any, field: str) -> datetime | None:
+def _optional_timestamp(raw: Any, field: str, source_timezone: tzinfo | None) -> datetime | None:
     if raw is None:
         return None
-    return _require_timestamp(raw, field)
+    return _require_timestamp(raw, field, source_timezone)
 
 
 @dataclass(frozen=True)
@@ -135,7 +137,7 @@ class GrocyProduct:
     default_purchase_price_type: int | None
 
     @staticmethod
-    def from_dict(raw: dict[str, Any]) -> "GrocyProduct":
+    def from_dict(raw: dict[str, Any], source_timezone: tzinfo | None) -> "GrocyProduct":
         return GrocyProduct(
             id=_require_int(raw.get("id"), "id"),
             name=_require_str(raw.get("name"), "name"),
@@ -177,7 +179,9 @@ class GrocyProduct:
             no_own_stock=_require_bool(raw.get("no_own_stock"), "no_own_stock"),
             default_consume_location_id=_optional_int(raw.get("default_consume_location_id"), "default_consume_location_id"),
             move_on_open=_require_bool(raw.get("move_on_open"), "move_on_open"),
-            row_created_timestamp=_require_timestamp(raw.get("row_created_timestamp"), "row_created_timestamp"),
+            row_created_timestamp=_require_timestamp(
+                raw.get("row_created_timestamp"), "row_created_timestamp", source_timezone
+            ),
             qu_id_consume=_optional_int(raw.get("qu_id_consume"), "qu_id_consume"),
             auto_reprint_stock_label=_require_bool(raw.get("auto_reprint_stock_label"), "auto_reprint_stock_label"),
             quick_open_amount=_require_float(raw.get("quick_open_amount"), "quick_open_amount"),
@@ -192,30 +196,32 @@ class GrocyStockEntry:
     id: int
     product_id: int
     amount: float
-    best_before_date: str | None
-    purchased_date: str | None
+    best_before_date: datetime | None
+    purchased_date: datetime | None
     stock_id: str | None
     price: float | None
     open: bool
-    opened_date: str | None
+    opened_date: datetime | None
     row_created_timestamp: datetime
     location_id: int | None
     shopping_location_id: int | None
     note: str | None
 
     @staticmethod
-    def from_dict(raw: dict[str, Any]) -> "GrocyStockEntry":
+    def from_dict(raw: dict[str, Any], source_timezone: tzinfo | None) -> "GrocyStockEntry":
         return GrocyStockEntry(
             id=_require_int(raw.get("id"), "id"),
             product_id=_require_int(raw.get("product_id"), "product_id"),
             amount=_require_float(raw.get("amount"), "amount"),
-            best_before_date=_optional_str(raw.get("best_before_date")),
-            purchased_date=_optional_str(raw.get("purchased_date")),
+            best_before_date=_optional_timestamp(raw.get("best_before_date"), "best_before_date", source_timezone),
+            purchased_date=_optional_timestamp(raw.get("purchased_date"), "purchased_date", source_timezone),
             stock_id=_optional_str(raw.get("stock_id")),
             price=_optional_float(raw.get("price"), "price"),
             open=_require_bool(raw.get("open"), "open"),
-            opened_date=_optional_str(raw.get("opened_date")),
-            row_created_timestamp=_require_timestamp(raw.get("row_created_timestamp"), "row_created_timestamp"),
+            opened_date=_optional_timestamp(raw.get("opened_date"), "opened_date", source_timezone),
+            row_created_timestamp=_require_timestamp(
+                raw.get("row_created_timestamp"), "row_created_timestamp", source_timezone
+            ),
             location_id=_optional_int(raw.get("location_id"), "location_id"),
             shopping_location_id=_optional_int(raw.get("shopping_location_id"), "shopping_location_id"),
             note=_optional_str(raw.get("note")),
@@ -227,16 +233,16 @@ class GrocyStockLogEntry:
     id: int
     product_id: int
     amount: float
-    best_before_date: str | None
-    purchased_date: str | None
-    used_date: str | None
+    best_before_date: datetime | None
+    purchased_date: datetime | None
+    used_date: datetime | None
     spoiled: bool
     stock_id: str | None
     transaction_type: str | None
     price: float | None
     undone: bool
-    undone_timestamp: str | None
-    opened_date: str | None
+    undone_timestamp: datetime | None
+    opened_date: datetime | None
     location_id: int | None
     recipe_id: int | None
     correlation_id: str | None
@@ -248,21 +254,21 @@ class GrocyStockLogEntry:
     note: str | None
 
     @staticmethod
-    def from_dict(raw: dict[str, Any]) -> "GrocyStockLogEntry":
+    def from_dict(raw: dict[str, Any], source_timezone: tzinfo | None) -> "GrocyStockLogEntry":
         return GrocyStockLogEntry(
             id=_require_int(raw.get("id"), "id"),
             product_id=_require_int(raw.get("product_id"), "product_id"),
             amount=_require_float(raw.get("amount"), "amount"),
-            best_before_date=_optional_str(raw.get("best_before_date")),
-            purchased_date=_optional_str(raw.get("purchased_date")),
-            used_date=_optional_str(raw.get("used_date")),
+            best_before_date=_optional_timestamp(raw.get("best_before_date"), "best_before_date", source_timezone),
+            purchased_date=_optional_timestamp(raw.get("purchased_date"), "purchased_date", source_timezone),
+            used_date=_optional_timestamp(raw.get("used_date"), "used_date", source_timezone),
             spoiled=_require_bool(raw.get("spoiled"), "spoiled"),
             stock_id=_optional_str(raw.get("stock_id")),
             transaction_type=_optional_str(raw.get("transaction_type")),
             price=_optional_float(raw.get("price"), "price"),
             undone=_require_bool(raw.get("undone"), "undone"),
-            undone_timestamp=_optional_str(raw.get("undone_timestamp")),
-            opened_date=_optional_str(raw.get("opened_date")),
+            undone_timestamp=_optional_timestamp(raw.get("undone_timestamp"), "undone_timestamp", source_timezone),
+            opened_date=_optional_timestamp(raw.get("opened_date"), "opened_date", source_timezone),
             location_id=_optional_int(raw.get("location_id"), "location_id"),
             recipe_id=_optional_int(raw.get("recipe_id"), "recipe_id"),
             correlation_id=_optional_str(raw.get("correlation_id")),
@@ -270,7 +276,9 @@ class GrocyStockLogEntry:
             stock_row_id=_optional_str(raw.get("stock_row_id")),
             shopping_location_id=_optional_int(raw.get("shopping_location_id"), "shopping_location_id"),
             user_id=_optional_int(raw.get("user_id"), "user_id"),
-            row_created_timestamp=_require_timestamp(raw.get("row_created_timestamp"), "row_created_timestamp"),
+            row_created_timestamp=_require_timestamp(
+                raw.get("row_created_timestamp"), "row_created_timestamp", source_timezone
+            ),
             note=_optional_str(raw.get("note")),
         )
 
@@ -307,20 +315,26 @@ def _parse_collection(raw: Any, entity: str) -> list[dict[str, Any]]:
     return parsed
 
 
-def parse_products(raw: Any) -> list[GrocyProduct]:
-    return [GrocyProduct.from_dict(entry) for entry in _parse_collection(raw, "products")]
+def parse_products(raw: Any, source_timezone: tzinfo | None) -> list[GrocyProduct]:
+    return [GrocyProduct.from_dict(entry, source_timezone) for entry in _parse_collection(raw, "products")]
 
 
-def parse_stock_entries(raw: Any) -> list[GrocyStockEntry]:
-    return [GrocyStockEntry.from_dict(entry) for entry in _parse_collection(raw, "stock")]
+def parse_stock_entries(raw: Any, source_timezone: tzinfo | None) -> list[GrocyStockEntry]:
+    return [GrocyStockEntry.from_dict(entry, source_timezone) for entry in _parse_collection(raw, "stock")]
 
 
-def parse_stock_log_entries(raw: Any) -> list[GrocyStockLogEntry]:
-    return [GrocyStockLogEntry.from_dict(entry) for entry in _parse_collection(raw, "stock_log")]
+def parse_stock_log_entries(raw: Any, source_timezone: tzinfo | None) -> list[GrocyStockLogEntry]:
+    return [GrocyStockLogEntry.from_dict(entry, source_timezone) for entry in _parse_collection(raw, "stock_log")]
 
 
 def parse_quantity_units(raw: Any) -> list[GrocyQuantityUnit]:
     return [GrocyQuantityUnit.from_dict(entry) for entry in _parse_collection(raw, "quantity_units")]
+
+
+def parse_product_stock_entries(raw: Any, source_timezone: tzinfo | None) -> list[GrocyStockEntry]:
+    if not isinstance(raw, list):
+        raise GrocyResponseError("Expected list of product stock entries")
+    return [GrocyStockEntry.from_dict(entry, source_timezone) for entry in raw]
 
 
 @dataclass(frozen=True)
@@ -333,19 +347,46 @@ class GrocyLocation:
     active: bool
 
     @staticmethod
-    def from_dict(raw: dict[str, Any]) -> "GrocyLocation":
+    def from_dict(raw: dict[str, Any], source_timezone: tzinfo | None) -> "GrocyLocation":
         return GrocyLocation(
             id=_require_int(raw.get("id"), "id"),
             name=_require_str(raw.get("name"), "name"),
             description=_optional_str(raw.get("description")),
-            row_created_timestamp=_require_timestamp(raw.get("row_created_timestamp"), "row_created_timestamp"),
+            row_created_timestamp=_require_timestamp(
+                raw.get("row_created_timestamp"), "row_created_timestamp", source_timezone
+            ),
             is_freezer=_require_bool(raw.get("is_freezer"), "is_freezer"),
             active=_require_bool(raw.get("active"), "active"),
         )
 
 
-def parse_locations(raw: Any) -> list[GrocyLocation]:
-    return [GrocyLocation.from_dict(entry) for entry in _parse_collection(raw, "locations")]
+def parse_locations(raw: Any, source_timezone: tzinfo | None) -> list[GrocyLocation]:
+    return [GrocyLocation.from_dict(entry, source_timezone) for entry in _parse_collection(raw, "locations")]
+
+
+@dataclass(frozen=True)
+class GrocyShoppingLocation:
+    id: int
+    name: str
+    description: str | None
+    row_created_timestamp: datetime
+    active: bool
+
+    @staticmethod
+    def from_dict(raw: dict[str, Any], source_timezone: tzinfo | None) -> "GrocyShoppingLocation":
+        return GrocyShoppingLocation(
+            id=_require_int(raw.get("id"), "id"),
+            name=_require_str(raw.get("name"), "name"),
+            description=_optional_str(raw.get("description")),
+            row_created_timestamp=_require_timestamp(
+                raw.get("row_created_timestamp"), "row_created_timestamp", source_timezone
+            ),
+            active=_require_bool(raw.get("active"), "active"),
+        )
+
+
+def parse_shopping_locations(raw: Any, source_timezone: tzinfo | None) -> list[GrocyShoppingLocation]:
+    return [GrocyShoppingLocation.from_dict(entry, source_timezone) for entry in _parse_collection(raw, "shopping_locations")]
 
 
 @dataclass(frozen=True)
@@ -357,18 +398,20 @@ class GrocyProductGroup:
     active: bool
 
     @staticmethod
-    def from_dict(raw: dict[str, Any]) -> "GrocyProductGroup":
+    def from_dict(raw: dict[str, Any], source_timezone: tzinfo | None) -> "GrocyProductGroup":
         return GrocyProductGroup(
             id=_require_int(raw.get("id"), "id"),
             name=_require_str(raw.get("name"), "name"),
             description=_optional_str(raw.get("description")),
-            row_created_timestamp=_require_timestamp(raw.get("row_created_timestamp"), "row_created_timestamp"),
+            row_created_timestamp=_require_timestamp(
+                raw.get("row_created_timestamp"), "row_created_timestamp", source_timezone
+            ),
             active=_require_bool(raw.get("active"), "active"),
         )
 
 
-def parse_product_groups(raw: Any) -> list[GrocyProductGroup]:
-    return [GrocyProductGroup.from_dict(entry) for entry in _parse_collection(raw, "product_groups")]
+def parse_product_groups(raw: Any, source_timezone: tzinfo | None) -> list[GrocyProductGroup]:
+    return [GrocyProductGroup.from_dict(entry, source_timezone) for entry in _parse_collection(raw, "product_groups")]
 
 
 __all__ = [
@@ -376,6 +419,7 @@ __all__ = [
     "GrocyStockEntry",
     "GrocyStockLogEntry",
     "GrocyQuantityUnit",
+    "GrocyShoppingLocation",
     "GrocyProductGroup",
     "GrocyLocation",
     "parse_products",
@@ -383,5 +427,7 @@ __all__ = [
     "parse_stock_log_entries",
     "parse_quantity_units",
     "parse_product_groups",
+    "parse_shopping_locations",
     "parse_locations",
+    "parse_product_stock_entries",
 ]

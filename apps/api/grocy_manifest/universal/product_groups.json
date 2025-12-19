@@ -1,0 +1,122 @@
+[
+    {
+        "name": "Fresh Fruits",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Frozen Fruits",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Dairy",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Packaging",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Flavorings & Extracts",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Sugars",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Fruit Juices/Purees",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Powders",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Chocolates",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Baking Essentials",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "General Dry Goods",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Canned Goods",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Flours & Starches",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Fats and Oils",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Kitchen Consumables",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Cleaning & Janitorial",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Decorations",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Eggs & Egg Products",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Soy / Plant Proteins",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Derived Intermediate Products",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Drinks",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Drink Toppings",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Supplies",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Prepared Ingredients",
+        "description": null,
+        "active": 1
+    }
+]

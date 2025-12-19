@@ -2,6 +2,7 @@ FROM ubuntu:24.04
 
 ARG PYTHON_VERSION
 ENV PYTHON_VERSION=${PYTHON_VERSION}
+ENV NODE_MAJOR=${NODE_MAJOR}
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -9,6 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     curl \
+    nodejs \
     npm \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update \

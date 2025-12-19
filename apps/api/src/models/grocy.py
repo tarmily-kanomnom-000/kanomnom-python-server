@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
+from core.grocy.note_metadata import InventoryLossReason
+
 
 class CreatedQuantityUnit(BaseModel):
+    name: str
+    identifier: int
+
+
+class CreatedProductGroup(BaseModel):
     name: str
     identifier: int
 
@@ -14,6 +22,8 @@ class InitializeInstanceResponse(BaseModel):
     instance_index: str
     quantity_unit_identifiers: dict[str, int]
     created_units: list[CreatedQuantityUnit]
+    product_group_identifiers: dict[str, int]
+    created_product_groups: list[CreatedProductGroup]
 
 
 class GrocyLocationPayload(BaseModel):
@@ -22,6 +32,14 @@ class GrocyLocationPayload(BaseModel):
     description: str | None = None
     row_created_timestamp: datetime
     is_freezer: bool
+    active: bool
+
+
+class GrocyShoppingLocationPayload(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+    row_created_timestamp: datetime
     active: bool
 
 
@@ -40,10 +58,81 @@ class InstanceSummary(BaseModel):
     location_types: list[str] = Field(default_factory=list)
     address: InstanceAddressPayload | None = None
     locations: list[GrocyLocationPayload] = Field(default_factory=list)
+    shopping_locations: list[GrocyShoppingLocationPayload] = Field(default_factory=list)
 
 
 class ListInstancesResponse(BaseModel):
     instances: list[InstanceSummary]
+
+
+class InventoryLossDetailPayload(BaseModel):
+    reason: InventoryLossReason
+    note: str | None = None
+
+
+class InventoryCorrectionMetadataPayload(BaseModel):
+    losses: list[InventoryLossDetailPayload] | None = None
+
+
+class InventoryCorrectionRequest(BaseModel):
+    new_amount: float
+    best_before_date: date | None = None
+    location_id: int | None = None
+    note: str | None = None
+    metadata: InventoryCorrectionMetadataPayload | None = None
+
+
+class PurchaseEntryMetadataPayload(BaseModel):
+    shipping_cost: float | None = None
+    tax_rate: float | None = None
+    brand: str | None = None
+    package_size: float | None = None
+    package_price: float | None = None
+    package_quantity: float | None = None
+    currency: str | None = None
+    conversion_rate: float | None = None
+
+
+class PurchaseEntryRequest(BaseModel):
+    amount: float
+    price: float
+    best_before_date: date | None = None
+    purchased_date: date | None = None
+    location_id: int | None = None
+    shopping_location_id: int | None = None
+    note: str | None = None
+    metadata: PurchaseEntryMetadataPayload | None = None
+
+
+class PurchaseEntryDefaultsResponse(BaseModel):
+    product_id: int
+    shopping_location_id: int | None = None
+    metadata: PurchaseEntryMetadataPayload
+
+
+class PurchaseEntryDefaultsBatchRequest(BaseModel):
+    product_ids: list[int] = Field(min_length=1)
+    shopping_location_id: int | None = None
+
+
+class PurchaseEntryDefaultsBatchResponse(BaseModel):
+    defaults: list[PurchaseEntryDefaultsResponse]
+
+
+class GrocyStockEntryPayload(BaseModel):
+    id: int
+    amount: float
+    best_before_date: datetime | None = None
+    purchased_date: datetime | None = None
+    stock_id: str | None = None
+    price: float | None = None
+    open: bool
+    opened_date: datetime | None = None
+    row_created_timestamp: datetime
+    location_id: int | None = None
+    shopping_location_id: int | None = None
+    note: str | None = None
+    note_metadata: dict[str, Any] | None = None
 
 
 class GrocyProductInventoryEntry(BaseModel):
@@ -84,9 +173,13 @@ class GrocyProductInventoryEntry(BaseModel):
     qu_id_price: int | None = None
     disable_open: bool
     default_purchase_price_type: int | None = None
-    quantity_on_hand: float
     last_stock_updated_at: datetime
     product_group_name: str | None = None
+    purchase_quantity_unit_name: str | None = None
+    stock_quantity_unit_name: str | None = None
+    consume_quantity_unit_name: str | None = None
+    price_quantity_unit_name: str | None = None
+    stocks: list[GrocyStockEntryPayload] = Field(default_factory=list)
 
 
 class GrocyProductsResponse(BaseModel):
@@ -96,10 +189,20 @@ class GrocyProductsResponse(BaseModel):
 
 __all__ = [
     "CreatedQuantityUnit",
+    "CreatedProductGroup",
     "InitializeInstanceResponse",
+    "PurchaseEntryDefaultsResponse",
+    "PurchaseEntryDefaultsBatchRequest",
+    "PurchaseEntryDefaultsBatchResponse",
     "InstanceAddressPayload",
     "GrocyLocationPayload",
+    "GrocyShoppingLocationPayload",
+    "InventoryLossDetailPayload",
+    "InventoryCorrectionMetadataPayload",
+    "InventoryCorrectionRequest",
+    "PurchaseEntryRequest",
     "GrocyProductInventoryEntry",
+    "GrocyStockEntryPayload",
     "GrocyProductsResponse",
     "InstanceSummary",
     "ListInstancesResponse",

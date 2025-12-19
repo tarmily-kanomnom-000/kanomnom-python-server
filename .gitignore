@@ -4,3 +4,4 @@ apps/api/request_dumps/*
 *cache*
 tests/artifacts/*
 apps/dashboard/node_modules/*
+apps/dashboard/.next/*

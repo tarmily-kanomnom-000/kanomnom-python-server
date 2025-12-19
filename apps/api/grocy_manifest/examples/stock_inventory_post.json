@@ -1,0 +1,26 @@
+[
+    {
+        "id": 4,
+        "product_id": 1,
+        "amount": 1,
+        "best_before_date": "2026-01-30",
+        "purchased_date": "2025-12-16",
+        "used_date": null,
+        "spoiled": 0,
+        "stock_id": "69423188907d4",
+        "transaction_type": "inventory-correction",
+        "price": 0.03,
+        "undone": 0,
+        "undone_timestamp": null,
+        "opened_date": null,
+        "location_id": 2,
+        "recipe_id": null,
+        "correlation_id": null,
+        "transaction_id": "69423365b11b1",
+        "stock_row_id": null,
+        "shopping_location_id": 1,
+        "user_id": 1,
+        "row_created_timestamp": "2025-12-16 23:36:53",
+        "note": null
+    }
+]

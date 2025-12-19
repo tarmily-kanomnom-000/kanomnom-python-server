@@ -8,7 +8,7 @@ from core.grocy.exceptions import ManifestNotFoundError
 from core.grocy.manager import GrocyManager
 from core.grocy.metadata import InstanceMetadataRepository
 from core.grocy.models import InstanceMetadata, UniversalManifest
-from core.grocy.services import QuantityUnitSyncResult
+from core.grocy.services import ProductGroupSyncResult, QuantityUnitSyncResult
 
 
 class GrocyGovernor:
@@ -28,7 +28,7 @@ class GrocyGovernor:
         if instance_index in self._managers:
             return self._managers[instance_index]
         metadata = self.metadata_repository.load(instance_index)
-        client = GrocyClient(metadata.grocy_url, metadata.api_key)
+        client = GrocyClient(metadata.grocy_url, metadata.api_key, metadata.instance_timezone)
         manager = GrocyManager(instance_index, client)
         self._managers[instance_index] = manager
         return manager
@@ -51,6 +51,12 @@ class GrocyGovernor:
         manifest = self._load_universal_manifest()
         manager = self.manager_for(instance_index)
         return manager.ensure_quantity_units(manifest)
+
+    def ensure_product_groups(self, instance_index: str) -> ProductGroupSyncResult:
+        """Ensure an instance has every product group defined in the universal manifest."""
+        manifest = self._load_universal_manifest()
+        manager = self.manager_for(instance_index)
+        return manager.ensure_product_groups(manifest)
 
     def _load_universal_manifest(self) -> UniversalManifest:
         universal_dir = self.manifest_root / "universal"

@@ -7,5 +7,6 @@ address:
   state: PA
 api_key: ydwR48LjoYiWi6etx61Fgi3htbLVztdqy7ZJntFkXcu64B018R
 grocy_url: http://grocy-home:80
+instance_timezone: "America/New_York"
 location_name: Home
 location_types: [ "Warehouse", "Factory" ]

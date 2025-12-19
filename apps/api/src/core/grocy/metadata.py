@@ -32,11 +32,13 @@ class InstanceMetadataRepository:
             )
         parsed = _parse_metadata_file(metadata_path)
         address = _hydrate_address(parsed.get("address"))
+        instance_timezone = _extract_timezone(parsed.get("instance_timezone"))
         return InstanceMetadata(
             grocy_url=str(parsed["grocy_url"]),
             api_key=str(parsed["api_key"]),
             location_name=str(parsed["location_name"]),
             location_types=list(parsed["location_types"]),
+            instance_timezone=instance_timezone,
             address=address,
         )
 
@@ -89,6 +91,13 @@ def _hydrate_address(raw: Any) -> InstanceAddress | None:
         postal_code=_require("postal code"),
         country=_require("country"),
     )
+
+
+def _extract_timezone(raw: Any) -> str | None:
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    return value or None
 
 
 def _parse_scalar(raw: str) -> Any:

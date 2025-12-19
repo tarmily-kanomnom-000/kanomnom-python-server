@@ -1,0 +1,12 @@
+address:
+  city: Philadelphia
+  country: United States of America
+  line 1: 8221 Germantown Ave
+  line 2: ''
+  postal code: '19118'
+  state: PA
+api_key: fCWNonRlrTlVkzk8iqWpLgcznQ2WLXOEFh0sXZqOz5QXZSHlh4
+grocy_url: http://grocy-test-00:80
+instance_timezone: "America/New_York"
+location_name: Test-00
+location_types: [ "Retail" ]

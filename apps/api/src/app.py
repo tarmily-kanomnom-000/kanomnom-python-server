@@ -73,8 +73,8 @@ async def lifespan(app: FastAPI):
     weather_stop_event: asyncio.Event | None = None
     weather_task: asyncio.Task | None = None
 
-    bot_task = asyncio.create_task(telegram_app.updater.start_polling())
-    await telegram_app.start()
+    # bot_task = asyncio.create_task(telegram_app.updater.start_polling())
+    # await telegram_app.start()
 
     weather_stop_event = asyncio.Event()
     weather_task = asyncio.create_task(_weather_ingest_loop(weather_stop_event))

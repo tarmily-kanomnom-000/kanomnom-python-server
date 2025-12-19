@@ -1,22 +1,44 @@
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import dataclass
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 
 from core.grocy.exceptions import MetadataNotFoundError
 from models.grocy import GrocyProductInventoryEntry, GrocyProductsResponse
 
 from .dependencies import governor, router
+from .helpers import serialize_inventory_view
+
+
+@dataclass(frozen=True)
+class GrocyProductsQuery:
+    """Query parameters for listing Grocy products."""
+
+    force_refresh: bool
+
+
+_TRUE_QUERY_VALUES = {"1", "true", "t", "yes", "y", "on"}
+
+
+def _parse_products_query(request: Request) -> GrocyProductsQuery:
+    value = request.query_params.get("force_refresh")
+    if value is None:
+        return GrocyProductsQuery(force_refresh=False)
+    normalized = value.strip().lower()
+    return GrocyProductsQuery(force_refresh=normalized in _TRUE_QUERY_VALUES)
 
 
 @router.get("/{instance_index}/products", response_model=GrocyProductsResponse)
-async def list_products(instance_index: str) -> GrocyProductsResponse:
+async def list_products(instance_index: str, request: Request) -> GrocyProductsResponse:
     """Return Grocy products enriched with stock quantities and recency info."""
+    query = _parse_products_query(request)
 
     def _load_products():
         manager = governor.manager_for(instance_index)
+        if query.force_refresh:
+            manager.force_refresh_product_inventory()
         return manager.list_product_inventory()
 
     try:
@@ -24,14 +46,24 @@ async def list_products(instance_index: str) -> GrocyProductsResponse:
     except MetadataNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
-    shaped_products = [
-        GrocyProductInventoryEntry(
-            **asdict(view.product),
-            quantity_on_hand=view.quantity_on_hand,
-            last_stock_updated_at=view.last_updated_at,
-            product_group_name=view.product_group_name,
-        )
-        for view in inventory_views
-    ]
+    shaped_products = [serialize_inventory_view(view) for view in inventory_views]
 
     return GrocyProductsResponse(instance_index=instance_index, products=shaped_products)
+
+
+@router.get("/{instance_index}/products/{product_id}", response_model=GrocyProductInventoryEntry)
+async def get_product(instance_index: str, product_id: int) -> GrocyProductInventoryEntry:
+    """Return a single Grocy product with fresh stock entries."""
+
+    def _load_product():
+        manager = governor.manager_for(instance_index)
+        return manager.get_product_inventory(product_id)
+
+    try:
+        inventory_view = await run_in_threadpool(_load_product)
+    except MetadataNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    return serialize_inventory_view(inventory_view)

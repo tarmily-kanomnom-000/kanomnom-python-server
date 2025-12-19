@@ -1,10 +1,11 @@
-import { Karla, Libre_Baskerville } from "next/font/google";
+export type AppFont = {
+  className: string;
+};
 
-export const libreBaskerville = Libre_Baskerville({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-});
+export const libreBaskerville: AppFont = {
+  className: "font-serif",
+};
 
-export const karla = Karla({
-  subsets: ["latin"],
-});
+export const karla: AppFont = {
+  className: "font-sans",
+};

@@ -3,6 +3,7 @@ FROM ubuntu:24.04
 # Accept Python version as build argument
 ARG PYTHON_VERSION
 ENV PYTHON_VERSION=${PYTHON_VERSION}
+ENV NODE_MAJOR=${NODE_MAJOR}
 
 # Avoid prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -12,7 +13,10 @@ RUN apt-get update && apt-get install -y \
     software-properties-common \
     curl \
     npm \
-    && rm -rf /var/lib/apt/lists/*
+    && \
+    curl -sL https://deb.nodesource.com/setup_24.x | bash && \
+    apt install nodejs -y && \
+    rm -rf /var/lib/apt/lists/*
 
 # Check if Python version is already installed
 RUN if ! command -v python${PYTHON_VERSION} &> /dev/null; then \

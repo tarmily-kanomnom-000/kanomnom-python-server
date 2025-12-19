@@ -26,6 +26,7 @@ class InstanceMetadata:
     api_key: str
     location_name: str
     location_types: list[str]
+    instance_timezone: str | None = None
     address: InstanceAddress | None = None
 
 
@@ -67,17 +68,51 @@ class QuantityUnitDefinition:
 
 
 @dataclass
+class ProductGroupDefinition:
+    """Semantic definition of a product group shipped in the universal manifest."""
+
+    name: str
+    description: str | None
+    active: int
+
+    @staticmethod
+    def from_dict(raw: dict[str, Any]) -> "ProductGroupDefinition":
+        """Hydrate a manifest entry into a strongly typed definition."""
+        return ProductGroupDefinition(
+            name=str(raw["name"]),
+            description=str(raw["description"]) if raw.get("description") is not None else None,
+            active=int(raw["active"]),
+        )
+
+    def normalized_name(self) -> str:
+        """Return the canonical form of the product group name for dictionary keys."""
+        return self.name.strip().lower()
+
+    def to_payload(self, group_id: int) -> dict[str, Any]:
+        """Render the definition into the payload Grocy expects."""
+        return {
+            "id": group_id,
+            "name": self.name,
+            "description": self.description,
+            "active": self.active,
+        }
+
+
+@dataclass
 class UniversalManifest:
     """Aggregated universal manifest content shared across Grocy instances."""
 
     quantity_units: list[QuantityUnitDefinition]
+    product_groups: list[ProductGroupDefinition]
 
     @staticmethod
     def load(universal_dir: Path) -> "UniversalManifest":
         """Load the universal manifest JSON payloads from disk."""
         quantity_units = _load_json_array(universal_dir / "quantity_units.json")
+        product_groups = _load_json_array(universal_dir / "product_groups.json")
         return UniversalManifest(
-            quantity_units=[QuantityUnitDefinition.from_dict(item) for item in quantity_units]
+            quantity_units=[QuantityUnitDefinition.from_dict(item) for item in quantity_units],
+            product_groups=[ProductGroupDefinition.from_dict(item) for item in product_groups],
         )
 
 

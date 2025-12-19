@@ -1,0 +1,16 @@
+[
+    {
+        "id": 1,
+        "name": "Wegmans - Cherry Hill",
+        "description": null,
+        "row_created_timestamp": "2025-11-27 11:56:55",
+        "active": 1
+    },
+    {
+        "id": 2,
+        "name": "Home",
+        "description": null,
+        "row_created_timestamp": "2025-11-30 14:02:19",
+        "active": 1
+    }
+]

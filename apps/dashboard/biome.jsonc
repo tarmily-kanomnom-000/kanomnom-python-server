@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
   "files": {
     "includes": ["src/**/*.{js,jsx,ts,tsx}"]
   },
@@ -11,9 +11,7 @@
   "linter": {
     "rules": {
       "nursery": {
-        "useExplicitType": "off",
-        "noSecrets": "off",
-        "useUniqueElementIds": "off"
+        "useExplicitType": "off"
       },
       "style": {
         "useBlockStatements": "on",
@@ -32,7 +30,8 @@
         "noUndeclaredVariables": "off",
         "useImportExtensions": "off",
         "noUnusedVariables": "off",
-        "noUnusedFunctionParameters": "off"
+        "noUnusedFunctionParameters": "off",
+        "useUniqueElementIds": "off"
       },
       "suspicious": {
         "noReactSpecificProps": "off",
@@ -51,7 +50,10 @@
         "noExcessiveCognitiveComplexity": "off",
         "noUselessFragments": "off"
       },
-      "a11y": "off"
+      "a11y": "off",
+      "security": {
+        "noSecrets": "off"
+      }
     }
   }
 }
