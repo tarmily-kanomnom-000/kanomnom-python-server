@@ -22,6 +22,7 @@ type ProductActionDialogProps = {
   onProductUpdate?: (product: GrocyProductInventoryEntry) => void;
   onSuccess: (message: string) => void;
   prefetchedPurchaseDefaults?: Record<number, PurchaseEntryDefaults>;
+  defaultPurchasedDate?: string | null;
 };
 
 export function ProductActionDialog({
@@ -34,6 +35,7 @@ export function ProductActionDialog({
   onProductUpdate,
   onSuccess,
   prefetchedPurchaseDefaults,
+  defaultPurchasedDate = null,
 }: ProductActionDialogProps) {
   const [transferScope, setTransferScope] = useState<
     "internal" | "external" | null
@@ -100,6 +102,7 @@ export function ProductActionDialog({
             prefetchedDefaults={
               prefetchedPurchaseDefaults?.[currentProduct.id] ?? null
             }
+            defaultPurchasedDate={defaultPurchasedDate}
             onClose={onClose}
             onProductChange={(updatedProduct) => {
               setCurrentProduct(updatedProduct);

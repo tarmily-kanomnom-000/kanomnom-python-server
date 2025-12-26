@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kanomnom.app/schemas/purchase-entry-request.schema.json",
+  "title": "PurchaseEntryRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["amount", "price"],
+  "properties": {
+    "amount": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "price": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "best_before_date": {
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "purchased_date": {
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "location_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "shopping_location_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "note": {
+      "type": ["string", "null"]
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "shipping_cost": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "tax_rate": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "brand": {
+          "type": ["string", "null"]
+        },
+        "package_size": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0
+        },
+        "package_price": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "package_quantity": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0
+        },
+        "currency": {
+          "type": ["string", "null"]
+        },
+        "conversion_rate": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}

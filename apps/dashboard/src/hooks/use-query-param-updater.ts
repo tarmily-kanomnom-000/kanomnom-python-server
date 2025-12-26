@@ -1,45 +1,46 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
+
+import { SEARCH_PARAM_CHANGE_EVENT } from "@/hooks/use-browser-search-params";
 
 type QueryValue = string | null | undefined;
 
 export function useQueryParamUpdater() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  return useCallback((updates: Record<string, QueryValue>) => {
+    if (typeof window === "undefined") {
+      return;
+    }
 
-  return useCallback(
-    (updates: Record<string, QueryValue>) => {
-      const nextParams = new URLSearchParams(searchParams.toString());
-      let changed = false;
+    const url = new URL(window.location.href);
+    const nextParams = url.searchParams;
+    let changed = false;
 
-      Object.entries(updates).forEach(([key, value]) => {
-        const currentValue = searchParams.get(key);
-        if (value === null || value === undefined || value === "") {
-          if (currentValue !== null) {
-            nextParams.delete(key);
-            changed = true;
-          }
-          return;
-        }
-
-        if (currentValue !== value) {
-          nextParams.set(key, value);
+    Object.entries(updates).forEach(([key, value]) => {
+      const currentValue = nextParams.get(key);
+      if (value === null || value === undefined || value === "") {
+        if (currentValue !== null) {
+          nextParams.delete(key);
           changed = true;
         }
-      });
-
-      if (!changed) {
         return;
       }
+      if (currentValue !== value) {
+        nextParams.set(key, value);
+        changed = true;
+      }
+    });
 
-      const queryString = nextParams.toString();
-      router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
-        scroll: false,
-      });
-    },
-    [pathname, router, searchParams],
-  );
+    if (!changed) {
+      return;
+    }
+
+    const nextUrl =
+      nextParams.toString().length > 0
+        ? `${url.pathname}?${nextParams.toString()}`
+        : url.pathname;
+
+    window.history.replaceState(window.history.state, "", nextUrl);
+    window.dispatchEvent(new Event(SEARCH_PARAM_CHANGE_EVENT));
+  }, []);
 }

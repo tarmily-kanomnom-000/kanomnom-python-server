@@ -1,9 +1,15 @@
+import purchaseEntrySchema from "@shared-schemas/purchase-entry-request.schema.json";
 import { NextResponse } from "next/server";
-import { parseOptionalNonNegativeNumber } from "@/app/api/grocy/utils";
 import { invalidateGrocyProductsCache } from "@/lib/grocy/server";
-import { deserializeGrocyProductInventoryEntry } from "@/lib/grocy/transformers";
-import type { GrocyProductInventoryEntry } from "@/lib/grocy/types";
+import {
+  deserializeGrocyProductInventoryEntry,
+  type GrocyProductInventoryEntryPayload,
+} from "@/lib/grocy/transformers";
 import { safeReadResponseText } from "@/lib/http";
+import {
+  type JsonSchema,
+  validateAgainstSchema,
+} from "@/lib/json-schema-validator";
 import { environmentVariables } from "@/utils/environmentVariables";
 
 type RouteContext = {
@@ -21,6 +27,117 @@ function resolveApiBaseUrl(): string {
     );
   }
   return apiBaseUrl;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+const toNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim().length) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const toOptionalNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  return toNumber(value);
+};
+
+const toOptionalString = (value: unknown): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+function toBackendMetadata(
+  metadata: Record<string, unknown> | undefined,
+): Record<string, unknown> | null {
+  if (!metadata) {
+    return null;
+  }
+  const shaped: Record<string, unknown> = {};
+  if ("shippingCost" in metadata) {
+    shaped.shipping_cost = metadata.shippingCost;
+  } else if ("shipping_cost" in metadata) {
+    shaped.shipping_cost = metadata.shipping_cost;
+  }
+  if ("taxRate" in metadata) {
+    shaped.tax_rate = metadata.taxRate;
+  } else if ("tax_rate" in metadata) {
+    shaped.tax_rate = metadata.tax_rate;
+  }
+  if ("brand" in metadata) {
+    shaped.brand = metadata.brand;
+  }
+  if ("packageSize" in metadata) {
+    shaped.package_size = metadata.packageSize;
+  } else if ("package_size" in metadata) {
+    shaped.package_size = metadata.package_size;
+  }
+  if ("packagePrice" in metadata) {
+    shaped.package_price = metadata.packagePrice;
+  } else if ("package_price" in metadata) {
+    shaped.package_price = metadata.package_price;
+  }
+  if ("quantity" in metadata) {
+    shaped.package_quantity = metadata.quantity;
+  } else if ("package_quantity" in metadata) {
+    shaped.package_quantity = metadata.package_quantity;
+  }
+  if ("currency" in metadata) {
+    shaped.currency = metadata.currency;
+  }
+  if ("conversionRate" in metadata) {
+    shaped.conversion_rate = metadata.conversionRate;
+  } else if ("conversion_rate" in metadata) {
+    shaped.conversion_rate = metadata.conversion_rate;
+  }
+  return Object.keys(shaped).length > 0 ? shaped : null;
+}
+
+function shapePurchasePayload(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  const amount = toNumber(payload.amount);
+  const price = toNumber(
+    payload.pricePerUnit ?? payload.price ?? payload.unitPrice,
+  );
+  const bestBefore = toOptionalString(
+    (payload.bestBeforeDate ?? payload.best_before_date) as string | undefined,
+  );
+  const purchasedDate = toOptionalString(
+    (payload.purchasedDate ?? payload.purchased_date) as string | undefined,
+  );
+  const locationId = toOptionalNumber(
+    payload.locationId ?? payload.location_id ?? null,
+  );
+  const shoppingLocationId = toOptionalNumber(
+    payload.shoppingLocationId ?? payload.shopping_location_id ?? null,
+  );
+  const note = toOptionalString(payload.note);
+  const metadata = toBackendMetadata(
+    isRecord(payload.metadata) ? payload.metadata : undefined,
+  );
+  return {
+    amount,
+    price,
+    best_before_date: bestBefore,
+    purchased_date: purchasedDate,
+    location_id: locationId,
+    shopping_location_id: shoppingLocationId,
+    note,
+    metadata,
+  };
 }
 
 export async function POST(
@@ -45,152 +162,25 @@ export async function POST(
     );
   }
 
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    Array.isArray(payload)
-  ) {
+  if (!isRecord(payload)) {
     return NextResponse.json(
       { error: "Invalid request payload" },
       { status: 400 },
     );
   }
 
-  const amountRaw = (payload as Record<string, unknown>).amount;
-  const priceRaw =
-    (payload as Record<string, unknown>).pricePerUnit ??
-    (payload as Record<string, unknown>).price ??
-    (payload as Record<string, unknown>).unitPrice;
-  const amount = Number(amountRaw);
-  if (!Number.isFinite(amount) || amount <= 0) {
+  const upstreamPayload = shapePurchasePayload(payload);
+  const schema = purchaseEntrySchema as JsonSchema;
+  const validationErrors = validateAgainstSchema(schema, upstreamPayload);
+  if (validationErrors.length > 0) {
     return NextResponse.json(
-      { error: "amount must be a positive number" },
+      {
+        error: "Invalid purchase payload.",
+        details: validationErrors,
+      },
       { status: 400 },
     );
   }
-  const price = Number(priceRaw);
-  if (!Number.isFinite(price)) {
-    return NextResponse.json(
-      { error: "pricePerUnit must be a valid number" },
-      { status: 400 },
-    );
-  }
-  const pricePerUnit = Math.round(price * 1_000_000) / 1_000_000;
-
-  const bestBeforeValue =
-    (payload as Record<string, unknown>).bestBeforeDate ??
-    (payload as Record<string, unknown>).best_before_date ??
-    null;
-  const purchasedValue =
-    (payload as Record<string, unknown>).purchasedDate ??
-    (payload as Record<string, unknown>).purchased_date ??
-    null;
-  const locationValue =
-    (payload as Record<string, unknown>).locationId ??
-    (payload as Record<string, unknown>).location_id ??
-    null;
-  const shoppingLocationValue =
-    (payload as Record<string, unknown>).shoppingLocationId ??
-    (payload as Record<string, unknown>).shopping_location_id ??
-    null;
-  const noteRaw = (payload as Record<string, unknown>).note;
-
-  const best_before_date =
-    typeof bestBeforeValue === "string" && bestBeforeValue.trim().length
-      ? bestBeforeValue
-      : null;
-  const purchased_date =
-    typeof purchasedValue === "string" && purchasedValue.trim().length
-      ? purchasedValue
-      : null;
-  const location_id =
-    typeof locationValue === "number"
-      ? locationValue
-      : typeof locationValue === "string" && locationValue.trim().length
-        ? Number(locationValue)
-        : null;
-  const shopping_location_id =
-    typeof shoppingLocationValue === "number"
-      ? shoppingLocationValue
-      : typeof shoppingLocationValue === "string" &&
-          shoppingLocationValue.trim().length
-        ? Number(shoppingLocationValue)
-        : null;
-  const note =
-    typeof noteRaw === "string" && noteRaw.trim().length ? noteRaw : null;
-
-  const metadataRaw = (payload as Record<string, unknown>).metadata ?? null;
-  let metadata: Record<string, unknown> | null = null;
-  if (metadataRaw !== null) {
-    if (typeof metadataRaw !== "object" || Array.isArray(metadataRaw)) {
-      return NextResponse.json(
-        { error: "metadata must be an object." },
-        { status: 400 },
-      );
-    }
-    try {
-      const metadataRecord = metadataRaw as Record<string, unknown>;
-      const shippingCost = parseOptionalNonNegativeNumber(
-        metadataRecord.shippingCost,
-        "metadata.shippingCost",
-      );
-      const taxRate = parseOptionalNonNegativeNumber(
-        metadataRecord.taxRate,
-        "metadata.taxRate",
-      );
-      const brandValue = metadataRecord.brand;
-      const shaped: Record<string, unknown> = {};
-      if (shippingCost !== null) {
-        shaped.shipping_cost = shippingCost;
-      }
-      if (taxRate !== null) {
-        shaped.tax_rate = taxRate;
-      }
-      if (typeof brandValue === "string" && brandValue.trim().length) {
-        shaped.brand = brandValue;
-      }
-      const packageSize = parseOptionalPositiveNumber(
-        metadataRecord.packageSize,
-        "metadata.packageSize",
-      );
-      if (packageSize !== null) {
-        shaped.package_size = packageSize;
-      }
-      const packagePrice = parseOptionalNonNegativeNumber(
-        metadataRecord.packagePrice,
-        "metadata.packagePrice",
-      );
-      if (packagePrice !== null) {
-        shaped.package_price = packagePrice;
-      }
-      const quantity = parseOptionalPositiveNumber(
-        metadataRecord.quantity,
-        "metadata.quantity",
-      );
-      if (quantity !== null) {
-        shaped.package_quantity = quantity;
-      }
-      const currencyValue = metadataRecord.currency;
-      if (typeof currencyValue === "string" && currencyValue.trim().length) {
-        shaped.currency = currencyValue.trim();
-      }
-      const conversionRate = parseOptionalPositiveNumber(
-        metadataRecord.conversionRate,
-        "metadata.conversionRate",
-      );
-      if (conversionRate !== null) {
-        shaped.conversion_rate = conversionRate;
-      }
-      metadata = Object.keys(shaped).length > 0 ? shaped : null;
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Invalid purchase metadata payload.";
-      return NextResponse.json({ error: message }, { status: 400 });
-    }
-  }
-
   const apiBaseUrl = resolveApiBaseUrl();
   const url = new URL(
     `/grocy/${instance_index}/products/${product_id}/purchase`,
@@ -202,16 +192,7 @@ export async function POST(
       Accept: "application/json",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      amount,
-      best_before_date,
-      purchased_date,
-      price: pricePerUnit,
-      location_id,
-      shopping_location_id,
-      note,
-      metadata,
-    }),
+    body: JSON.stringify(upstreamPayload),
     cache: "no-store",
   });
 
@@ -227,23 +208,7 @@ export async function POST(
   }
 
   const upstream =
-    (await upstreamResponse.json()) as GrocyProductInventoryEntry;
+    (await upstreamResponse.json()) as GrocyProductInventoryEntryPayload;
   invalidateGrocyProductsCache(instance_index);
   return NextResponse.json(deserializeGrocyProductInventoryEntry(upstream));
-}
-function parseOptionalPositiveNumber(
-  value: unknown,
-  field: string,
-): number | null {
-  if (value == null || value === "") {
-    return null;
-  }
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`${field} must be a finite number.`);
-  }
-  if (parsed <= 0) {
-    throw new Error(`${field} must be greater than 0.`);
-  }
-  return parsed;
 }

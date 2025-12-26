@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { deserializeGrocyProductInventoryEntry } from "@/lib/grocy/transformers";
-import type { GrocyProductInventoryEntry } from "@/lib/grocy/types";
+import {
+  deserializeGrocyProductInventoryEntry,
+  type GrocyProductInventoryEntryPayload,
+} from "@/lib/grocy/transformers";
 import { safeReadResponseText } from "@/lib/http";
 import { environmentVariables } from "@/utils/environmentVariables";
 
@@ -52,6 +54,6 @@ export async function GET(
     );
   }
 
-  const payload = (await response.json()) as GrocyProductInventoryEntry;
+  const payload = (await response.json()) as GrocyProductInventoryEntryPayload;
   return NextResponse.json(deserializeGrocyProductInventoryEntry(payload));
 }

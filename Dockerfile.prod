@@ -1,6 +1,7 @@
 FROM ubuntu:24.04
 
 ARG PYTHON_VERSION
+ARG NODE_MAJOR
 ENV PYTHON_VERSION=${PYTHON_VERSION}
 ENV NODE_MAJOR=${NODE_MAJOR}
 
@@ -10,14 +11,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     curl \
-    nodejs \
     npm \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
         python${PYTHON_VERSION} \
     && curl -LsSf https://astral.sh/uv/install.sh | sh \
-    \
+    && curl -sL https://deb.nodesource.com/setup_24.x | bash \
+    && apt install nodejs -y \
     # Remove package manager and all unnecessary files
     && apt-get purge -y curl software-properties-common \
     && apt-get autoremove -y \
@@ -47,7 +48,7 @@ RUN uv --version || (echo "uv verification failed" && exit 1)
 
 ENV PYTHONPATH="/home/kanomnom-python-server/apps/api/src:$PYTHONPATH"
 
-COPY pyproject.toml uv.lock /home/kanomnom-python-server/apps/api/src
+COPY pyproject.toml uv.lock /home/kanomnom-python-server/apps/api/src/
 COPY apps /home/kanomnom-python-server/apps
 COPY scripts /home/kanomnom-python-server/scripts
 WORKDIR /home/kanomnom-python-server

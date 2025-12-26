@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from datetime import tzinfo
+import logging
+from time import perf_counter
 from typing import Any
 
 import requests
+from requests.adapters import HTTPAdapter
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from urllib3.util import Retry
 
 from core.grocy.responses import (
     GrocyLocation,
@@ -24,6 +28,12 @@ from core.grocy.responses import (
     parse_product_stock_entries,
 )
 
+logger = logging.getLogger(__name__)
+
+_DEFAULT_REQUEST_TIMEOUT_SECONDS = 15.0
+_RETRYABLE_STATUS_CODES = (502, 503, 504)
+_ALLOWED_METHODS = frozenset({"GET", "POST"})
+
 
 class GrocyClient:
     """Thin HTTP client that encapsulates Grocy's REST API semantics."""
@@ -32,7 +42,11 @@ class GrocyClient:
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
         self.session.headers.update({"GROCY-API-KEY": api_key})
+        adapter = HTTPAdapter(max_retries=_build_retry_strategy())
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
         self._source_timezone = _coerce_timezone(instance_timezone)
+        self._request_timeout = _DEFAULT_REQUEST_TIMEOUT_SECONDS
 
     def list_quantity_units(self) -> list[GrocyQuantityUnit]:
         """Return the list of quantity units already present in Grocy."""
@@ -42,6 +56,9 @@ class GrocyClient:
     def create_quantity_unit(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Create a quantity unit via Grocy's API."""
         return self._request("POST", "/api/objects/quantity_units", payload)
+    def update_quantity_unit(self, unit_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        """Update an existing quantity unit via Grocy's API."""
+        return self._request("PUT", f"/api/objects/quantity_units/{unit_id}", payload)
 
     def list_products(self) -> list[GrocyProduct]:
         """Fetch the available products from Grocy."""
@@ -81,6 +98,9 @@ class GrocyClient:
     def create_product_group(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Create a product group via Grocy's API."""
         return self._request("POST", "/api/objects/product_groups", payload)
+    def update_product_group(self, group_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        """Update a product group via Grocy's API."""
+        return self._request("PUT", f"/api/objects/product_groups/{group_id}", payload)
 
     def correct_product_inventory(self, product_id: int, payload: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
         """Apply an inventory correction for the provided product."""
@@ -97,14 +117,49 @@ class GrocyClient:
         json_body: dict[str, Any] | None,
     ) -> list[dict[str, Any]] | dict[str, Any]:
         """Issue an HTTP request and raise with contextual details when Grocy rejects it."""
-        response = self.session.request(method=method, url=f"{self.base_url}{path}", json=json_body)
+        url = f"{self.base_url}{path}"
+        start = perf_counter()
+        try:
+            response = self.session.request(
+                method=method,
+                url=url,
+                json=json_body,
+                timeout=self._request_timeout,
+            )
+        except requests.Timeout as exc:  # pragma: no cover - network timeout path
+            elapsed_ms = (perf_counter() - start) * 1000
+            logger.error(
+                "grocy_request_timeout",
+                extra={"method": method, "path": path, "elapsed_ms": round(elapsed_ms, 2)},
+            )
+            raise
         try:
             response.raise_for_status()
         except requests.HTTPError as error:  # pragma: no cover - network failure path
+            elapsed_ms = (perf_counter() - start) * 1000
             details = response.text.strip()
+            logger.warning(
+                "grocy_request_error",
+                extra={
+                    "method": method,
+                    "path": path,
+                    "status_code": response.status_code,
+                    "elapsed_ms": round(elapsed_ms, 2),
+                },
+            )
             if details:
                 raise requests.HTTPError(f"{error} - {details}") from error
             raise
+        elapsed_ms = (perf_counter() - start) * 1000
+        logger.debug(
+            "grocy_request",
+            extra={
+                "method": method,
+                "path": path,
+                "status_code": response.status_code,
+                "elapsed_ms": round(elapsed_ms, 2),
+            },
+        )
         if not response.content:
             return {}
         return response.json()
@@ -120,3 +175,13 @@ def _coerce_timezone(timezone_name: str | None) -> tzinfo | None:
         return ZoneInfo(cleaned)
     except ZoneInfoNotFoundError as exc:
         raise ValueError(f"Unknown timezone '{timezone_name}'") from exc
+
+
+def _build_retry_strategy() -> Retry:
+    return Retry(
+        total=3,
+        status_forcelist=_RETRYABLE_STATUS_CODES,
+        allowed_methods=_ALLOWED_METHODS,
+        backoff_factor=0.5,
+        raise_on_status=False,
+    )

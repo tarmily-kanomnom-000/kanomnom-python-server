@@ -2,7 +2,7 @@
     {
         "id": 1,
         "name": "Fresh Fruits",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Includes berries, citrus, and other seasonal produce.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[\"sulfites\"],\"is_discrete\":false}}",
         "row_created_timestamp": "2025-11-16 22:25:02",
         "active": 1
     },

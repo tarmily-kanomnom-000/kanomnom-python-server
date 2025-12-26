@@ -37,6 +37,8 @@ class ProductInventoryView:
     stock_unit_name: str | None
     consume_unit_name: str | None
     price_unit_name: str | None
+    unit_name_lookup: dict[str, str]
+    discrete_units: dict[str, bool]
     stocks: list[GrocyStockEntry]
 
 
@@ -46,6 +48,8 @@ class InventoryContext:
 
     groups_by_id: dict[int, str]
     unit_names: dict[int, str]
+    discrete_units: dict[str, bool]
+    unit_name_lookup: dict[str, str]
 
 
 @dataclass(frozen=True)
@@ -151,6 +155,7 @@ class ProductInventoryService:
         self._quantity_units_cache = quantity_units_cache
         self._settings = settings
         self._product_groups_cache = get_grocy_product_groups_cache()
+        self._product_lookup: dict[str, dict[int, GrocyProduct]] = {}
 
     def list_products_with_inventory(self, instance_index: str) -> list[ProductInventoryView]:
         """Return Grocy products with stock quantities and recency information."""
@@ -170,6 +175,8 @@ class ProductInventoryService:
                     entries_for_product,
                     context.groups_by_id,
                     context.unit_names,
+                    context.discrete_units,
+                    context.unit_name_lookup,
                     fallback,
                     last_update_by_id.get(product.id),
                 )
@@ -191,6 +198,8 @@ class ProductInventoryService:
             entries,
             context.groups_by_id,
             context.unit_names,
+            context.discrete_units,
+            context.unit_name_lookup,
             self._settings.cold_start_timestamp,
         )
 
@@ -283,6 +292,7 @@ class ProductInventoryService:
     def force_refresh_inventory(self, instance_index: str) -> None:
         """Invalidate every cached artifact so the next read fetches from Grocy."""
         self.product_cache.clear_cache(instance_index)
+        self._product_lookup.pop(instance_index, None)
         self.invalidate_inventory_caches(instance_index)
         self._product_groups_cache.clear_cache(instance_index)
         self._quantity_units_cache.clear_cache(instance_index)
@@ -290,9 +300,11 @@ class ProductInventoryService:
     def _load_products(self, instance_index: str) -> list[GrocyProduct]:
         cached_products = self.product_cache.load_products(instance_index)
         if cached_products is not None:
+            self._prime_product_lookup(instance_index, cached_products)
             return cached_products
         products = self.client.list_products()
         self.product_cache.save_products(instance_index, products)
+        self._prime_product_lookup(instance_index, products)
         return products
 
     def _load_stock_log(self, instance_index: str) -> list[GrocyStockLogEntry]:
@@ -312,19 +324,35 @@ class ProductInventoryService:
         return entries
 
     def _get_product(self, instance_index: str, product_id: int) -> GrocyProduct:
-        products = self._load_products(instance_index)
-        for product in products:
-            if product.id == product_id:
-                return product
+        lookup = self._product_lookup_for_instance(instance_index)
+        product = lookup.get(product_id)
+        if product is not None:
+            return product
         raise ValueError(f"Product id {product_id} is not available for instance {instance_index}")
+
+    def _product_lookup_for_instance(self, instance_index: str) -> dict[int, GrocyProduct]:
+        lookup = self._product_lookup.get(instance_index)
+        if lookup is None:
+            products = self._load_products(instance_index)
+            lookup = self._product_lookup.get(instance_index)
+            if lookup is None:
+                lookup = {product.id: product for product in products}
+                self._product_lookup[instance_index] = lookup
+        return lookup
+
+    def _prime_product_lookup(self, instance_index: str, products: list[GrocyProduct]) -> None:
+        self._product_lookup[instance_index] = {product.id: product for product in products}
 
     def _build_inventory_context(self, instance_index: str) -> InventoryContext:
         """Load shared product-group and quantity-unit data for inventory views."""
         groups = self._load_product_groups(instance_index)
         units = self._load_quantity_units(instance_index)
+        unit_names_map = _map_unit_names(units)
         return InventoryContext(
             groups_by_id={group.id: group.name for group in groups},
-            unit_names=_map_unit_names(units),
+            unit_names=unit_names_map,
+            discrete_units=_map_discrete_units(units),
+            unit_name_lookup=_build_unit_name_lookup(unit_names_map),
         )
 
     def _load_product_groups(self, instance_index: str) -> list[GrocyProductGroup]:
@@ -357,6 +385,8 @@ class ProductInventoryService:
         entries: list[GrocyStockEntry],
         groups_by_id: dict[int, str],
         unit_names: dict[int, str],
+        discrete_units: dict[str, bool],
+        unit_name_lookup: dict[str, str],
         fallback_timestamp: datetime,
         last_updated_override: datetime | None = None,
     ) -> ProductInventoryView:
@@ -369,6 +399,8 @@ class ProductInventoryService:
             stock_unit_name=_resolve_unit_name(product.qu_id_stock, unit_names),
             consume_unit_name=_resolve_unit_name(product.qu_id_consume, unit_names),
             price_unit_name=_resolve_unit_name(product.qu_id_price, unit_names),
+            unit_name_lookup=unit_name_lookup,
+            discrete_units=discrete_units,
             stocks=entries,
         )
 
@@ -401,6 +433,31 @@ def _group_stock_entries(entries: list[GrocyStockEntry]) -> dict[int, list[Grocy
 
 def _map_unit_names(units: list[GrocyQuantityUnit]) -> dict[int, str]:
     return {unit.id: unit.name for unit in units}
+
+
+def _map_discrete_units(units: list[GrocyQuantityUnit]) -> dict[str, bool]:
+    mapping: dict[str, bool] = {}
+    for unit in units:
+        if unit.is_discrete is None:
+            continue
+        normalized = unit.name.strip().lower()
+        if not normalized:
+            continue
+        mapping[normalized] = unit.is_discrete
+    return mapping
+
+
+def _build_unit_name_lookup(unit_names: dict[int, str]) -> dict[str, str]:
+    """Create a lookup table of normalized unit names to their canonical display form."""
+    lookup: dict[str, str] = {}
+    for name in unit_names.values():
+        if not name:
+            continue
+        normalized = name.strip().lower()
+        if not normalized:
+            continue
+        lookup.setdefault(normalized, name)
+    return lookup
 
 
 def _resolve_unit_name(unit_id: int | None, names_by_id: dict[int, str]) -> str | None:

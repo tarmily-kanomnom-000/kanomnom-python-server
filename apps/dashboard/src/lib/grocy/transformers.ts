@@ -39,7 +39,7 @@ type GrocyStockEntryPayload = Omit<
   row_created_timestamp: string;
 };
 
-type GrocyProductInventoryEntryPayload = Omit<
+export type GrocyProductInventoryEntryPayload = Omit<
   GrocyProductInventoryEntry,
   "last_stock_updated_at" | "stocks"
 > & {
@@ -110,6 +110,7 @@ export function deserializeGrocyProductInventoryEntry(
 ): GrocyProductInventoryEntry {
   return {
     ...product,
+    description_metadata: product.description_metadata ?? null,
     last_stock_updated_at: new Date(product.last_stock_updated_at),
     stocks: product.stocks?.map(deserializeGrocyStockEntry) ?? [],
   };

@@ -41,6 +41,13 @@ def _normalize_optional_text(value: str | None, field_name: str) -> str | None:
     return normalized
 
 
+def _normalize_required_text(value: Any, field_name: str) -> str:
+    normalized = _normalize_optional_text(value, field_name)
+    if normalized is None:
+        raise ValueError(f"{field_name} must be a non-empty string.")
+    return normalized
+
+
 def _normalize_optional_number(value: Any, field_name: str) -> float | None:
     if value is None:
         return None
@@ -69,10 +76,44 @@ def _normalize_optional_positive_number(value: Any, field_name: str) -> float | 
     return normalized
 
 
+def _normalize_required_positive_number(value: Any, field_name: str) -> float:
+    normalized = _normalize_optional_positive_number(value, field_name)
+    if normalized is None:
+        raise ValueError(f"{field_name} must be greater than 0.")
+    return normalized
+
+
 def _normalize_bool(value: Any, field_name: str) -> bool:
     if isinstance(value, bool):
         return value
     raise ValueError(f"{field_name} must be a boolean value.")
+
+
+def _normalize_optional_bool(value: Any, field_name: str) -> bool | None:
+    if value is None:
+        return None
+    return _normalize_bool(value, field_name)
+
+
+def _normalize_string_sequence(value: Any, field_name: str) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, (str, bytes)):
+        candidates: Sequence[Any] = [value]
+    elif isinstance(value, Sequence):
+        candidates = value
+    else:
+        raise ValueError(f"{field_name} must be a list of strings.")
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for index, entry in enumerate(candidates):
+        token = _normalize_required_text(entry, f"{field_name}[{index}]")
+        key = token.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(token)
+    return tuple(normalized)
 
 
 class InventoryLossReason(str, Enum):
@@ -231,6 +272,142 @@ class PurchaseEntryNoteMetadata(BaseNoteMetadata):
 
 
 _register_metadata(PurchaseEntryNoteMetadata.kind, PurchaseEntryNoteMetadata)
+
+
+@dataclass(frozen=True)
+class ProductUnitConversion:
+    """Represents a custom unit conversion for a product."""
+
+    from_unit: str
+    to_unit: str
+    factor: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "from_unit", _normalize_required_text(self.from_unit, "from_unit"))
+        object.__setattr__(self, "to_unit", _normalize_required_text(self.to_unit, "to_unit"))
+        object.__setattr__(self, "factor", _normalize_required_positive_number(self.factor, "factor"))
+
+    def to_attrs(self) -> dict[str, Any]:
+        return {
+            "from_unit": self.from_unit,
+            "to_unit": self.to_unit,
+            "factor": self.factor,
+        }
+
+    @classmethod
+    def from_attrs(cls, attrs: Mapping[str, Any]) -> "ProductUnitConversion":
+        if not isinstance(attrs, Mapping):
+            raise ValueError("Unit conversions must be objects with from_unit, to_unit, and factor fields.")
+        return cls(
+            from_unit=_normalize_required_text(attrs.get("from_unit"), "from_unit"),
+            to_unit=_normalize_required_text(attrs.get("to_unit"), "to_unit"),
+            factor=_normalize_required_positive_number(attrs.get("factor"), "factor"),
+        )
+
+
+def _normalize_unit_conversions(value: Any) -> tuple[ProductUnitConversion, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, ProductUnitConversion):
+        return (value,)
+    if isinstance(value, Mapping):
+        candidates: Sequence[Any] = [value]
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        candidates = value
+    else:
+        raise ValueError("unit_conversions must be a list of conversion definitions.")
+    normalized: list[ProductUnitConversion] = []
+    for entry in candidates:
+        if isinstance(entry, ProductUnitConversion):
+            normalized.append(entry)
+        elif isinstance(entry, Mapping):
+            normalized.append(ProductUnitConversion.from_attrs(entry))
+        else:
+            raise ValueError("Each conversion entry must be an object with from_unit, to_unit, and factor.")
+    return tuple(normalized)
+
+
+@dataclass(frozen=True)
+class ProductDescriptionMetadata(BaseNoteMetadata):
+    """Structured metadata stored inside Grocy product descriptions."""
+
+    kind: ClassVar[str] = "product_description"
+
+    unit_conversions: tuple[ProductUnitConversion, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "unit_conversions", _normalize_unit_conversions(self.unit_conversions))
+
+    def to_attrs(self) -> dict[str, Any]:
+        if not self.unit_conversions:
+            return {}
+        return {
+            "kind": self.kind,
+            "unit_conversions": [conversion.to_attrs() for conversion in self.unit_conversions],
+        }
+
+    @classmethod
+    def from_attrs(cls, attrs: Mapping[str, Any]) -> "ProductDescriptionMetadata":
+        return cls(unit_conversions=_normalize_unit_conversions(attrs.get("unit_conversions")))
+
+
+_register_metadata(ProductDescriptionMetadata.kind, ProductDescriptionMetadata)
+
+
+@dataclass(frozen=True)
+class QuantityUnitDescriptionMetadata(BaseNoteMetadata):
+    """Structured metadata stored inside Grocy quantity unit descriptions."""
+
+    kind: ClassVar[str] = "quantity_unit"
+
+    is_discrete: bool | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "is_discrete", _normalize_optional_bool(self.is_discrete, "is_discrete"))
+
+    def to_attrs(self) -> dict[str, Any]:
+        attrs: dict[str, Any] = {}
+        if self.is_discrete is not None:
+            attrs["is_discrete"] = self.is_discrete
+        if not attrs:
+            return {}
+        attrs["kind"] = self.kind
+        return attrs
+
+    @classmethod
+    def from_attrs(cls, attrs: Mapping[str, Any]) -> "QuantityUnitDescriptionMetadata":
+        return cls(is_discrete=_normalize_optional_bool(attrs.get("is_discrete"), "is_discrete"))
+
+
+_register_metadata(QuantityUnitDescriptionMetadata.kind, QuantityUnitDescriptionMetadata)
+
+
+@dataclass(frozen=True)
+class ProductGroupDescriptionMetadata(BaseNoteMetadata):
+    """Structured metadata stored inside Grocy product group descriptions."""
+
+    kind: ClassVar[str] = "product_group"
+
+    allergens: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "allergens", _normalize_string_sequence(self.allergens, "allergens"))
+
+    def to_attrs(self) -> dict[str, Any]:
+        attrs: dict[str, Any] = {}
+        if self.allergens:
+            attrs["allergens"] = list(self.allergens)
+        if not attrs:
+            return {}
+        attrs["kind"] = self.kind
+        return attrs
+
+    @classmethod
+    def from_attrs(cls, attrs: Mapping[str, Any]) -> "ProductGroupDescriptionMetadata":
+        return cls(allergens=_normalize_string_sequence(attrs.get("allergens"), "allergens"))
+
+
+_register_metadata(ProductGroupDescriptionMetadata.kind, ProductGroupDescriptionMetadata)
 
 
 @dataclass(frozen=True)

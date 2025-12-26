@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import ast
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Sequence
+
+import yaml
 
 from core.grocy.exceptions import MetadataNotFoundError
 from core.grocy.models import InstanceAddress, InstanceMetadata
@@ -33,59 +34,46 @@ class InstanceMetadataRepository:
         parsed = _parse_metadata_file(metadata_path)
         address = _hydrate_address(parsed.get("address"))
         instance_timezone = _extract_timezone(parsed.get("instance_timezone"))
+        location_types = _require_string_list(parsed.get("location_types"), "location_types")
         return InstanceMetadata(
-            grocy_url=str(parsed["grocy_url"]),
-            api_key=str(parsed["api_key"]),
-            location_name=str(parsed["location_name"]),
-            location_types=list(parsed["location_types"]),
+            grocy_url=_require_string(parsed.get("grocy_url"), "grocy_url"),
+            api_key=_require_string(parsed.get("api_key"), "api_key"),
+            location_name=_require_string(parsed.get("location_name"), "location_name"),
+            location_types=location_types,
             instance_timezone=instance_timezone,
             address=address,
         )
 
 
 def _parse_metadata_file(path: Path) -> dict[str, Any]:
-    """Parse the metadata.yaml file without relying on external dependencies."""
-    root: dict[str, Any] = {}
-    stack = [root]
-    indent_stack = [0]
+    """Parse the metadata.yaml file using PyYAML for correctness and safety."""
     with path.open("r", encoding="utf-8") as handle:
-        for raw in handle:
-            if not raw.strip() or raw.lstrip().startswith("#"):
-                continue
-            indent = len(raw) - len(raw.lstrip(" "))
-            while indent < indent_stack[-1] and len(stack) > 1:
-                stack.pop()
-                indent_stack.pop()
-            line = raw.strip()
-            if ":" not in line:
-                raise ValueError(f"Invalid metadata line in {path}: {raw.rstrip()}")
-            key, remainder = line.split(":", 1)
-            cleaned_key = key.strip().strip('"')
-            value_str = remainder.strip()
-            if not value_str:
-                new_dict: dict[str, Any] = {}
-                stack[-1][cleaned_key] = new_dict
-                stack.append(new_dict)
-                indent_stack.append(indent + 2)
-            else:
-                stack[-1][cleaned_key] = _parse_scalar(value_str)
-    return root
+        try:
+            parsed = yaml.safe_load(handle) or {}
+        except yaml.YAMLError as exc:
+            raise ValueError(f"Failed to parse metadata file {path}: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(f"Expected mapping at root of {path}")
+    return parsed
 
 
 def _hydrate_address(raw: Any) -> InstanceAddress | None:
-    if not isinstance(raw, dict):
+    if raw is None:
         return None
+    if not isinstance(raw, Mapping):
+        raise ValueError("address must be a mapping.")
+
     def _require(key: str) -> str:
-        value = raw.get(key) or raw.get(key.replace(" ", "_"))
+        value = raw.get(key)
         if value is None:
-            raise ValueError(f"Missing required address field '{key}'")
-        return str(value)
+            value = raw.get(key.replace(" ", "_"))
+        return _require_string(value, f"address.{key}")
 
     line1 = _require("line 1")
     line2_raw = raw.get("line 2") or raw.get("line_2")
     return InstanceAddress(
         line1=line1,
-        line2=str(line2_raw) if line2_raw not in (None, "") else None,
+        line2=_optional_string(line2_raw),
         city=_require("city"),
         state=_require("state"),
         postal_code=_require("postal code"),
@@ -100,9 +88,26 @@ def _extract_timezone(raw: Any) -> str | None:
     return value or None
 
 
-def _parse_scalar(raw: str) -> Any:
-    """Parse a scalar value, falling back to raw strings when literal eval fails."""
-    try:
-        return ast.literal_eval(raw)
-    except (ValueError, SyntaxError):
-        return raw.strip()
+def _require_string(value: Any, field: str) -> str:
+    if value is None:
+        raise ValueError(f"{field} is required.")
+    cleaned = str(value).strip()
+    if not cleaned:
+        raise ValueError(f"{field} must be a non-empty string.")
+    return cleaned
+
+
+def _optional_string(value: Any) -> str | None:
+    if value is None:
+        return None
+    cleaned = str(value).strip()
+    return cleaned if cleaned else None
+
+
+def _require_string_list(value: Any, field: str) -> list[str]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise ValueError(f"{field} must be a list of strings.")
+    entries: list[str] = []
+    for index, entry in enumerate(value):
+        entries.append(_require_string(entry, f"{field}[{index}]"))
+    return entries

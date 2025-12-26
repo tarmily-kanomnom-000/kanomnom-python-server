@@ -1,16 +1,17 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
 } from "react";
 
 import { InstanceSelector } from "@/components/grocy/instances/instance-selector";
 import { ProductsPanel } from "@/components/grocy/instances/products-panel";
+import { useBrowserSearchParams } from "@/hooks/use-browser-search-params";
 import { useQueryParamUpdater } from "@/hooks/use-query-param-updater";
 import { fetchGrocyProduct, fetchGrocyProducts } from "@/lib/grocy/client";
 import {
@@ -27,7 +28,7 @@ type InstancesPickerProps = {
 };
 
 export function InstancesPicker({ instances }: InstancesPickerProps) {
-  const searchParams = useSearchParams();
+  const searchParams = useBrowserSearchParams();
   const updateQueryParams = useQueryParamUpdater();
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(
     () =>
@@ -39,6 +40,7 @@ export function InstancesPicker({ instances }: InstancesPickerProps) {
   const [products, setProducts] = useState<GrocyProductInventoryEntry[]>([]);
   const [productError, setProductError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const latestRequestIdRef = useRef(0);
 
   const selectedInstance = useMemo(
     () =>
@@ -86,13 +88,25 @@ export function InstancesPicker({ instances }: InstancesPickerProps) {
         return;
       }
 
+      const requestId = latestRequestIdRef.current + 1;
+      latestRequestIdRef.current = requestId;
+      const instanceIndex = selectedInstance.instance_index;
+
       setProductError(null);
       startTransition(() => {
-        fetchGrocyProducts(selectedInstance.instance_index, {
+        fetchGrocyProducts(instanceIndex, {
           forceRefresh: options?.forceRefresh ?? false,
         })
-          .then((items) => setProducts(items))
+          .then((items) => {
+            if (latestRequestIdRef.current !== requestId) {
+              return;
+            }
+            setProducts(items);
+          })
           .catch((error: unknown) => {
+            if (latestRequestIdRef.current !== requestId) {
+              return;
+            }
             setProductError(
               error instanceof Error
                 ? error.message

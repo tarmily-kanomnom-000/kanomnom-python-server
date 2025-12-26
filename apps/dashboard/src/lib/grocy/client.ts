@@ -3,11 +3,13 @@ import axios from "axios";
 import {
   deserializeGrocyProductInventoryEntry,
   deserializeGrocyProducts,
+  type GrocyProductInventoryEntryPayload,
   type GrocyProductsResponsePayload,
 } from "@/lib/grocy/transformers";
 import type {
   GrocyProductInventoryEntry,
   InventoryCorrectionRequestPayload,
+  PurchaseEntryCalculation,
   PurchaseEntryDefaults,
   PurchaseEntryRequestPayload,
 } from "@/lib/grocy/types";
@@ -35,7 +37,9 @@ export async function fetchGrocyProduct(
       fetchOptions: { cache: "no-store" },
     },
   );
-  return deserializeGrocyProductInventoryEntry(response.data);
+  return deserializeGrocyProductInventoryEntry(
+    response.data as GrocyProductInventoryEntryPayload,
+  );
 }
 
 export async function fetchGrocyProducts(
@@ -84,7 +88,9 @@ export async function submitInventoryCorrection(
         fetchOptions: { cache: "no-store" },
       },
     );
-    const entry = deserializeGrocyProductInventoryEntry(response.data);
+    const entry = deserializeGrocyProductInventoryEntry(
+      response.data as GrocyProductInventoryEntryPayload,
+    );
     invalidateGrocyProductsClientCache(instanceIndex);
     return entry;
   } catch (error) {
@@ -122,7 +128,9 @@ export async function submitPurchaseEntry(
         fetchOptions: { cache: "no-store" },
       },
     );
-    const entry = deserializeGrocyProductInventoryEntry(response.data);
+    const entry = deserializeGrocyProductInventoryEntry(
+      response.data as GrocyProductInventoryEntryPayload,
+    );
     invalidateGrocyProductsClientCache(instanceIndex);
     return entry;
   } catch (error) {
@@ -183,4 +191,20 @@ export async function fetchBulkPurchaseEntryDefaults(
     },
   );
   return (response.data as { defaults: PurchaseEntryDefaults[] }).defaults;
+}
+
+export async function fetchPurchaseEntryCalculation(
+  instanceIndex: string,
+  productId: number,
+  metadata: PurchaseEntryRequestPayload["metadata"],
+): Promise<PurchaseEntryCalculation> {
+  const response = await axios.post(
+    `/api/grocy/${instanceIndex}/products/${productId}/purchase/derive`,
+    { metadata },
+    {
+      adapter: "fetch",
+      fetchOptions: { cache: "no-store" },
+    },
+  );
+  return response.data as PurchaseEntryCalculation;
 }

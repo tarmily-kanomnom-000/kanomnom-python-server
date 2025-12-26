@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { invalidateGrocyProductsCache } from "@/lib/grocy/server";
-import { deserializeGrocyProductInventoryEntry } from "@/lib/grocy/transformers";
-import type { GrocyProductInventoryEntry } from "@/lib/grocy/types";
+import {
+  deserializeGrocyProductInventoryEntry,
+  type GrocyProductInventoryEntryPayload,
+} from "@/lib/grocy/transformers";
 import { safeReadResponseText } from "@/lib/http";
 import { environmentVariables } from "@/utils/environmentVariables";
 
@@ -202,7 +204,7 @@ export async function POST(
   }
 
   const upstream =
-    (await upstreamResponse.json()) as GrocyProductInventoryEntry;
+    (await upstreamResponse.json()) as GrocyProductInventoryEntryPayload;
   invalidateGrocyProductsCache(instance_index);
   return NextResponse.json(deserializeGrocyProductInventoryEntry(upstream));
 }

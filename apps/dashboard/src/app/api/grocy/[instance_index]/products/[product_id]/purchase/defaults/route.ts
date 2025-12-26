@@ -10,14 +10,21 @@ type RouteContext = {
   }>;
 };
 
+type UpstreamPurchaseDefaultsMetadata = {
+  shipping_cost?: number | null;
+  tax_rate?: number | null;
+  brand?: string | null;
+  package_size?: number | null;
+  package_price?: number | null;
+  package_quantity?: number | null;
+  currency?: string | null;
+  conversion_rate?: number | null;
+};
+
 type UpstreamDefaultsResponse = {
   product_id: number;
   shopping_location_id: number | null;
-  metadata: {
-    shipping_cost?: number | null;
-    tax_rate?: number | null;
-    brand?: string | null;
-  } | null;
+  metadata: UpstreamPurchaseDefaultsMetadata | null;
 };
 
 function resolveApiBaseUrl(): string {

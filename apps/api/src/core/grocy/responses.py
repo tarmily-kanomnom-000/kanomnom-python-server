@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone, tzinfo
 from typing import Any
 
+from core.grocy.note_metadata import QuantityUnitDescriptionMetadata, decode_structured_note
 
 class GrocyResponseError(ValueError):
     """Raised when Grocy responses cannot be parsed into strongly typed models."""
@@ -291,16 +292,26 @@ class GrocyQuantityUnit:
     name_plural: str | None
     plural_forms: str | None
     active: bool
+    is_discrete: bool | None = None
 
     @staticmethod
     def from_dict(raw: dict[str, Any]) -> "GrocyQuantityUnit":
+        description = _optional_str(raw.get("description"))
+        is_discrete: bool | None = None
+        if description:
+            decoded_description = decode_structured_note(description)
+            description = decoded_description.note or None
+            metadata = decoded_description.metadata
+            if isinstance(metadata, QuantityUnitDescriptionMetadata):
+                is_discrete = metadata.is_discrete
         return GrocyQuantityUnit(
             id=_require_int(raw.get("id"), "id"),
             name=_require_str(raw.get("name"), "name"),
-            description=_optional_str(raw.get("description")),
+            description=description,
             name_plural=_optional_str(raw.get("name_plural")),
             plural_forms=_optional_str(raw.get("plural_forms")),
             active=_require_bool(raw.get("active"), "active"),
+            is_discrete=is_discrete,
         )
 
 
@@ -396,17 +407,27 @@ class GrocyProductGroup:
     description: str | None
     row_created_timestamp: datetime
     active: bool
+    allergens: tuple[str, ...] = ()
 
     @staticmethod
     def from_dict(raw: dict[str, Any], source_timezone: tzinfo | None) -> "GrocyProductGroup":
+        description = _optional_str(raw.get("description"))
+        allergens: tuple[str, ...] = ()
+        if description:
+            decoded_description = decode_structured_note(description)
+            description = decoded_description.note or None
+            metadata = decoded_description.metadata
+            if isinstance(metadata, ProductGroupDescriptionMetadata):
+                allergens = metadata.allergens
         return GrocyProductGroup(
             id=_require_int(raw.get("id"), "id"),
             name=_require_str(raw.get("name"), "name"),
-            description=_optional_str(raw.get("description")),
+            description=description,
             row_created_timestamp=_require_timestamp(
                 raw.get("row_created_timestamp"), "row_created_timestamp", source_timezone
             ),
             active=_require_bool(raw.get("active"), "active"),
+            allergens=allergens,
         )
 
 

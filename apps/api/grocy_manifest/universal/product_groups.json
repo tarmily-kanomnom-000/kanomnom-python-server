@@ -1,122 +1,122 @@
 [
     {
         "name": "Fresh Fruits",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Fresh fruit kept for toppings, fillings, and garnishes that are prepped daily.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Frozen Fruits",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Frozen berries and pur\\u00e9es used when fresh fruit is out of season.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Dairy",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Milk, cream, butter, and cultured dairy used across doughs, custards, and beverages.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[\"milk\"]}}",
         "active": 1
     },
     {
         "name": "Packaging",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Service-ready boxes, liners, wraps, and other presentation materials.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Flavorings & Extracts",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Concentrated flavorings such as vanilla, citrus oils, and spices for batters and syrups.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Sugars",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Granulated, powdered, and specialty sugars for sweetening, caramelizing, and finishing.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Fruit Juices/Purees",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Prepared juices and fruit pur\\u00e9es for curds, mousses, glazes, and drinks.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Powders",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Functional powdered ingredients like cocoa, gelatin, baking powder, and stabilizers.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Chocolates",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Couverture chips, feves, and bars for ganache, molding, and decorations.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[\"milk\",\"soy\"]}}",
         "active": 1
     },
     {
         "name": "Baking Essentials",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Yeast, baking soda, and other foundational leaveners and conditioners.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "General Dry Goods",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Pantry staples such as grains, beans, and savory dry ingredients for cafe items.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Canned Goods",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Shelf-stable fruits, milks, and purees kept as backup mise en place.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Flours & Starches",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Bread, pastry, specialty flours, and starches that define dough structure.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Fats and Oils",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Cooking oils, shortening, and specialty fats for lamination, frying, and fillings.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Kitchen Consumables",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Consumable prep items like parchment, piping bags, gloves, and towels.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Cleaning & Janitorial",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Cleaners, sanitizers, and paper goods that keep the bakehouse compliant.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Decorations",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Sprinkles, metallics, toppers, and d\\u00e9cor elements for finishing touches.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Eggs & Egg Products",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Shell eggs and pasteurized egg products for batters, custards, and glazes.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[\"egg\"]}}",
         "active": 1
     },
     {
         "name": "Soy / Plant Proteins",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Soy milk, tofu, and plant-based proteins supporting vegan pastry offerings.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[\"soy\"]}}",
         "active": 1
     },
     {
         "name": "Derived Intermediate Products",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"House-made bases such as caramel, praline, and pastry creams staged for reuse.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Drinks",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Cafe beverages, bottled drinks, and barista provisions sold alongside pastries.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Drink Toppings",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Whipped creams, syrups, and dusting toppings that finish beverages.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Supplies",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Merchandising materials, labels, twine, and other non-food supplies.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     },
     {
         "name": "Prepared Ingredients",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Prepped mise en place such as toasted nuts, roasted fruits, or chopped chocolate ready for service.\",\"attrs\":{\"kind\":\"product_group\",\"allergens\":[]}}",
         "active": 1
     }
 ]

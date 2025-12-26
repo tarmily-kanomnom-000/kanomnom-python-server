@@ -65,10 +65,23 @@ export type GrocyStockEntry = {
   } | null;
 };
 
+export type ProductUnitConversionDefinition = {
+  from_unit: string;
+  to_unit: string;
+  factor: number;
+};
+
+export type ProductDescriptionMetadata = {
+  kind?: string;
+  unit_conversions?: ProductUnitConversionDefinition[];
+  [key: string]: unknown;
+} | null;
+
 export type GrocyProductInventoryEntry = {
   id: number;
   name: string;
   description: string | null;
+  description_metadata: ProductDescriptionMetadata;
   product_group_name: string | null;
   min_stock_amount: number;
   default_best_before_days: number;
@@ -146,4 +159,10 @@ export type PurchaseEntryDefaults = {
     currency: string | null;
     conversionRate: number | null;
   };
+};
+
+export type PurchaseEntryCalculation = {
+  amount: number;
+  unitPrice: number;
+  totalUsd: number;
 };

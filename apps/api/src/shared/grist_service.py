@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import httpx
 import polars as pl
 import requests
 
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 GRIST_ENDPOINT = os.getenv("GRIST_ENDPOINT")
 GRIST_API_KEY = os.getenv("GRIST_API_KEY")
 GRIST_OPEX_DOCUMENT_ID = os.getenv("GRIST_OPEX_DOCUMENT_ID")
+GRIST_SUPPLY_PURCHASES_TABLE_ID = os.getenv("GRIST_SUPPLY_PURCHASES_TABLE_ID")
 GRIST_MATERIAL_PURCHASES_TABLE_ID = os.getenv("GRIST_MATERIAL_PURCHASES_TABLE_ID")
 _GRIST_RESPONSE_DUMP_DIR = Path(os.getenv("GRIST_RESPONSE_DUMP_DIR", "request_dumps"))
 _IGNORED_RESPONSE_FIELDS: frozenset[str] = frozenset({"material_price_summaries", "receipt"})
@@ -178,6 +180,44 @@ def _log_mixed_type_columns(rows: list[dict[str, Any]]) -> None:
                 sorted(types),
                 samples[column],
             )
+
+
+async def create_grist_purchase_record(fields: dict[str, Any]) -> None:
+    """Post a single purchase record to the configured Grist table."""
+
+    if not fields:
+        logger.info("Skipping Grist purchase post because no fields were provided.")
+        return
+    required_settings = {
+        "endpoint": GRIST_ENDPOINT,
+        "api_key": GRIST_API_KEY,
+        "document_id": GRIST_OPEX_DOCUMENT_ID,
+        "table_id": GRIST_SUPPLY_PURCHASES_TABLE_ID,
+    }
+    missing = [name for name, value in required_settings.items() if not value]
+    if missing:
+        logger.warning("Cannot post purchase to Grist; missing config values: %s", ", ".join(missing))
+        return
+
+    url = (
+        f"{GRIST_ENDPOINT}/api/docs/{GRIST_OPEX_DOCUMENT_ID}"
+        f"/tables/{GRIST_SUPPLY_PURCHASES_TABLE_ID}/records"
+    )
+    payload = {"records": [{"fields": fields}]}
+    headers = {"Authorization": f"Bearer {GRIST_API_KEY}"}
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.post(url, headers=headers, json=payload)
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError:
+        logger.error(
+            "Failed to post purchase record to Grist: %s - %s",
+            response.status_code,
+            response.text,
+        )
+        raise
+    logger.info("Posted purchase '%s' to Grist", fields.get("material"))
 
 
 def get_grist_table() -> pl.DataFrame:

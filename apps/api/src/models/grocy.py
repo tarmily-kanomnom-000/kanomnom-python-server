@@ -119,6 +119,26 @@ class PurchaseEntryDefaultsBatchResponse(BaseModel):
     defaults: list[PurchaseEntryDefaultsResponse]
 
 
+class PurchaseEntryCalculationRequest(BaseModel):
+    metadata: PurchaseEntryMetadataPayload
+
+
+class PurchaseEntryCalculationResponse(BaseModel):
+    amount: float
+    unit_price: float
+    total_usd: float
+
+
+class ProductUnitConversionPayload(BaseModel):
+    from_unit: str
+    to_unit: str
+    factor: float
+
+
+class ProductDescriptionMetadataPayload(BaseModel):
+    unit_conversions: list[ProductUnitConversionPayload] = Field(default_factory=list)
+
+
 class GrocyStockEntryPayload(BaseModel):
     id: int
     amount: float
@@ -139,6 +159,7 @@ class GrocyProductInventoryEntry(BaseModel):
     id: int
     name: str
     description: str | None = None
+    description_metadata: ProductDescriptionMetadataPayload | None = None
     product_group_id: int | None = None
     active: bool
     location_id: int | None = None
@@ -194,6 +215,10 @@ __all__ = [
     "PurchaseEntryDefaultsResponse",
     "PurchaseEntryDefaultsBatchRequest",
     "PurchaseEntryDefaultsBatchResponse",
+    "PurchaseEntryCalculationRequest",
+    "PurchaseEntryCalculationResponse",
+    "ProductUnitConversionPayload",
+    "ProductDescriptionMetadataPayload",
     "InstanceAddressPayload",
     "GrocyLocationPayload",
     "GrocyShoppingLocationPayload",

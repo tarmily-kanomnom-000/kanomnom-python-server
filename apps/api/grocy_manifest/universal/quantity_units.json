@@ -1,64 +1,71 @@
 [
     {
         "name": "piece",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":true}}",
         "name_plural": "pieces",
         "plural_forms": null,
         "active": 1
     },
     {
-        "name": "gram",
-        "description": null,
-        "name_plural": "grams",
+        "name": "g",
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
+        "name_plural": "g",
         "plural_forms": null,
         "active": 1
     },
     {
         "name": "gallon",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
         "name_plural": "gallons",
         "plural_forms": null,
         "active": 1
     },
     {
         "name": "roll",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":true}}",
         "name_plural": "rolls",
         "plural_forms": null,
         "active": 1
     },
     {
         "name": "mL",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
         "name_plural": "mL",
         "plural_forms": null,
         "active": 1
     },
     {
         "name": "stack",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":true}}",
         "name_plural": "stacks",
         "plural_forms": null,
         "active": 1
     },
     {
-        "name": "liter",
-        "description": null,
-        "name_plural": "liters",
+        "name": "L",
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
+        "name_plural": "L",
         "plural_forms": null,
         "active": 1
     },
     {
-        "name": "pound",
-        "description": null,
-        "name_plural": "pounds",
+        "name": "lb",
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
+        "name_plural": "lb",
         "plural_forms": null,
         "active": 1
     },
     {
-        "name": "kilogram",
-        "description": null,
-        "name_plural": "kilograms",
+        "name": "kg",
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
+        "name_plural": "kg",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "name": "box",
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":true}}",
+        "name_plural": "boxes",
         "plural_forms": null,
         "active": 1
     }

@@ -2,7 +2,7 @@
     {
         "id": 1,
         "name": "Fresh Strawberries",
-        "description": null,
+        "description": "kanomnom::{\"v\":1,\"note\":\"Pre-washed 1 lb clamshell from vendor.\",\"attrs\":{\"kind\":\"product_description\",\"unit_conversions\":[{\"from_unit\":\"piece\",\"to_unit\":\"g\",\"factor\":454},{\"from_unit\":\"g\",\"to_unit\":\"piece\",\"factor\":0.00220264}]}}",
         "product_group_id": 1,
         "active": 1,
         "location_id": 3,

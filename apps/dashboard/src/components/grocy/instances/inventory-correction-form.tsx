@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { useMeasuredElementHeight } from "@/hooks/use-measured-element-height";
 import { submitInventoryCorrection } from "@/lib/grocy/client";
 import type {
   GrocyProductInventoryEntry,
   InventoryLossReason,
 } from "@/lib/grocy/types";
-
 import {
   buildSearchableOptions,
   computeDefaultBestBeforeDate,
@@ -56,30 +56,8 @@ export function InventoryCorrectionForm({
   const [losses, setLosses] = useState<
     { reason: InventoryLossReason; note: string }[]
   >([]);
-  const leftColumnRef = useRef<HTMLDivElement | null>(null);
-  const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
-
-  useEffect(() => {
-    const node = leftColumnRef.current;
-    if (!node) {
-      return;
-    }
-    const updateHeight = () => {
-      setLeftColumnHeight(node.getBoundingClientRect().height);
-    };
-    updateHeight();
-    if (typeof ResizeObserver === "function") {
-      const observer = new ResizeObserver(() => updateHeight());
-      observer.observe(node);
-      return () => {
-        observer.disconnect();
-      };
-    }
-    window.addEventListener("resize", updateHeight);
-    return () => {
-      window.removeEventListener("resize", updateHeight);
-    };
-  }, []);
+  const [leftColumnRef, leftColumnHeight] =
+    useMeasuredElementHeight<HTMLDivElement>();
 
   const isLossReasonSelected = (reason: InventoryLossReason): boolean =>
     losses.some((entry) => entry.reason === reason);

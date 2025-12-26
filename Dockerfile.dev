@@ -2,6 +2,7 @@ FROM ubuntu:24.04
 
 # Accept Python version as build argument
 ARG PYTHON_VERSION
+ARG NODE_MAJOR
 ENV PYTHON_VERSION=${PYTHON_VERSION}
 ENV NODE_MAJOR=${NODE_MAJOR}
 

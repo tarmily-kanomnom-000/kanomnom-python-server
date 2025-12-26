@@ -1,6 +1,5 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -8,7 +7,7 @@ import {
   ListControls,
   type NumericRange,
 } from "@/components/grocy/list-controls";
-import { useQueryParamUpdater } from "@/hooks/use-query-param-updater";
+import { useSyncedQueryState } from "@/hooks/use-synced-query-state";
 import { fetchBulkPurchaseEntryDefaults } from "@/lib/grocy/client";
 import { GROCY_QUERY_PARAMS } from "@/lib/grocy/query-params";
 import type {
@@ -24,12 +23,28 @@ import {
   resolveProductGroup,
   resolveQuantityOnHand,
 } from "./helpers";
+import {
+  areArraysEqual,
+  areDateRangesEqual,
+  areNumericRangesEqual,
+  areSortStatesEqual,
+  buildDefaultSortState,
+  PRODUCT_SORT_OPTIONS,
+  parseDateRangeParam,
+  parseNumericRangeParam,
+  parseSortStateParam,
+  parseStockStatusParam,
+  parseStringArrayParam,
+  serializeDateRangeParam,
+  serializeNumericRangeParam,
+  serializeSortStateParam,
+  serializeStringArrayParam,
+} from "./inventory-query-state";
 import { ProductActionDialog } from "./product-action-dialog";
 import type { ProductActionType } from "./product-actions";
 import { ProductDetailsDialog } from "./product-details-dialog";
 import {
   compareProducts,
-  ProductSortField,
   ProductSortState,
   ProductStockCategory,
   resolveDaysSinceUpdate,
@@ -37,7 +52,6 @@ import {
   STOCK_STATUS_CATEGORY_BY_LABEL,
   STOCK_STATUS_FILTER_OPTIONS,
   STOCK_STATUS_LABEL_BY_CATEGORY,
-  STOCK_STATUS_PRIORITY,
 } from "./product-metrics";
 import { ProductsTable } from "./products-table";
 
@@ -49,32 +63,10 @@ const PRODUCT_STALENESS_PARAM = GROCY_QUERY_PARAMS.inventoryStalenessRange;
 const PRODUCT_UPDATED_PARAM = GROCY_QUERY_PARAMS.inventoryUpdatedRange;
 const PRODUCT_SORT_PARAM = GROCY_QUERY_PARAMS.inventorySort;
 
-const NUMERIC_RANGE_MODES: NumericRange["mode"][] = [
-  "exact",
-  "lt",
-  "gt",
-  "between",
-];
-const DATE_RANGE_MODES: DateRange["mode"][] = [
-  "on",
-  "before",
-  "after",
-  "between",
-];
-const DEFAULT_SORT_STATE: ProductSortState = [
-  { field: "name", direction: "asc" },
-];
-
-const PRODUCT_SORT_OPTIONS: Array<{ label: string; value: ProductSortField }> =
-  [
-    { label: "Product name", value: "name" },
-    { label: "Stock status", value: "status" },
-    { label: "Amount in stock", value: "quantity" },
-    { label: "Days since last update", value: "daysSinceUpdate" },
-    { label: "Last updated", value: "updated" },
-  ];
-
 const PURCHASE_DEFAULTS_BATCH_SIZE = 25;
+const PURCHASE_DEFAULT_PREFETCH_CONCURRENCY = 4;
+const PURCHASE_DEFAULT_PREFETCH_RETRY_BASE_DELAY_MS = 5_000;
+const PURCHASE_DEFAULT_PREFETCH_RETRY_MAX_DELAY_MS = 60_000;
 
 type ProductInteractionMode = "details" | "purchase" | "inventory";
 
@@ -87,168 +79,24 @@ const PRODUCT_MODE_OPTIONS: Array<{
   { value: "inventory", label: "Inventory" },
 ];
 
-function buildDefaultSortState(): ProductSortState {
-  return DEFAULT_SORT_STATE.map((rule) => ({ ...rule }));
-}
+const parseSearchQueryParam = (rawValue: string | null): string =>
+  rawValue ?? "";
 
-function parseStringArrayParam(raw: string | null): string[] {
-  if (!raw) {
-    return [];
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed.filter((value) => typeof value === "string");
-    }
-  } catch {
-    // fall through to default
-  }
-  return [];
-}
+const serializeSearchQueryParam = (value: string): string | null => {
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+};
 
-function parseStockStatusParam(raw: string | null): ProductStockCategory[] {
-  const values = parseStringArrayParam(raw);
-  return values.filter(
-    (value): value is ProductStockCategory => value in STOCK_STATUS_PRIORITY,
-  );
-}
+const buildPurchaseDefaultsCacheKey = (
+  productId: number,
+  shoppingLocationId: number | null,
+): string => `${productId}:${shoppingLocationId ?? "__none__"}`;
 
-function parseNumericRangeParam(raw: string | null): NumericRange | null {
-  if (!raw) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      NUMERIC_RANGE_MODES.includes(parsed.mode)
-    ) {
-      return {
-        mode: parsed.mode,
-        min:
-          typeof parsed.min === "number" || parsed.min === null
-            ? parsed.min
-            : undefined,
-        max:
-          typeof parsed.max === "number" || parsed.max === null
-            ? parsed.max
-            : undefined,
-      };
-    }
-  } catch {
-    // ignore malformed values
-  }
-  return null;
-}
-
-function parseDateRangeParam(raw: string | null): DateRange | null {
-  if (!raw) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      DATE_RANGE_MODES.includes(parsed.mode)
-    ) {
-      const isValidValue = (value: unknown) =>
-        typeof value === "string" ||
-        value === null ||
-        typeof value === "undefined";
-      if (isValidValue(parsed.start) && isValidValue(parsed.end)) {
-        return {
-          mode: parsed.mode,
-          start:
-            typeof parsed.start === "string" || parsed.start === null
-              ? parsed.start
-              : undefined,
-          end:
-            typeof parsed.end === "string" || parsed.end === null
-              ? parsed.end
-              : undefined,
-        };
-      }
-    }
-  } catch {
-    // ignore malformed values
-  }
-  return null;
-}
-
-function parseSortStateParam(raw: string | null): ProductSortState {
-  if (!raw) {
-    return buildDefaultSortState();
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (
-      Array.isArray(parsed) &&
-      parsed.every(
-        (rule) =>
-          rule &&
-          typeof rule === "object" &&
-          PRODUCT_SORT_OPTIONS.some((option) => option.value === rule.field) &&
-          (rule.direction === "asc" || rule.direction === "desc"),
-      )
-    ) {
-      return parsed.length > 0 ? parsed : buildDefaultSortState();
-    }
-  } catch {
-    // ignore malformed values
-  }
-  return buildDefaultSortState();
-}
-
-function areArraysEqual<T>(a: T[], b: T[]): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  return a.every((value, index) => value === b[index]);
-}
-
-function areNumericRangesEqual(
-  a: NumericRange | null,
-  b: NumericRange | null,
-): boolean {
-  if (a === b) {
-    return true;
-  }
-  if (!a || !b) {
-    return false;
-  }
-  return (
-    a.mode === b.mode &&
-    (a.min ?? null) === (b.min ?? null) &&
-    (a.max ?? null) === (b.max ?? null)
-  );
-}
-
-function areDateRangesEqual(a: DateRange | null, b: DateRange | null): boolean {
-  if (a === b) {
-    return true;
-  }
-  if (!a || !b) {
-    return false;
-  }
-  return (
-    a.mode === b.mode &&
-    (a.start ?? null) === (b.start ?? null) &&
-    (a.end ?? null) === (b.end ?? null)
-  );
-}
-
-function areSortStatesEqual(a: ProductSortState, b: ProductSortState): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  return a.every(
-    (rule, index) =>
-      rule.field === b[index]?.field && rule.direction === b[index]?.direction,
-  );
-}
-
+const buildDateInputValue = (): string => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today.toISOString().slice(0, 10);
+};
 function chunkArray<T>(items: T[], size: number): T[][] {
   if (size <= 0) {
     return [items.slice()];
@@ -281,97 +129,61 @@ export function ProductsPanel({
   onProductUpdate,
   onRefresh,
 }: ProductsPanelProps) {
-  const searchParams = useSearchParams();
-  const updateQueryParams = useQueryParamUpdater();
-  const [searchQuery, setSearchQuery] = useState<string>(
-    () => searchParams.get(PRODUCT_SEARCH_PARAM) ?? "",
-  );
-  const [selectedGroups, setSelectedGroups] = useState<string[]>(() =>
-    parseStringArrayParam(searchParams.get(PRODUCT_GROUPS_PARAM)),
-  );
-  const [sortState, setSortState] = useState<ProductSortState>(() =>
-    parseSortStateParam(searchParams.get(PRODUCT_SORT_PARAM)),
-  );
-  const [quantityRange, setQuantityRange] = useState<NumericRange | null>(() =>
-    parseNumericRangeParam(searchParams.get(PRODUCT_QUANTITY_PARAM)),
-  );
-  const [updatedDateRange, setUpdatedDateRange] = useState<DateRange | null>(
-    () => parseDateRangeParam(searchParams.get(PRODUCT_UPDATED_PARAM)),
-  );
-  const [stalenessRange, setStalenessRange] = useState<NumericRange | null>(
-    () => parseNumericRangeParam(searchParams.get(PRODUCT_STALENESS_PARAM)),
-  );
-  const [selectedStockStatuses, setSelectedStockStatuses] = useState<
+  const [searchQuery, setSearchQuery] = useSyncedQueryState<string>({
+    key: PRODUCT_SEARCH_PARAM,
+    parse: parseSearchQueryParam,
+    serialize: serializeSearchQueryParam,
+  });
+  const [selectedGroups, setSelectedGroups] = useSyncedQueryState<string[]>({
+    key: PRODUCT_GROUPS_PARAM,
+    parse: parseStringArrayParam,
+    serialize: serializeStringArrayParam,
+    isEqual: areArraysEqual,
+  });
+  const [sortState, setSortState] = useSyncedQueryState<ProductSortState>({
+    key: PRODUCT_SORT_PARAM,
+    parse: parseSortStateParam,
+    serialize: serializeSortStateParam,
+    isEqual: areSortStatesEqual,
+  });
+  const [quantityRange, setQuantityRange] =
+    useSyncedQueryState<NumericRange | null>({
+      key: PRODUCT_QUANTITY_PARAM,
+      parse: parseNumericRangeParam,
+      serialize: serializeNumericRangeParam,
+      isEqual: areNumericRangesEqual,
+    });
+  const [updatedDateRange, setUpdatedDateRange] =
+    useSyncedQueryState<DateRange | null>({
+      key: PRODUCT_UPDATED_PARAM,
+      parse: parseDateRangeParam,
+      serialize: serializeDateRangeParam,
+      isEqual: areDateRangesEqual,
+    });
+  const [stalenessRange, setStalenessRange] =
+    useSyncedQueryState<NumericRange | null>({
+      key: PRODUCT_STALENESS_PARAM,
+      parse: parseNumericRangeParam,
+      serialize: serializeNumericRangeParam,
+      isEqual: areNumericRangesEqual,
+    });
+  const [selectedStockStatuses, setSelectedStockStatuses] = useSyncedQueryState<
     ProductStockCategory[]
-  >(() => parseStockStatusParam(searchParams.get(PRODUCT_STATUSES_PARAM)));
+  >({
+    key: PRODUCT_STATUSES_PARAM,
+    parse: parseStockStatusParam,
+    serialize: serializeStringArrayParam,
+    isEqual: areArraysEqual,
+  });
   const [purchaseDefaultsByProductId, setPurchaseDefaultsByProductId] =
     useState<Record<number, PurchaseEntryDefaults>>({});
-  const prefetchedDefaultsRef = useRef<Set<number>>(new Set());
-
-  useEffect(() => {
-    const nextValue = searchParams.get(PRODUCT_SEARCH_PARAM) ?? "";
-    setSearchQuery((current) => (current === nextValue ? current : nextValue));
-  }, [searchParams]);
-
-  useEffect(() => {
-    const nextGroups = parseStringArrayParam(
-      searchParams.get(PRODUCT_GROUPS_PARAM),
-    );
-    setSelectedGroups((current) =>
-      areArraysEqual(current, nextGroups) ? current : nextGroups,
-    );
-  }, [searchParams]);
-
-  useEffect(() => {
-    const nextStatuses = parseStockStatusParam(
-      searchParams.get(PRODUCT_STATUSES_PARAM),
-    );
-    setSelectedStockStatuses((current) =>
-      areArraysEqual(current, nextStatuses) ? current : nextStatuses,
-    );
-  }, [searchParams]);
-
-  useEffect(() => {
-    const nextQuantityRange = parseNumericRangeParam(
-      searchParams.get(PRODUCT_QUANTITY_PARAM),
-    );
-    setQuantityRange((current) =>
-      areNumericRangesEqual(current, nextQuantityRange)
-        ? current
-        : nextQuantityRange,
-    );
-  }, [searchParams]);
-
-  useEffect(() => {
-    const nextStalenessRange = parseNumericRangeParam(
-      searchParams.get(PRODUCT_STALENESS_PARAM),
-    );
-    setStalenessRange((current) =>
-      areNumericRangesEqual(current, nextStalenessRange)
-        ? current
-        : nextStalenessRange,
-    );
-  }, [searchParams]);
-
-  useEffect(() => {
-    const nextUpdatedRange = parseDateRangeParam(
-      searchParams.get(PRODUCT_UPDATED_PARAM),
-    );
-    setUpdatedDateRange((current) =>
-      areDateRangesEqual(current, nextUpdatedRange)
-        ? current
-        : nextUpdatedRange,
-    );
-  }, [searchParams]);
-
-  useEffect(() => {
-    const nextSortState = parseSortStateParam(
-      searchParams.get(PRODUCT_SORT_PARAM),
-    );
-    setSortState((current) =>
-      areSortStatesEqual(current, nextSortState) ? current : nextSortState,
-    );
-  }, [searchParams]);
+  const [purchaseDefaultsError, setPurchaseDefaultsError] = useState<
+    string | null
+  >(null);
+  const prefetchedDefaultsRef = useRef<Set<string>>(new Set());
+  const prefetchRetryAttemptsRef = useRef(0);
+  const prefetchRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [prefetchRetrySignal, setPrefetchRetrySignal] = useState(0);
 
   const instanceDefaultsResetKey = activeInstanceId ?? "__none__";
 
@@ -379,28 +191,58 @@ export function ProductsPanel({
     void instanceDefaultsResetKey;
     prefetchedDefaultsRef.current = new Set();
     setPurchaseDefaultsByProductId({});
+    setPurchaseDefaultsError(null);
+    prefetchRetryAttemptsRef.current = 0;
+    if (prefetchRetryTimeoutRef.current) {
+      clearTimeout(prefetchRetryTimeoutRef.current);
+      prefetchRetryTimeoutRef.current = null;
+    }
+    setPrefetchRetrySignal((value) => value + 1);
   }, [instanceDefaultsResetKey]);
 
   useEffect(() => {
+    // Force effect reruns whenever the retry signal increments without depending on other state.
+    void prefetchRetrySignal;
     if (!activeInstanceId) {
       return;
     }
+    const shoppingLocationId: number | null = null;
     const missingProductIds = products
-      .map((product) => product.id)
-      .filter((id) => !prefetchedDefaultsRef.current.has(id));
+      .map((product) => ({
+        id: product.id,
+        key: buildPurchaseDefaultsCacheKey(product.id, shoppingLocationId),
+      }))
+      .filter((entry) => !prefetchedDefaultsRef.current.has(entry.key))
+      .map((entry) => entry.id);
     if (missingProductIds.length === 0) {
+      prefetchRetryAttemptsRef.current = 0;
+      setPurchaseDefaultsError(null);
+      if (prefetchRetryTimeoutRef.current) {
+        clearTimeout(prefetchRetryTimeoutRef.current);
+        prefetchRetryTimeoutRef.current = null;
+      }
       return;
     }
+    setPurchaseDefaultsError(null);
     let cancelled = false;
     const batches = chunkArray(missingProductIds, PURCHASE_DEFAULTS_BATCH_SIZE);
 
-    const loadDefaults = async () => {
-      for (const batch of batches) {
-        try {
+    const runPrefetch = async () => {
+      const workerCount = Math.min(
+        PURCHASE_DEFAULT_PREFETCH_CONCURRENCY,
+        batches.length,
+      );
+      const runWorker = async (workerIndex: number) => {
+        for (
+          let batchIndex = workerIndex;
+          batchIndex < batches.length;
+          batchIndex += workerCount
+        ) {
+          const batch = batches[batchIndex];
           const defaults = await fetchBulkPurchaseEntryDefaults(
             activeInstanceId,
             batch,
-            null,
+            shoppingLocationId,
           );
           if (cancelled) {
             return;
@@ -409,80 +251,68 @@ export function ProductsPanel({
             const next = { ...current };
             defaults.forEach((entry) => {
               next[entry.productId] = entry;
-              prefetchedDefaultsRef.current.add(entry.productId);
+              prefetchedDefaultsRef.current.add(
+                buildPurchaseDefaultsCacheKey(
+                  entry.productId,
+                  entry.shoppingLocationId ?? null,
+                ),
+              );
             });
             return next;
           });
-        } catch {
-          if (cancelled) {
-            return;
-          }
-          // Ignore errors to avoid interrupting other batches; we'll refetch on next render.
         }
+      };
+
+      await Promise.all(
+        Array.from({ length: workerCount }, (_, index) => runWorker(index)),
+      );
+    };
+
+    const loadDefaults = async () => {
+      try {
+        await runPrefetch();
+        if (cancelled) {
+          return;
+        }
+        prefetchRetryAttemptsRef.current = 0;
+        if (prefetchRetryTimeoutRef.current) {
+          clearTimeout(prefetchRetryTimeoutRef.current);
+          prefetchRetryTimeoutRef.current = null;
+        }
+        setPurchaseDefaultsError(null);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        console.warn("Failed to prefetch purchase entry defaults", error);
+        const attempt = prefetchRetryAttemptsRef.current + 1;
+        prefetchRetryAttemptsRef.current = attempt;
+        const delay = Math.min(
+          PURCHASE_DEFAULT_PREFETCH_RETRY_MAX_DELAY_MS,
+          PURCHASE_DEFAULT_PREFETCH_RETRY_BASE_DELAY_MS * attempt,
+        );
+        setPurchaseDefaultsError(
+          `Unable to preload purchase metadata. We'll retry automatically in ${Math.round(delay / 1000)} seconds.`,
+        );
+        if (prefetchRetryTimeoutRef.current) {
+          clearTimeout(prefetchRetryTimeoutRef.current);
+        }
+        prefetchRetryTimeoutRef.current = setTimeout(() => {
+          setPrefetchRetrySignal((value) => value + 1);
+        }, delay);
       }
     };
 
     void loadDefaults();
     return () => {
       cancelled = true;
+      if (prefetchRetryTimeoutRef.current) {
+        clearTimeout(prefetchRetryTimeoutRef.current);
+        prefetchRetryTimeoutRef.current = null;
+      }
     };
-  }, [activeInstanceId, products]);
+  }, [activeInstanceId, products, prefetchRetrySignal]);
 
-  useEffect(() => {
-    const normalized = searchQuery.trim();
-    updateQueryParams({
-      [PRODUCT_SEARCH_PARAM]: normalized.length > 0 ? searchQuery : null,
-    });
-  }, [searchQuery, updateQueryParams]);
-
-  useEffect(() => {
-    updateQueryParams({
-      [PRODUCT_GROUPS_PARAM]:
-        selectedGroups.length > 0 ? JSON.stringify(selectedGroups) : null,
-    });
-  }, [selectedGroups, updateQueryParams]);
-
-  useEffect(() => {
-    updateQueryParams({
-      [PRODUCT_STATUSES_PARAM]:
-        selectedStockStatuses.length > 0
-          ? JSON.stringify(selectedStockStatuses)
-          : null,
-    });
-  }, [selectedStockStatuses, updateQueryParams]);
-
-  useEffect(() => {
-    updateQueryParams({
-      [PRODUCT_QUANTITY_PARAM]: quantityRange
-        ? JSON.stringify(quantityRange)
-        : null,
-    });
-  }, [quantityRange, updateQueryParams]);
-
-  useEffect(() => {
-    updateQueryParams({
-      [PRODUCT_STALENESS_PARAM]: stalenessRange
-        ? JSON.stringify(stalenessRange)
-        : null,
-    });
-  }, [stalenessRange, updateQueryParams]);
-
-  useEffect(() => {
-    updateQueryParams({
-      [PRODUCT_UPDATED_PARAM]: updatedDateRange
-        ? JSON.stringify(updatedDateRange)
-        : null,
-    });
-  }, [updatedDateRange, updateQueryParams]);
-
-  useEffect(() => {
-    const serialized = areSortStatesEqual(sortState, buildDefaultSortState())
-      ? null
-      : JSON.stringify(sortState);
-    updateQueryParams({
-      [PRODUCT_SORT_PARAM]: serialized,
-    });
-  }, [sortState, updateQueryParams]);
   const [activeProduct, setActiveProduct] =
     useState<GrocyProductInventoryEntry | null>(null);
   const [activeAction, setActiveAction] = useState<{
@@ -494,6 +324,9 @@ export function ProductsPanel({
   const lastInstanceId = useRef<string | null>(null);
   const [productInteractionMode, setProductInteractionMode] =
     useState<ProductInteractionMode>("details");
+  const [purchaseDateOverride, setPurchaseDateOverride] = useState<
+    string | null
+  >(() => buildDateInputValue());
 
   useEffect(() => {
     if (!activeInstanceId) {
@@ -516,7 +349,16 @@ export function ProductsPanel({
     setStalenessRange(null);
     setSelectedStockStatuses([]);
     setActiveProduct(null);
-  }, [activeInstanceId]);
+  }, [
+    activeInstanceId,
+    setQuantityRange,
+    setSearchQuery,
+    setSelectedGroups,
+    setSelectedStockStatuses,
+    setSortState,
+    setStalenessRange,
+    setUpdatedDateRange,
+  ]);
 
   useEffect(() => {
     if (!activeAction) {
@@ -580,7 +422,7 @@ export function ProductsPanel({
       const next = current.filter((group) => productGroups.includes(group));
       return next.length === current.length ? current : next;
     });
-  }, [productGroups]);
+  }, [productGroups, setSelectedGroups]);
 
   const toggleGroup = (group: string) => {
     setSelectedGroups((current) =>
@@ -773,6 +615,45 @@ export function ProductsPanel({
     </div>
   );
 
+  const renderPurchaseModeDefaults = () => {
+    if (productInteractionMode !== "purchase") {
+      return null;
+    }
+    return (
+      <div className="rounded-3xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-4 text-sm text-neutral-700 shadow-inner">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              Default purchase date
+            </p>
+            <p className="text-xs text-neutral-500">
+              New purchase entries open with this date pre-filled so you can
+              batch receipts for a given day.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              type="date"
+              value={purchaseDateOverride ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setPurchaseDateOverride(value ? value : null);
+              }}
+              className="rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setPurchaseDateOverride(buildDateInputValue())}
+              className="rounded-full border border-neutral-300 px-4 py-2 text-xs font-semibold text-neutral-700 transition hover:border-neutral-900 hover:text-neutral-900"
+            >
+              Use today
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (errorMessage) {
     return (
       <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -804,6 +685,11 @@ export function ProductsPanel({
           {notification}
         </div>
       ) : null}
+      {purchaseDefaultsError ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          {purchaseDefaultsError}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-sm font-medium text-neutral-700">
@@ -833,6 +719,8 @@ export function ProductsPanel({
           </div>
         ) : null}
       </div>
+
+      {renderPurchaseModeDefaults()}
 
       <ListControls
         searchLabel="Search products"
@@ -888,6 +776,7 @@ export function ProductsPanel({
           shoppingLocationNamesById={shoppingLocationNamesById}
           onProductUpdate={onProductUpdate}
           prefetchedPurchaseDefaults={purchaseDefaultsByProductId}
+          defaultPurchasedDate={purchaseDateOverride}
           onSuccess={(message) => {
             handleActionSuccess(message);
             setActiveAction(null);
