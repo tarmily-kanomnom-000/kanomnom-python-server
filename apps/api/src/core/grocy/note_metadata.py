@@ -207,6 +207,7 @@ class PurchaseEntryNoteMetadata(BaseNoteMetadata):
     package_quantity: float | None = None
     currency: str | None = None
     conversion_rate: float | None = None
+    on_sale: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "shipping_cost", _normalize_optional_number(self.shipping_cost, "shipping_cost"))
@@ -233,6 +234,11 @@ class PurchaseEntryNoteMetadata(BaseNoteMetadata):
             "conversion_rate",
             _normalize_optional_positive_number(self.conversion_rate, "conversion_rate"),
         )
+        object.__setattr__(
+            self,
+            "on_sale",
+            _normalize_optional_bool(self.on_sale, "on_sale") or False,
+        )
 
     def to_attrs(self) -> dict[str, Any]:
         attrs: dict[str, Any] = {}
@@ -252,6 +258,7 @@ class PurchaseEntryNoteMetadata(BaseNoteMetadata):
             attrs["currency"] = self.currency
         if self.conversion_rate is not None:
             attrs["conversion_rate"] = self.conversion_rate
+        attrs["on_sale"] = self.on_sale
         if not attrs:
             return {}
         attrs["kind"] = self.kind
@@ -268,6 +275,7 @@ class PurchaseEntryNoteMetadata(BaseNoteMetadata):
             package_quantity=_normalize_optional_positive_number(attrs.get("package_quantity"), "package_quantity"),
             currency=_normalize_optional_text(attrs.get("currency"), "currency"),
             conversion_rate=_normalize_optional_positive_number(attrs.get("conversion_rate"), "conversion_rate"),
+            on_sale=_normalize_optional_bool(attrs.get("on_sale"), "on_sale") or False,
         )
 
 

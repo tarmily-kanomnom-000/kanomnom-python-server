@@ -4,7 +4,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone, tzinfo
 from typing import Any
 
-from core.grocy.note_metadata import QuantityUnitDescriptionMetadata, decode_structured_note
+from core.grocy.note_metadata import (
+    ProductGroupDescriptionMetadata,
+    QuantityUnitDescriptionMetadata,
+    decode_structured_note,
+)
 
 class GrocyResponseError(ValueError):
     """Raised when Grocy responses cannot be parsed into strongly typed models."""

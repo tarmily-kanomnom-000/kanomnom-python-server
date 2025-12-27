@@ -8,6 +8,7 @@ import {
   type NumericRange,
 } from "@/components/grocy/list-controls";
 import { useSyncedQueryState } from "@/hooks/use-synced-query-state";
+import type { DashboardRole } from "@/lib/auth/types";
 import { fetchBulkPurchaseEntryDefaults } from "@/lib/grocy/client";
 import { GROCY_QUERY_PARAMS } from "@/lib/grocy/query-params";
 import type {
@@ -115,6 +116,7 @@ type ProductsPanelProps = {
   activeInstanceId: string | null;
   locationNamesById: Record<number, string>;
   shoppingLocationNamesById: Record<number, string>;
+  userRole: DashboardRole;
   onProductUpdate?: (product: GrocyProductInventoryEntry) => void;
   onRefresh?: () => void;
 };
@@ -126,6 +128,7 @@ export function ProductsPanel({
   activeInstanceId,
   locationNamesById,
   shoppingLocationNamesById,
+  userRole,
   onProductUpdate,
   onRefresh,
 }: ProductsPanelProps) {
@@ -184,6 +187,7 @@ export function ProductsPanel({
   const prefetchRetryAttemptsRef = useRef(0);
   const prefetchRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [prefetchRetrySignal, setPrefetchRetrySignal] = useState(0);
+  const isAdmin = userRole === "admin";
 
   const instanceDefaultsResetKey = activeInstanceId ?? "__none__";
 
@@ -203,6 +207,13 @@ export function ProductsPanel({
   useEffect(() => {
     // Force effect reruns whenever the retry signal increments without depending on other state.
     void prefetchRetrySignal;
+    if (!isAdmin) {
+      if (prefetchRetryTimeoutRef.current) {
+        clearTimeout(prefetchRetryTimeoutRef.current);
+        prefetchRetryTimeoutRef.current = null;
+      }
+      return;
+    }
     if (!activeInstanceId) {
       return;
     }
@@ -311,7 +322,7 @@ export function ProductsPanel({
         prefetchRetryTimeoutRef.current = null;
       }
     };
-  }, [activeInstanceId, products, prefetchRetrySignal]);
+  }, [activeInstanceId, isAdmin, products, prefetchRetrySignal]);
 
   const [activeProduct, setActiveProduct] =
     useState<GrocyProductInventoryEntry | null>(null);
@@ -327,6 +338,18 @@ export function ProductsPanel({
   const [purchaseDateOverride, setPurchaseDateOverride] = useState<
     string | null
   >(() => buildDateInputValue());
+
+  useEffect(() => {
+    if (isAdmin) {
+      return;
+    }
+    setProductInteractionMode("details");
+    setActiveAction(null);
+    setActiveProduct(null);
+    setPurchaseDefaultsByProductId({});
+    setPurchaseDefaultsError(null);
+    prefetchedDefaultsRef.current = new Set();
+  }, [isAdmin]);
 
   useEffect(() => {
     if (!activeInstanceId) {
@@ -576,6 +599,10 @@ export function ProductsPanel({
   const handlePrimaryProductSelection = (
     product: GrocyProductInventoryEntry,
   ) => {
+    if (!isAdmin) {
+      setActiveProduct(product);
+      return;
+    }
     if (productInteractionMode === "purchase") {
       setActiveAction({ product, action: "purchaseEntry" });
       return;
@@ -587,13 +614,21 @@ export function ProductsPanel({
     setActiveProduct(product);
   };
 
+  const allowedModes = useMemo(
+    () =>
+      isAdmin
+        ? PRODUCT_MODE_OPTIONS
+        : PRODUCT_MODE_OPTIONS.filter((option) => option.value === "details"),
+    [isAdmin],
+  );
+
   const renderModeButtons = () => (
     <div className="flex flex-col items-center gap-2 lg:flex-1 lg:flex-row lg:items-center lg:justify-center">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
         Mode
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
-        {PRODUCT_MODE_OPTIONS.map((option) => {
+        {allowedModes.map((option) => {
           const isActive = option.value === productInteractionMode;
           return (
             <button
@@ -616,7 +651,7 @@ export function ProductsPanel({
   );
 
   const renderPurchaseModeDefaults = () => {
-    if (productInteractionMode !== "purchase") {
+    if (!isAdmin || productInteractionMode !== "purchase") {
       return null;
     }
     return (

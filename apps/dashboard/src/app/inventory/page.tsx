@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { InstancesPicker } from "@/components/grocy/instances-picker";
+import { getCurrentSession } from "@/lib/auth/session";
 import { fetchGrocyInstances } from "@/lib/grocy/server";
 
 export const metadata: Metadata = {
@@ -10,6 +12,12 @@ export const metadata: Metadata = {
 export const revalidate = 0;
 
 export default async function InventoryPage() {
+  const session = await getCurrentSession();
+  const userRole = session?.user?.role ?? "viewer";
+  if (!session) {
+    redirect("/login");
+  }
+
   let instances: Awaited<ReturnType<typeof fetchGrocyInstances>> = [];
   let errorMessage: string | null = null;
 
@@ -33,7 +41,7 @@ export default async function InventoryPage() {
           </p>
         </div>
       ) : (
-        <InstancesPicker instances={instances} />
+        <InstancesPicker instances={instances} userRole={userRole} />
       )}
     </main>
   );

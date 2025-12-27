@@ -9,48 +9,42 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install Python and uv, then remove all unnecessary components
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
+    ca-certificates \
     curl \
-    npm \
+    gnupg \
+    software-properties-common \
     && add-apt-repository ppa:deadsnakes/ppa \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
+        nodejs \
         python${PYTHON_VERSION} \
     && curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && curl -sL https://deb.nodesource.com/setup_24.x | bash \
-    && apt install nodejs -y \
-    # Remove package manager and all unnecessary files
-    && apt-get purge -y curl software-properties-common \
+    && node --version \
+    && npm --version \
+    && apt-get purge -y curl software-properties-common gnupg \
     && apt-get autoremove -y \
     && apt-get clean \
-    && rm -rf /var/lib/apt /etc/apt /var/lib/dpkg /var/lib/cache /var/lib/log \
-    \
-    # Remove unnecessary user, group, and system files
-    && rm -rf /usr/share/locale /usr/share/i18n /usr/lib/locale \
-    && rm -rf /usr/share/info /usr/share/man /usr/share/groff /usr/share/lintian /usr/share/linda \
-    \
-    # Remove static libraries not needed at runtime
-    && find /usr/lib /usr/local/lib -name "*.a" -type f -delete \
-    \
-    # Remove Python cache and compiled files
+    && rm -rf /var/lib/apt/lists/* \
     && find / -type d -name "__pycache__" -exec rm -rf {} + \
     && find / -type f -name "*.pyc" -delete \
-    \
-    # Remove unused user directories
     && rm -rf /root/.cache /root/.config /root/.local/share \
-    \
-    # Strip unneeded symbols from shared libraries
+    && find /usr/lib /usr/local/lib -name "*.a" -type f -delete \
     && find /usr/lib /usr/local/lib -type f -exec strip --strip-unneeded {} 2>/dev/null \; || true
 
-ENV PATH="/root/.local/bin:$PATH"
+ENV PATH="/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 RUN uv --version || (echo "uv verification failed" && exit 1)
 
 ENV PYTHONPATH="/home/kanomnom-python-server/apps/api/src:$PYTHONPATH"
 
-COPY pyproject.toml uv.lock /home/kanomnom-python-server/apps/api/src/
+COPY apps/api/pyproject.toml apps/api/uv.lock /home/kanomnom-python-server/apps/api/src/
 COPY apps /home/kanomnom-python-server/apps
+COPY schemas /home/kanomnom-python-server/schemas
 COPY scripts /home/kanomnom-python-server/scripts
+WORKDIR /home/kanomnom-python-server/apps/dashboard
+RUN npm ci
 WORKDIR /home/kanomnom-python-server
 
 ENTRYPOINT ["./scripts/run-stack-prod.sh"]

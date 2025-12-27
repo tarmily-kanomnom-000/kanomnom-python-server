@@ -1,5 +1,7 @@
 import purchaseEntrySchema from "@shared-schemas/purchase-entry-request.schema.json";
 import { NextResponse } from "next/server";
+
+import { buildRoleHeaders, requireUser } from "@/lib/auth/authorization";
 import { invalidateGrocyProductsCache } from "@/lib/grocy/server";
 import {
   deserializeGrocyProductInventoryEntry,
@@ -102,6 +104,11 @@ function toBackendMetadata(
   } else if ("conversion_rate" in metadata) {
     shaped.conversion_rate = metadata.conversion_rate;
   }
+  if ("onSale" in metadata) {
+    shaped.on_sale = metadata.onSale;
+  } else if ("on_sale" in metadata) {
+    shaped.on_sale = metadata.on_sale;
+  }
   return Object.keys(shaped).length > 0 ? shaped : null;
 }
 
@@ -144,6 +151,11 @@ export async function POST(
   request: Request,
   context: RouteContext,
 ): Promise<Response> {
+  const authResult = await requireUser({ allowedRoles: ["admin"] });
+  if ("response" in authResult) {
+    return authResult.response;
+  }
+  const roleHeaders = buildRoleHeaders(authResult.role);
   const { instance_index, product_id } = await context.params;
   if (!instance_index || !product_id) {
     return NextResponse.json(
@@ -191,6 +203,7 @@ export async function POST(
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
+      ...roleHeaders,
     },
     body: JSON.stringify(upstreamPayload),
     cache: "no-store",

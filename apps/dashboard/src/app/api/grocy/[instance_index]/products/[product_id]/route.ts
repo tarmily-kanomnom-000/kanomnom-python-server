@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireUser } from "@/lib/auth/authorization";
 import {
   deserializeGrocyProductInventoryEntry,
   type GrocyProductInventoryEntryPayload,
@@ -28,6 +29,10 @@ export async function GET(
   _request: Request,
   context: RouteContext,
 ): Promise<Response> {
+  const authResult = await requireUser();
+  if ("response" in authResult) {
+    return authResult.response;
+  }
   const { instance_index, product_id } = await context.params;
   if (!instance_index || !product_id) {
     return NextResponse.json(

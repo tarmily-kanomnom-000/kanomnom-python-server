@@ -61,6 +61,7 @@ export type GrocyStockEntry = {
     package_quantity?: number;
     currency?: string;
     conversion_rate?: number;
+    on_sale?: boolean;
     [key: string]: unknown;
   } | null;
 };
@@ -143,6 +144,7 @@ export type PurchaseEntryRequestPayload = {
     quantity?: number | null;
     currency?: string | null;
     conversionRate?: number | null;
+    onSale?: boolean | null;
   } | null;
 };
 
@@ -158,6 +160,7 @@ export type PurchaseEntryDefaults = {
     quantity: number | null;
     currency: string | null;
     conversionRate: number | null;
+    onSale: boolean;
   };
 };
 

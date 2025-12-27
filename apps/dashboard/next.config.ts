@@ -12,6 +12,13 @@ const pluginOptions: PluginOptions = {
 const withSerwist = withSerwistInit(pluginOptions);
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://kanomnom0000:6971",
+    "http://kanomnom0000",
+    "kanomnom0000",
+  ],
   experimental: {
     externalDir: true,
   },

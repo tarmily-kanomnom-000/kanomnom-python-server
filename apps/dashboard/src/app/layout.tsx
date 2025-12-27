@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { karla } from "@/app/fonts";
+import { Providers } from "@/app/providers";
 import { MenuBar } from "@/components/menu-bar";
 
 export const metadata: Metadata = {
@@ -21,10 +22,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${karla.className} bg-neutral-100`}>
-        <div className="flex min-h-screen flex-col">
-          <MenuBar />
-          <div className="flex-1">{children}</div>
-        </div>
+        <Providers>
+          <div className="flex min-h-screen flex-col">
+            <MenuBar />
+            <div className="flex-1">{children}</div>
+          </div>
+        </Providers>
       </body>
     </html>
   );

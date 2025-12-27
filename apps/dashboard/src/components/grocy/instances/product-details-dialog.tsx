@@ -378,6 +378,7 @@ function StockEntryMetadata({
       typeof metadata.conversion_rate === "number"
         ? metadata.conversion_rate
         : null;
+    const onSale = metadata.on_sale === true;
     if (
       shippingCost === null &&
       taxRate === null &&
@@ -386,13 +387,15 @@ function StockEntryMetadata({
       packageQuantity === null &&
       packagePrice === null &&
       !currency &&
-      conversionRate === null
+      conversionRate === null &&
+      !onSale
     ) {
       return null;
     }
     const currencyLabel = currency ?? "local currency";
     return (
       <div className="mt-2 space-y-1 text-xs text-neutral-500">
+        {onSale ? <p>On sale: Yes</p> : null}
         {shippingCost !== null ? (
           <p>
             Shipping cost: {currencyLabel} {shippingCost.toFixed(2)}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { buildRoleHeaders, requireUser } from "@/lib/auth/authorization";
 import { safeReadResponseText } from "@/lib/http";
 import { environmentVariables } from "@/utils/environmentVariables";
 
@@ -70,6 +71,11 @@ function normalizeMetadataPayload(
   } else if ("conversion_rate" in value) {
     shaped.conversion_rate = value.conversion_rate;
   }
+  if ("onSale" in value) {
+    shaped.on_sale = value.onSale;
+  } else if ("on_sale" in value) {
+    shaped.on_sale = value.on_sale;
+  }
   return shaped;
 }
 
@@ -77,6 +83,11 @@ export async function POST(
   request: Request,
   context: RouteContext,
 ): Promise<Response> {
+  const authResult = await requireUser({ allowedRoles: ["admin"] });
+  if ("response" in authResult) {
+    return authResult.response;
+  }
+  const roleHeaders = buildRoleHeaders(authResult.role);
   const { instance_index, product_id } = await context.params;
   if (!instance_index || !product_id) {
     return NextResponse.json(
@@ -119,6 +130,7 @@ export async function POST(
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
+      ...roleHeaders,
     },
     body: JSON.stringify(payload),
     cache: "no-store",

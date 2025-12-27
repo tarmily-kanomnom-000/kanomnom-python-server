@@ -15,7 +15,6 @@ fi
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 api_dir="${repo_root}/apps/api"
 dashboard_dir="${repo_root}/apps/dashboard"
-fifo_path=""
 dashboard_port="${DASHBOARD_PORT:-3000}"
 
 if ! command -v uv >/dev/null 2>&1; then
@@ -23,13 +22,11 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-package_runner="npm"
-if command -v pnpm >/dev/null 2>&1; then
-  package_runner="pnpm"
-elif ! command -v npm >/dev/null 2>&1; then
-  echo "Neither pnpm nor npm are available in PATH." >&2
+if ! command -v npm >/dev/null 2>&1; then
+  echo "npm is not available in PATH." >&2
   exit 1
 fi
+package_runner="npm"
 
 api_pid=""
 dashboard_pid=""
@@ -46,9 +43,6 @@ cleanup() {
     kill "${dashboard_pid}" >/dev/null 2>&1 || true
   fi
   wait >/dev/null 2>&1 || true
-  if [[ -n "${fifo_path}" && -p "${fifo_path}" ]]; then
-    rm -f "${fifo_path}"
-  fi
   exit "${exit_code}"
 }
 
@@ -81,28 +75,39 @@ api_pid=$!
 ) &
 dashboard_pid=$!
 
-fifo_path="$(mktemp -u)"
-mkfifo "${fifo_path}"
+finished_service=""
+finished_code=0
+remaining_pid=""
 
-forward_exit() {
-  local name=$1
-  local pid=$2
-  if wait "${pid}"; then
-    printf "%s:0\n" "${name}" >"${fifo_path}"
-  else
-    printf "%s:%s\n" "${name}" "$?" >"${fifo_path}"
-  fi
-}
+if wait -n "${api_pid}" "${dashboard_pid}"; then
+  finished_code=0
+else
+  finished_code=$?
+fi
 
-forward_exit "api" "${api_pid}" &
-forward_exit "dashboard" "${dashboard_pid}" &
+if ! kill -0 "${api_pid}" >/dev/null 2>&1; then
+  finished_service="api"
+  remaining_pid="${dashboard_pid}"
+elif ! kill -0 "${dashboard_pid}" >/dev/null 2>&1; then
+  finished_service="dashboard"
+  remaining_pid="${api_pid}"
+fi
 
-IFS=":" read -r finished_service finished_code <"${fifo_path}"
+if [[ -z "${finished_service}" ]]; then
+  finished_service="unknown"
+fi
 
 if [[ "${finished_code}" -ne 0 ]]; then
   echo "${finished_service} exited with code ${finished_code}. Shutting down remaining services..." >&2
+  if [[ -n "${remaining_pid}" ]] && kill -0 "${remaining_pid}" >/dev/null 2>&1; then
+    kill "${remaining_pid}" >/dev/null 2>&1 || true
+  fi
 else
   echo "${finished_service} exited cleanly. Waiting for remaining services to finish..."
 fi
 
-wait "${api_pid}" "${dashboard_pid}" || true
+if [[ -n "${remaining_pid}" ]] && kill -0 "${remaining_pid}" >/dev/null 2>&1; then
+  wait "${remaining_pid}" || true
+fi
+
+exit "${finished_code}"

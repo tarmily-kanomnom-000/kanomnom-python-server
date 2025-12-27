@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReadonlyURLSearchParams } from "next/navigation";
+import { ReadonlyURLSearchParams } from "next/navigation";
 import { useMemo, useSyncExternalStore } from "react";
 
 export const SEARCH_PARAM_CHANGE_EVENT = "kanomnom:searchparamschange" as const;
@@ -31,5 +31,8 @@ export function useBrowserSearchParams(): ReadonlyURLSearchParams {
     getSearchSnapshot,
     () => "",
   );
-  return useMemo(() => new URLSearchParams(searchString), [searchString]);
+  return useMemo(
+    () => new ReadonlyURLSearchParams(searchString),
+    [searchString],
+  );
 }

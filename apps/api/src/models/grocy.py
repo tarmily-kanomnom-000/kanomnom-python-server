@@ -91,6 +91,7 @@ class PurchaseEntryMetadataPayload(BaseModel):
     package_quantity: float | None = None
     currency: str | None = None
     conversion_rate: float | None = None
+    on_sale: bool = False
 
 
 class PurchaseEntryRequest(BaseModel):

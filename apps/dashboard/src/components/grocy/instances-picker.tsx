@@ -13,6 +13,7 @@ import { InstanceSelector } from "@/components/grocy/instances/instance-selector
 import { ProductsPanel } from "@/components/grocy/instances/products-panel";
 import { useBrowserSearchParams } from "@/hooks/use-browser-search-params";
 import { useQueryParamUpdater } from "@/hooks/use-query-param-updater";
+import type { DashboardRole } from "@/lib/auth/types";
 import { fetchGrocyProduct, fetchGrocyProducts } from "@/lib/grocy/client";
 import {
   GROCY_QUERY_PARAMS,
@@ -25,9 +26,10 @@ import type {
 
 type InstancesPickerProps = {
   instances: GrocyInstanceSummary[];
+  userRole: DashboardRole;
 };
 
-export function InstancesPicker({ instances }: InstancesPickerProps) {
+export function InstancesPicker({ instances, userRole }: InstancesPickerProps) {
   const searchParams = useBrowserSearchParams();
   const updateQueryParams = useQueryParamUpdater();
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(
@@ -181,6 +183,7 @@ export function InstancesPicker({ instances }: InstancesPickerProps) {
         activeInstanceId={selectedInstance?.instance_index ?? null}
         locationNamesById={locationNamesById}
         shoppingLocationNamesById={shoppingLocationNamesById}
+        userRole={userRole}
         onProductUpdate={handleProductUpdate}
         onRefresh={handleRefreshProducts}
       />

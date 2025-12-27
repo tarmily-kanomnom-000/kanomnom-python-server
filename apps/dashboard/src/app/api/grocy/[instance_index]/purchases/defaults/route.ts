@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { parseOptionalNonNegativeNumber } from "@/app/api/grocy/utils";
+import { buildRoleHeaders, requireUser } from "@/lib/auth/authorization";
 import { safeReadResponseText } from "@/lib/http";
 import { environmentVariables } from "@/utils/environmentVariables";
 
@@ -25,6 +26,7 @@ type UpstreamPurchaseDefaultsMetadata = {
   package_quantity?: number | null;
   currency?: string | null;
   conversion_rate?: number | null;
+  on_sale?: boolean | null;
 };
 
 type UpstreamDefaultsEntry = {
@@ -86,6 +88,11 @@ export async function POST(
   request: Request,
   context: RouteContext,
 ): Promise<Response> {
+  const authResult = await requireUser({ allowedRoles: ["admin"] });
+  if ("response" in authResult) {
+    return authResult.response;
+  }
+  const roleHeaders = buildRoleHeaders(authResult.role);
   const { instance_index } = await context.params;
   if (!instance_index) {
     return NextResponse.json(
@@ -114,6 +121,7 @@ export async function POST(
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
+      ...roleHeaders,
     },
     body: JSON.stringify({
       product_ids: payload.productIds,
@@ -180,6 +188,7 @@ export async function POST(
           typeof entry.metadata?.conversion_rate === "number"
             ? entry.metadata.conversion_rate
             : null,
+        onSale: entry.metadata?.on_sale === true,
       },
     })),
   });

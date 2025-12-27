@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+import { buildRoleHeaders, requireUser } from "@/lib/auth/authorization";
 import { invalidateGrocyProductsCache } from "@/lib/grocy/server";
 import {
   deserializeGrocyProductInventoryEntry,
@@ -81,6 +83,11 @@ export async function POST(
   request: Request,
   context: RouteContext,
 ): Promise<Response> {
+  const authResult = await requireUser({ allowedRoles: ["admin"] });
+  if ("response" in authResult) {
+    return authResult.response;
+  }
+  const roleHeaders = buildRoleHeaders(authResult.role);
   const { instance_index, product_id } = await context.params;
   if (!instance_index || !product_id) {
     return NextResponse.json(
@@ -180,6 +187,7 @@ export async function POST(
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
+      ...roleHeaders,
     },
     body: JSON.stringify({
       new_amount: newAmount,

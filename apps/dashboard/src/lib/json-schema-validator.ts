@@ -1,4 +1,4 @@
-type JsonSchemaType = "object" | "number" | "integer" | "string" | "null";
+type JsonSchemaType = "object" | "number" | "integer" | "string" | "boolean" | "null";
 
 export type JsonSchema = {
   type?: JsonSchemaType | JsonSchemaType[];
@@ -140,6 +140,13 @@ export const validateAgainstSchema = (
       return errors;
     }
     validateString(schema, value, path, errors);
+    return errors;
+  }
+  if (includesType(schema, "boolean")) {
+    if (typeof value !== "boolean") {
+      errors.push(`${path} must be a boolean.`);
+      return errors;
+    }
     return errors;
   }
   errors.push(`${path} has unsupported type.`);

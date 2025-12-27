@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireUser } from "@/lib/auth/authorization";
 import { fetchGrocyProductsForInstance } from "@/lib/grocy/server";
 
 type RouteContext = {
@@ -22,6 +23,10 @@ export async function GET(
   request: Request,
   context: RouteContext,
 ): Promise<Response> {
+  const authResult = await requireUser();
+  if ("response" in authResult) {
+    return authResult.response;
+  }
   const { instance_index } = await context.params;
   if (!instance_index) {
     return NextResponse.json(

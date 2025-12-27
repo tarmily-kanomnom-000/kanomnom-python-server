@@ -128,6 +128,7 @@ class PurchaseEntryDefaults:
 
     shipping_cost: float
     tax_rate: float
+    on_sale: bool
     brand: str | None = None
     package_size: float | None = None
     package_price: float | None = None
@@ -269,6 +270,7 @@ class ProductInventoryService:
         return PurchaseEntryDefaults(
             shipping_cost=0.0,
             tax_rate=0.0,
+            on_sale=False,
             brand=None,
             package_size=None,
             package_price=None,

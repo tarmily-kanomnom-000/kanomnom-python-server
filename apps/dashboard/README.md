@@ -23,6 +23,15 @@ export PATH="/Users/tarmilywen/.local/share/fnm/node-versions/v18.19.1/installat
 
 Copy `.env.example` to `.env.local` (or the environment-specific file you prefer) and fill in the values. At minimum set `KANOMNOM_API_BASE_URL` (or `NEXT_PUBLIC_API_BASE_URL` when the value must be exposed to the browser) to point at the FastAPI runtime that serves Grocy data, e.g. `http://localhost:8000`. The dashboard relies on this to load Grocy instances for the Inventory workspace.
 
+Authentication is handled by NextAuth with a simple credentials provider so the dashboard is not publicly exposed. Add:
+
+- `AUTH_SECRET`: Random string for NextAuth JWT/session signing.
+- `NEXTAUTH_URL`: The dashboard origin (e.g. `http://localhost:3000`).
+- `DASHBOARD_USERS_FILE` (preferred): Path to a JSON file containing an array of `{ "username": "...", "passwordHash": "...", "role": "admin|viewer" }`. Relative paths are resolved from `apps/dashboard`, e.g. `./temp_accounts_hash.json`.
+- `DASHBOARD_USERS_JSON` (fallback): JSON array of `{ "username": "...", "passwordHash": "...", "role": "admin|viewer" }` entries.
+
+Generate password hashes with `node -e "console.log(require('bcryptjs').hashSync('changeme', 10))"`. Admins can mutate inventory/purchase data; viewers can only browse inventory.
+
 ## Dashboard Overview
 
 ### Purpose

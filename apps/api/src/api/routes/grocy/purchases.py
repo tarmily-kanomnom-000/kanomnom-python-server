@@ -110,6 +110,7 @@ async def get_purchase_entry_defaults(
         package_quantity=defaults.package_quantity,
         currency=defaults.currency,
         conversion_rate=defaults.conversion_rate,
+        on_sale=defaults.on_sale,
     )
     return PurchaseEntryDefaultsResponse(
         product_id=product_id,
@@ -164,6 +165,7 @@ async def get_purchase_entry_defaults_batch(
             package_quantity=item.package_quantity,
             currency=item.currency,
             conversion_rate=item.conversion_rate,
+            on_sale=item.on_sale,
         )
         shaped.append(
             PurchaseEntryDefaultsResponse(
@@ -207,6 +209,7 @@ async def record_purchase_entry(
                 package_quantity=purchase.metadata.package_quantity,
                 currency=purchase.metadata.currency,
                 conversion_rate=purchase.metadata.conversion_rate,
+                on_sale=purchase.metadata.on_sale,
             )
             derived_amount, derived_unit_price, _ = _derive_purchase_amount_and_price(candidate)
             if candidate.to_attrs():
@@ -288,6 +291,7 @@ async def derive_purchase_entry(
             package_quantity=payload.metadata.package_quantity,
             currency=payload.metadata.currency,
             conversion_rate=payload.metadata.conversion_rate,
+            on_sale=payload.metadata.on_sale,
         )
         derived_amount, derived_unit_price, total_usd = _derive_purchase_amount_and_price(candidate)
     except ValueError as exc:
@@ -350,6 +354,7 @@ def _build_grist_record_fields(
         "pruchase_date": purchase_epoch,
         "notes": (purchase.note or "").strip(),
     }
+    fields["on_sale"] = False
     unit_name = _resolve_product_unit_name(product)
     if unit_name:
         fields["unit"] = unit_name
@@ -382,6 +387,7 @@ def _build_grist_record_fields(
         fields.setdefault("local_currency", "USD")
     if metadata.conversion_rate is not None:
         fields["conversion_rate_to_USD_at_purchase_date"] = metadata.conversion_rate
+    fields["on_sale"] = metadata.on_sale
 
     return fields
 

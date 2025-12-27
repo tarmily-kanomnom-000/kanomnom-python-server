@@ -143,6 +143,7 @@ export function PurchaseEntryForm({
     hydrate: hydrateBrand,
     reset: resetBrand,
   } = useDirtyStringField("");
+  const [onSale, setOnSale] = useState(false);
   const [derivedTotals, setDerivedTotals] = useState<{
     amount: number | null;
     unitPrice: number | null;
@@ -185,6 +186,7 @@ export function PurchaseEntryForm({
     resetShippingCost("");
     resetTaxRate("");
     resetBrand("");
+    setOnSale(false);
   }, [
     formResetTrigger,
     resetBrand,
@@ -245,6 +247,7 @@ export function PurchaseEntryForm({
 
       const trimmedBrand = metadata?.brand?.trim() ?? "";
       hydrateBrand(trimmedBrand);
+      setOnSale(metadata?.onSale ?? false);
     },
     [
       hydrateBrand,
@@ -357,6 +360,7 @@ export function PurchaseEntryForm({
     quantity: number | null;
     currency: string | null;
     conversionRate: number | null;
+    onSale: boolean;
   };
 
   const normalizedPurchaseMetadata = useMemo<PurchaseMetadataPayload>(() => {
@@ -371,10 +375,12 @@ export function PurchaseEntryForm({
       quantity: isPackageQuantityValid ? packageQuantityNumber : null,
       currency: normalizeCurrency(currencyValue),
       conversionRate: isConversionRateValid ? conversionRateNumber : null,
+      onSale,
     };
   }, [
     brand,
     currencyValue,
+    onSale,
     isConversionRateValid,
     conversionRateNumber,
     isPackagePriceValid,
@@ -642,6 +648,15 @@ export function PurchaseEntryForm({
                     Cost of a single package before shipping or tax.
                   </p>
                 )}
+                <label className="mt-2 flex items-center gap-2 text-sm font-semibold text-neutral-900">
+                  <input
+                    type="checkbox"
+                    checked={onSale}
+                    onChange={(event) => setOnSale(event.target.checked)}
+                    className="h-4 w-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900"
+                  />
+                  <span>On sale</span>
+                </label>
               </div>
             </div>
             <div className="space-y-4 md:ml-auto md:w-full">
