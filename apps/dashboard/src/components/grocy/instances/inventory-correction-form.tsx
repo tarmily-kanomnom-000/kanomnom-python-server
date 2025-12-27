@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMeasuredElementHeight } from "@/hooks/use-measured-element-height";
 import { submitInventoryCorrection } from "@/lib/grocy/client";
 import type {
@@ -39,6 +39,7 @@ export function InventoryCorrectionForm({
   onSuccess,
 }: InventoryCorrectionFormProps) {
   const quantityUnit = resolveQuantityUnit(product);
+  const amountInputRef = useRef<HTMLInputElement | null>(null);
   const [newAmount, setNewAmount] = useState("");
   const defaultBestBefore = useMemo(
     () => computeDefaultBestBeforeDate(product.default_best_before_days),
@@ -58,6 +59,10 @@ export function InventoryCorrectionForm({
   >([]);
   const [leftColumnRef, leftColumnHeight] =
     useMeasuredElementHeight<HTMLDivElement>();
+
+  useEffect(() => {
+    amountInputRef.current?.focus();
+  }, []);
 
   const isLossReasonSelected = (reason: InventoryLossReason): boolean =>
     losses.some((entry) => entry.reason === reason);
@@ -195,6 +200,7 @@ export function InventoryCorrectionForm({
                 step="0.01"
                 min="0"
                 value={newAmount}
+                ref={amountInputRef}
                 onChange={(event) => setNewAmount(event.target.value)}
                 className={`w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none ${
                   quantityUnit ? "pr-16" : ""

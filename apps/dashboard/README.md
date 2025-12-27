@@ -91,3 +91,12 @@ Whenever you add or rename fields in the Python models, mirror the change in the
 - **Extend via queries:** New dashboard modules should follow the `src/queries` pattern—wrap remote calls in a query builder, then consume that via TanStack Query or simple hooks. This keeps data-access consistent with the Medusa examples.
 
 Following this structure ensures Grocy integrations stay debuggable, typed, and aligned with the rest of the Ka-Nom Nom dashboard.
+
+## PWA + Offline Grocy Data
+
+- Service worker: built by Serwist from `src/sw.ts` to `public/sw.js`. Registered in `src/app/layout.tsx` via `ServiceWorkerRegistration`.
+- Prefetcher: `GrocyOfflineBootstrap` runs once per tab session and calls `prefetchGrocyDataForOffline()` (`src/lib/offline/grocy-cache.ts`). If online, it fetches `/api/grocy/instances`, caches to `localStorage` key `kanomnom:pwa:grocy:instances`, then loops each instance and fetches `/api/grocy/<instance_index>/products?forceRefresh=1`, caching to `kanomnom:pwa:grocy:products:<instance_index>`.
+- Read path: Instances/products queries use `fetchWithOfflineCache`, so they store successful responses to `localStorage` and, when offline or on network failure, fall back to the cached payload.
+- Mutations: `submitInventoryCorrection` and `submitPurchaseEntry` deserialize the returned product and upsert it into the cached list for that instance, keeping offline data in sync with server state. Client and server caches are invalidated after each mutation.
+- Refresh: “Refresh data” passes `forceRefresh` through to the API, which overwrites the cached list with fresh server data.
+- Scope: Only instance lists and product inventories are cached today. No offline mutation queue—offline writes will fail fast. Add new data types by reusing the helpers in `src/lib/offline/grocy-cache.ts` and the `fetchWithOfflineCache` wrapper.

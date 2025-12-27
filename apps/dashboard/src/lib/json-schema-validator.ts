@@ -1,4 +1,10 @@
-type JsonSchemaType = "object" | "number" | "integer" | "string" | "boolean" | "null";
+type JsonSchemaType =
+  | "object"
+  | "number"
+  | "integer"
+  | "string"
+  | "boolean"
+  | "null";
 
 export type JsonSchema = {
   type?: JsonSchemaType | JsonSchemaType[];

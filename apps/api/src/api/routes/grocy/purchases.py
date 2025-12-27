@@ -214,6 +214,12 @@ async def record_purchase_entry(
             derived_amount, derived_unit_price, _ = _derive_purchase_amount_and_price(candidate)
             if candidate.to_attrs():
                 metadata = candidate
+            logger.info(
+                "Purchase metadata received: product_id=%s raw_on_sale=%s normalized_on_sale=%s",
+                product_id,
+                purchase.metadata.on_sale,
+                metadata.on_sale if metadata else None,
+            )
         validate_note_text(purchase.note)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -262,6 +268,11 @@ async def record_purchase_entry(
         recorded_entry=recorded_entry,
         purchase_epoch=purchase_epoch,
         shopping_location_name=shopping_location_name,
+    )
+    logger.info(
+        "Posting purchase to Grist: product=%s on_sale=%s",
+        serialized_product.name,
+        grist_fields.get("on_sale"),
     )
     try:
         await create_grist_purchase_record(grist_fields)
@@ -387,7 +398,8 @@ def _build_grist_record_fields(
         fields.setdefault("local_currency", "USD")
     if metadata.conversion_rate is not None:
         fields["conversion_rate_to_USD_at_purchase_date"] = metadata.conversion_rate
-    fields["on_sale"] = metadata.on_sale
+    # Explicitly coerce to bool so we never leak None or non-boolean types into Grist.
+    fields["on_sale"] = bool(metadata.on_sale)
 
     return fields
 

@@ -1,6 +1,10 @@
 import axios from "axios";
 
 import type { GrocyInstanceSummary } from "@/lib/grocy/types";
+import {
+  fetchWithOfflineCache,
+  grocyInstancesCacheKey,
+} from "@/lib/offline/grocy-cache";
 
 type InstancesQueryOptions = {
   useForceCache?: boolean;
@@ -17,16 +21,22 @@ export function getGrocyInstancesQuery(options: InstancesQueryOptions = {}) {
 async function fetchGrocyInstances({
   useForceCache = false,
 }: InstancesQueryOptions): Promise<GrocyInstanceSummary[]> {
-  const response = await axios.get("/api/grocy/instances", {
-    adapter: "fetch",
-    fetchOptions: useForceCache
-      ? { cache: "force-cache" }
-      : { cache: "default" },
-  });
-
-  const payload = response.data as {
+  const payload = await fetchWithOfflineCache<{
     instances: GrocyInstanceSummary[];
-  };
+  }>({
+    cacheKey: grocyInstancesCacheKey(),
+    fetcher: async () => {
+      const response = await axios.get("/api/grocy/instances", {
+        adapter: "fetch",
+        fetchOptions: useForceCache
+          ? { cache: "force-cache" }
+          : { cache: "default" },
+      });
+      return response.data as {
+        instances: GrocyInstanceSummary[];
+      };
+    },
+  });
 
   return payload.instances;
 }

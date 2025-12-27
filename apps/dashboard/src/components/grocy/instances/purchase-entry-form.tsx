@@ -59,6 +59,7 @@ export function PurchaseEntryForm({
   }, []);
 
   const purchaseUnit = resolveQuantityUnit(product);
+  const packageSizeInputRef = useRef<HTMLInputElement | null>(null);
   const {
     value: packageSize,
     set: setPackageSize,
@@ -143,7 +144,22 @@ export function PurchaseEntryForm({
     hydrate: hydrateBrand,
     reset: resetBrand,
   } = useDirtyStringField("");
-  const [onSale, setOnSale] = useState(false);
+  const [onSale, setOnSaleState] = useState(false);
+  const onSaleDirtyRef = useRef(false);
+  const setOnSale = useCallback((nextValue: boolean) => {
+    onSaleDirtyRef.current = true;
+    setOnSaleState(nextValue);
+  }, []);
+  const hydrateOnSale = useCallback((nextValue: boolean) => {
+    if (onSaleDirtyRef.current) {
+      return;
+    }
+    setOnSaleState(nextValue);
+  }, []);
+  const resetOnSale = useCallback((nextValue: boolean) => {
+    onSaleDirtyRef.current = false;
+    setOnSaleState(nextValue);
+  }, []);
   const [derivedTotals, setDerivedTotals] = useState<{
     amount: number | null;
     unitPrice: number | null;
@@ -186,7 +202,8 @@ export function PurchaseEntryForm({
     resetShippingCost("");
     resetTaxRate("");
     resetBrand("");
-    setOnSale(false);
+    resetOnSale(false);
+    packageSizeInputRef.current?.focus();
   }, [
     formResetTrigger,
     resetBrand,
@@ -197,6 +214,7 @@ export function PurchaseEntryForm({
     resetPackageSize,
     resetShippingCost,
     resetTaxRate,
+    resetOnSale,
   ]);
 
   useEffect(() => {
@@ -247,7 +265,7 @@ export function PurchaseEntryForm({
 
       const trimmedBrand = metadata?.brand?.trim() ?? "";
       hydrateBrand(trimmedBrand);
-      setOnSale(metadata?.onSale ?? false);
+      hydrateOnSale(metadata?.onSale ?? false);
     },
     [
       hydrateBrand,
@@ -259,6 +277,7 @@ export function PurchaseEntryForm({
       hydrateShippingCost,
       hydrateTaxRate,
       normalizeCurrency,
+      hydrateOnSale,
     ],
   );
 
@@ -555,6 +574,7 @@ export function PurchaseEntryForm({
                     min="0"
                     step="0.0001"
                     value={packageSize}
+                    ref={packageSizeInputRef}
                     onChange={(event) => {
                       setPackageSize(event.target.value);
                       if (statusMessage?.type === "error") {

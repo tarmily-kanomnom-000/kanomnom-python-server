@@ -66,6 +66,10 @@
         "conversion_rate": {
           "type": ["number", "null"],
           "exclusiveMinimum": 0
+        },
+        "on_sale": {
+          "type": "boolean",
+          "default": false
         }
       }
     }

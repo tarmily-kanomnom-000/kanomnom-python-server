@@ -1,6 +1,10 @@
 import axios from "axios";
 
 import type { GrocyProductInventoryEntry } from "@/lib/grocy/types";
+import {
+  fetchWithOfflineCache,
+  grocyProductsCacheKey,
+} from "@/lib/offline/grocy-cache";
 
 type ProductsQueryOptions = {
   instanceIndex: string;
@@ -23,16 +27,22 @@ async function fetchGrocyProducts(
   instanceIndex: string,
   useForceCache: boolean,
 ): Promise<GrocyProductInventoryEntry[]> {
-  const response = await axios.get(`/api/grocy/${instanceIndex}/products`, {
-    adapter: "fetch",
-    fetchOptions: useForceCache
-      ? { cache: "force-cache" }
-      : { cache: "no-store" },
-  });
-
-  const payload = response.data as {
+  const payload = await fetchWithOfflineCache<{
     products: GrocyProductInventoryEntry[];
-  };
+  }>({
+    cacheKey: grocyProductsCacheKey(instanceIndex),
+    fetcher: async () => {
+      const response = await axios.get(`/api/grocy/${instanceIndex}/products`, {
+        adapter: "fetch",
+        fetchOptions: useForceCache
+          ? { cache: "force-cache" }
+          : { cache: "no-store" },
+      });
+      return response.data as {
+        products: GrocyProductInventoryEntry[];
+      };
+    },
+  });
 
   return payload.products;
 }
