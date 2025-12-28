@@ -162,11 +162,7 @@ def _normalize_loss_details(value: Any) -> tuple[LossDetail, ...]:
         else:
             raise ValueError("Loss reason must be a string or enum value.")
         note_value = entry.get("note")
-        note = (
-            note_value.strip()
-            if isinstance(note_value, str) and note_value.strip()
-            else None
-        )
+        note = note_value.strip() if isinstance(note_value, str) and note_value.strip() else None
         if reason in seen:
             continue
         seen.add(reason)
@@ -434,10 +430,7 @@ class InventoryCorrectionNoteMetadata(BaseNoteMetadata):
             return {}
         return {
             "kind": self.kind,
-            "losses": [
-                {"reason": loss.reason.value, "note": loss.note}
-                for loss in self.losses
-            ],
+            "losses": [{"reason": loss.reason.value, "note": loss.note} for loss in self.losses],
         }
 
     @classmethod

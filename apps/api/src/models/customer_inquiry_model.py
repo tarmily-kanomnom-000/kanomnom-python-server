@@ -6,7 +6,7 @@ from typing import Optional, Union
 import phonenumbers
 from email_validator import EmailNotValidError, ValidatedEmail, validate_email
 from phonenumbers import PhoneNumber
-from pydantic import BaseModel, ConfigDict, RootModel, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, RootModel, field_validator
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

@@ -3,11 +3,14 @@ import axios from "axios";
 import {
   deserializeGrocyProductInventoryEntry,
   deserializeGrocyProducts,
+  deserializeGrocyStockEntry,
   type GrocyProductInventoryEntryPayload,
   type GrocyProductsResponsePayload,
+  type GrocyStockEntryPayload,
 } from "@/lib/grocy/transformers";
 import type {
   GrocyProductInventoryEntry,
+  GrocyStockEntry,
   InventoryCorrectionRequestPayload,
   PurchaseEntryCalculation,
   PurchaseEntryDefaults,
@@ -30,6 +33,11 @@ export function invalidateGrocyProductsClientCache(
 
 type FetchOptions = {
   forceRefresh?: boolean;
+};
+
+export type PurchaseSubmissionResult = {
+  product: GrocyProductInventoryEntry;
+  newEntries: GrocyStockEntry[];
 };
 
 export async function fetchGrocyProduct(
@@ -144,7 +152,7 @@ export async function submitPurchaseEntry(
   instanceIndex: string,
   productId: number,
   payload: PurchaseEntryRequestPayload,
-): Promise<GrocyProductInventoryEntry> {
+): Promise<PurchaseSubmissionResult> {
   try {
     const response = await axios.post(
       `/api/grocy/${instanceIndex}/products/${productId}/purchase`,
@@ -154,12 +162,18 @@ export async function submitPurchaseEntry(
         fetchOptions: { cache: "no-store" },
       },
     );
-    const entry = deserializeGrocyProductInventoryEntry(
-      response.data as GrocyProductInventoryEntryPayload,
+    const payloadEntries = response.data;
+    if (!Array.isArray(payloadEntries)) {
+      throw new Error(
+        "Unexpected purchase response. Expected stock entry list.",
+      );
+    }
+    const newEntries = (payloadEntries as GrocyStockEntryPayload[]).map(
+      deserializeGrocyStockEntry,
     );
     invalidateGrocyProductsClientCache(instanceIndex);
-    upsertCachedProduct(instanceIndex, entry);
-    return entry;
+    const updatedProduct = await fetchGrocyProduct(instanceIndex, productId);
+    return { product: updatedProduct, newEntries };
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const detail =

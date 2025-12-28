@@ -10,6 +10,7 @@ from core.grocy.note_metadata import (
     decode_structured_note,
 )
 
+
 class GrocyResponseError(ValueError):
     """Raised when Grocy responses cannot be parsed into strongly typed models."""
 
@@ -165,7 +166,9 @@ class GrocyProduct:
                 raw.get("default_best_before_days_after_thawing"), "default_best_before_days_after_thawing"
             ),
             picture_file_name=_optional_str(raw.get("picture_file_name")),
-            enable_tare_weight_handling=_require_bool(raw.get("enable_tare_weight_handling"), "enable_tare_weight_handling"),
+            enable_tare_weight_handling=_require_bool(
+                raw.get("enable_tare_weight_handling"), "enable_tare_weight_handling"
+            ),
             tare_weight=_require_float(raw.get("tare_weight"), "tare_weight"),
             not_check_stock_fulfillment_for_recipes=_require_bool(
                 raw.get("not_check_stock_fulfillment_for_recipes"), "not_check_stock_fulfillment_for_recipes"
@@ -180,9 +183,13 @@ class GrocyProduct:
             hide_on_stock_overview=_require_bool(raw.get("hide_on_stock_overview"), "hide_on_stock_overview"),
             default_stock_label_type=_optional_int(raw.get("default_stock_label_type"), "default_stock_label_type"),
             should_not_be_frozen=_require_bool(raw.get("should_not_be_frozen"), "should_not_be_frozen"),
-            treat_opened_as_out_of_stock=_require_bool(raw.get("treat_opened_as_out_of_stock"), "treat_opened_as_out_of_stock"),
+            treat_opened_as_out_of_stock=_require_bool(
+                raw.get("treat_opened_as_out_of_stock"), "treat_opened_as_out_of_stock"
+            ),
             no_own_stock=_require_bool(raw.get("no_own_stock"), "no_own_stock"),
-            default_consume_location_id=_optional_int(raw.get("default_consume_location_id"), "default_consume_location_id"),
+            default_consume_location_id=_optional_int(
+                raw.get("default_consume_location_id"), "default_consume_location_id"
+            ),
             move_on_open=_require_bool(raw.get("move_on_open"), "move_on_open"),
             row_created_timestamp=_require_timestamp(
                 raw.get("row_created_timestamp"), "row_created_timestamp", source_timezone
@@ -192,7 +199,9 @@ class GrocyProduct:
             quick_open_amount=_require_float(raw.get("quick_open_amount"), "quick_open_amount"),
             qu_id_price=_optional_int(raw.get("qu_id_price"), "qu_id_price"),
             disable_open=_require_bool(raw.get("disable_open"), "disable_open"),
-            default_purchase_price_type=_optional_int(raw.get("default_purchase_price_type"), "default_purchase_price_type"),
+            default_purchase_price_type=_optional_int(
+                raw.get("default_purchase_price_type"), "default_purchase_price_type"
+            ),
         )
 
 
@@ -325,7 +334,9 @@ def _parse_collection(raw: Any, entity: str) -> list[dict[str, Any]]:
     parsed: list[dict[str, Any]] = []
     for index, item in enumerate(raw):
         if not isinstance(item, dict):
-            raise GrocyResponseError(f"Expected dict entries for '{entity}' at index {index}, received {type(item).__name__}")
+            raise GrocyResponseError(
+                f"Expected dict entries for '{entity}' at index {index}, received {type(item).__name__}"
+            )
         parsed.append(item)
     return parsed
 
@@ -401,7 +412,10 @@ class GrocyShoppingLocation:
 
 
 def parse_shopping_locations(raw: Any, source_timezone: tzinfo | None) -> list[GrocyShoppingLocation]:
-    return [GrocyShoppingLocation.from_dict(entry, source_timezone) for entry in _parse_collection(raw, "shopping_locations")]
+    return [
+        GrocyShoppingLocation.from_dict(entry, source_timezone)
+        for entry in _parse_collection(raw, "shopping_locations")
+    ]
 
 
 @dataclass(frozen=True)

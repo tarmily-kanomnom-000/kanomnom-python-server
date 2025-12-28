@@ -4,8 +4,8 @@ import { NextResponse } from "next/server";
 import { buildRoleHeaders, requireUser } from "@/lib/auth/authorization";
 import { invalidateGrocyProductsCache } from "@/lib/grocy/server";
 import {
-  deserializeGrocyProductInventoryEntry,
-  type GrocyProductInventoryEntryPayload,
+  deserializeGrocyStockEntry,
+  type GrocyStockEntryPayload,
 } from "@/lib/grocy/transformers";
 import { safeReadResponseText } from "@/lib/http";
 import {
@@ -220,8 +220,7 @@ export async function POST(
     );
   }
 
-  const upstream =
-    (await upstreamResponse.json()) as GrocyProductInventoryEntryPayload;
+  const upstream = (await upstreamResponse.json()) as GrocyStockEntryPayload[];
   invalidateGrocyProductsCache(instance_index);
-  return NextResponse.json(deserializeGrocyProductInventoryEntry(upstream));
+  return NextResponse.json(upstream.map(deserializeGrocyStockEntry));
 }

@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Callable
 
+import requests
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
-import requests
 
 from core.grocy.exceptions import MetadataNotFoundError
 from core.grocy.note_metadata import (
@@ -108,9 +108,7 @@ async def execute_product_mutation(
 
     try:
         await run_in_threadpool(_apply_mutation)
-        return await run_in_threadpool(
-            lambda: governor.manager_for(instance_index).get_product_inventory(product_id)
-        )
+        return await run_in_threadpool(lambda: governor.manager_for(instance_index).get_product_inventory(product_id))
     except MetadataNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:

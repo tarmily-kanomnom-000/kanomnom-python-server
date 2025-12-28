@@ -28,9 +28,7 @@ class InstanceMetadataRepository:
         """Load the metadata.yaml file for a specific Grocy instance."""
         metadata_path = self.manifest_root / instance_index / "metadata.yaml"
         if not metadata_path.exists():
-            raise MetadataNotFoundError(
-                f"Missing metadata for instance {instance_index}: {metadata_path}"
-            )
+            raise MetadataNotFoundError(f"Missing metadata for instance {instance_index}: {metadata_path}")
         parsed = _parse_metadata_file(metadata_path)
         address = _hydrate_address(parsed.get("address"))
         instance_timezone = _extract_timezone(parsed.get("instance_timezone"))

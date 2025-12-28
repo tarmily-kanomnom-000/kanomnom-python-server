@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict
 
 from core.grocy.client import GrocyClient
 from core.grocy.exceptions import ManifestNotFoundError

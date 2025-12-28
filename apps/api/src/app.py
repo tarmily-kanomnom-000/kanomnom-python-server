@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import uvicorn
@@ -11,7 +11,6 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from flet.fastapi import app as flet_fastapi
-from zoneinfo import ZoneInfo
 
 from api.routes import grist, grocy
 from bot import TELEGRAM_INQURY_GROUP_CHAT_ID, telegram_app
@@ -32,8 +31,8 @@ from services.weather.config import (
     WEATHER_FETCH_TIME,
     weather_scheduler_timezone,
 )
-from services.weather.utils import seconds_until_next_run
 from services.weather.job import WeatherIngestJob
+from services.weather.utils import seconds_until_next_run
 from setup import initialize_server
 
 initialize_server()
@@ -73,8 +72,8 @@ async def lifespan(app: FastAPI):
     weather_stop_event: asyncio.Event | None = None
     weather_task: asyncio.Task | None = None
 
-    # bot_task = asyncio.create_task(telegram_app.updater.start_polling())
-    # await telegram_app.start()
+    bot_task = asyncio.create_task(telegram_app.updater.start_polling())
+    await telegram_app.start()
 
     weather_stop_event = asyncio.Event()
     weather_task = asyncio.create_task(_weather_ingest_loop(weather_stop_event))
@@ -110,6 +109,7 @@ validation_error_cache = TTLCache(maxsize=1000, ttl=600)
 # Directory to store request dumps
 DUMP_DIR = Path("request_dumps")
 DUMP_DIR.mkdir(exist_ok=True)
+
 
 async def _weather_ingest_loop(stop_event: asyncio.Event) -> None:
     tz = weather_scheduler_timezone()

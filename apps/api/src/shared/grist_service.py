@@ -199,10 +199,7 @@ async def create_grist_purchase_record(fields: dict[str, Any]) -> None:
         logger.warning("Cannot post purchase to Grist; missing config values: %s", ", ".join(missing))
         return
 
-    url = (
-        f"{GRIST_ENDPOINT}/api/docs/{GRIST_OPEX_DOCUMENT_ID}"
-        f"/tables/{GRIST_SUPPLY_PURCHASES_TABLE_ID}/records"
-    )
+    url = f"{GRIST_ENDPOINT}/api/docs/{GRIST_OPEX_DOCUMENT_ID}" f"/tables/{GRIST_SUPPLY_PURCHASES_TABLE_ID}/records"
     payload = {"records": [{"fields": fields}]}
     headers = {"Authorization": f"Bearer {GRIST_API_KEY}"}
 

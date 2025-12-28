@@ -8,7 +8,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from psycopg2.extensions import connection as PgConnection
 
-from .config import DatabaseConfig, LocationConfig, WEEKDAY_NAMES
+from .config import WEEKDAY_NAMES, DatabaseConfig, LocationConfig
 from .datasource import (
     build_daily_context,
     build_window_metrics,
@@ -100,9 +100,7 @@ class WeatherIngestJob:
                 )
                 continue
 
-            friendly_open_days = ", ".join(
-                f"{day.isoformat()} ({_weekday_name(day.weekday())})" for day in open_days
-            )
+            friendly_open_days = ", ".join(f"{day.isoformat()} ({_weekday_name(day.weekday())})" for day in open_days)
             print(
                 "📅 Fetching hourly weather for open days "
                 f"{friendly_open_days} "

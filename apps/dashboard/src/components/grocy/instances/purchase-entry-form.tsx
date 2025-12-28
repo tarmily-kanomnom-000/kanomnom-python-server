@@ -538,7 +538,7 @@ export function PurchaseEntryForm({
         note: note.trim().length ? note.trim() : null,
         metadata: metadataForSubmit,
       };
-      const updatedProduct = await submitPurchaseEntry(
+      const { product: updatedProduct } = await submitPurchaseEntry(
         instanceIndex,
         product.id,
         payload,

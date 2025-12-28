@@ -26,7 +26,7 @@ export type ListInstancesResponsePayload = {
   instances: GrocyInstanceSummaryPayload[];
 };
 
-type GrocyStockEntryPayload = Omit<
+export type GrocyStockEntryPayload = Omit<
   GrocyStockEntry,
   | "best_before_date"
   | "purchased_date"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from core.cache.grocy_product_cache import GrocyProductCacheManager
@@ -16,7 +16,13 @@ from core.grocy.note_metadata import (
     PurchaseEntryNoteMetadata,
     encode_structured_note,
 )
-from core.grocy.responses import GrocyProduct, GrocyProductGroup, GrocyQuantityUnit, GrocyStockEntry, GrocyStockLogEntry
+from core.grocy.responses import (
+    GrocyProduct,
+    GrocyProductGroup,
+    GrocyQuantityUnit,
+    GrocyStockEntry,
+    GrocyStockLogEntry,
+)
 
 
 @dataclass(frozen=True)
@@ -405,6 +411,7 @@ class ProductInventoryService:
             discrete_units=discrete_units,
             stocks=entries,
         )
+
 
 def _map_last_update(stock_log_entries: list[GrocyStockLogEntry]) -> dict[int, datetime]:
     """Determine the most recent stock log timestamp per product id."""

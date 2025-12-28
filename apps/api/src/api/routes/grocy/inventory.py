@@ -25,8 +25,7 @@ async def correct_product_inventory(
     try:
         if correction.metadata is not None:
             loss_entries = [
-                {"reason": detail.reason, "note": detail.note}
-                for detail in (correction.metadata.losses or [])
+                {"reason": detail.reason, "note": detail.note} for detail in (correction.metadata.losses or [])
             ]
             if loss_entries:
                 metadata = InventoryCorrectionNoteMetadata(losses=loss_entries)

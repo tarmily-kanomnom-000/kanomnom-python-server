@@ -4,7 +4,11 @@ from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 
 from core.grocy.exceptions import ManifestNotFoundError, MetadataNotFoundError
-from models.grocy import CreatedProductGroup, CreatedQuantityUnit, InitializeInstanceResponse
+from models.grocy import (
+    CreatedProductGroup,
+    CreatedQuantityUnit,
+    InitializeInstanceResponse,
+)
 
 from .dependencies import governor, router
 
@@ -26,12 +30,10 @@ async def initialize_instance(instance_index: str) -> InitializeInstanceResponse
         raise HTTPException(status_code=500, detail=str(error)) from error
 
     created_units = [
-        CreatedQuantityUnit(name=item.definition.name, identifier=item.identifier)
-        for item in units_result.created
+        CreatedQuantityUnit(name=item.definition.name, identifier=item.identifier) for item in units_result.created
     ]
     created_groups = [
-        CreatedProductGroup(name=item.definition.name, identifier=item.identifier)
-        for item in groups_result.created
+        CreatedProductGroup(name=item.definition.name, identifier=item.identifier) for item in groups_result.created
     ]
 
     return InitializeInstanceResponse(

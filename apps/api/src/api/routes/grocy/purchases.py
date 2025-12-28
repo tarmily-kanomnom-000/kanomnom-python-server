@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import date, datetime, time
 import json
 import logging
+from dataclasses import dataclass
+from datetime import date, datetime, time
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -13,11 +13,16 @@ from fastapi import HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 
 from core.grocy.exceptions import ManifestNotFoundError, MetadataNotFoundError
-
-from core.grocy.note_metadata import PurchaseEntryNoteMetadata, validate_note_text
+from core.grocy.note_metadata import (
+    PurchaseEntryNoteMetadata,
+    decode_structured_note,
+    validate_note_text,
+)
+from core.grocy.responses import GrocyStockEntry
 from core.grocy.stock import PurchaseEntry, PurchaseEntryDraft
 from models.grocy import (
     GrocyProductInventoryEntry,
+    GrocyStockEntryPayload,
     PurchaseEntryCalculationRequest,
     PurchaseEntryCalculationResponse,
     PurchaseEntryDefaultsBatchRequest,
@@ -26,10 +31,10 @@ from models.grocy import (
     PurchaseEntryMetadataPayload,
     PurchaseEntryRequest,
 )
+from shared.grist_service import create_grist_purchase_record
 
 from .dependencies import governor, router
 from .helpers import execute_product_mutation, serialize_inventory_view
-from shared.grist_service import create_grist_purchase_record
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +74,80 @@ def _ensure_schema_alignment(schema: dict[str, Any]) -> None:
     model_properties = set(model_schema.get("properties", {}).keys())
     shared_properties = set(schema.get("properties", {}).keys())
     if model_properties != shared_properties:
-        raise RuntimeError(
-            "Shared purchase entry schema properties do not match PurchaseEntryRequest definition."
+        raise RuntimeError("Shared purchase entry schema properties do not match PurchaseEntryRequest definition.")
+
+
+def _resolve_package_batch(metadata: PurchaseEntryNoteMetadata | None) -> tuple[int, float] | None:
+    if metadata is None:
+        return None
+    if metadata.package_quantity is None or metadata.package_size is None:
+        return None
+    quantity = metadata.package_quantity
+    if not float(quantity).is_integer():
+        raise ValueError("package_quantity must be a whole number to create discrete package entries.")
+    count = int(quantity)
+    if count < 1:
+        raise ValueError("package_quantity must be at least 1.")
+    return count, metadata.package_size
+
+
+def _serialize_stock_entries(entries: list[GrocyStockEntry]) -> list[GrocyStockEntryPayload]:
+    serialized: list[GrocyStockEntryPayload] = []
+    for entry in entries:
+        decoded_note = decode_structured_note(entry.note)
+        payload: dict[str, Any] = {
+            "id": entry.id,
+            "amount": entry.amount,
+            "best_before_date": entry.best_before_date,
+            "purchased_date": entry.purchased_date,
+            "stock_id": entry.stock_id,
+            "price": entry.price,
+            "open": entry.open,
+            "opened_date": entry.opened_date,
+            "row_created_timestamp": entry.row_created_timestamp,
+            "location_id": entry.location_id,
+            "shopping_location_id": entry.shopping_location_id,
+            "note": decoded_note.note or None,
+        }
+        if decoded_note.metadata is not None:
+            payload["note_metadata"] = decoded_note.metadata.to_api_payload()
+        serialized.append(GrocyStockEntryPayload(**payload))
+    return serialized
+
+
+def _build_purchase_drafts(
+    purchase: PurchaseEntryRequest,
+    metadata: PurchaseEntryNoteMetadata | None,
+    resolved_amount: float,
+    resolved_price: float,
+) -> list[PurchaseEntryDraft]:
+    package_batch = _resolve_package_batch(metadata)
+    if package_batch is None:
+        entry_amount = resolved_amount
+        entry_count = 1
+    else:
+        entry_count, package_size = package_batch
+        entry_amount = package_size
+    drafts: list[PurchaseEntryDraft] = []
+    base_note = (purchase.note or "").strip()
+    for index in range(entry_count):
+        tag = f"(package {index + 1}/{entry_count})" if entry_count > 1 else ""
+        resolved_note = base_note
+        if tag:
+            resolved_note = f"{base_note} {tag}".strip() if base_note else tag
+        drafts.append(
+            PurchaseEntryDraft(
+                amount=entry_amount,
+                price_per_unit=resolved_price,
+                best_before_date=purchase.best_before_date,
+                purchased_date=purchase.purchased_date,
+                location_id=purchase.location_id,
+                shopping_location_id=purchase.shopping_location_id,
+                note=resolved_note,
+                metadata=metadata,
+            )
         )
+    return drafts
 
 
 _PURCHASE_ENTRY_SCHEMA = _load_shared_purchase_schema()
@@ -186,14 +262,14 @@ async def get_purchase_entry_schema() -> dict[str, Any]:
 
 @router.post(
     "/{instance_index}/products/{product_id}/purchase",
-    response_model=GrocyProductInventoryEntry,
+    response_model=list[GrocyStockEntryPayload],
 )
 async def record_purchase_entry(
     instance_index: str,
     product_id: int,
     purchase: PurchaseEntryRequest,
-) -> GrocyProductInventoryEntry:
-    """Record a purchase entry for the specified product."""
+) -> list[GrocyStockEntryPayload]:
+    """Record purchase entries for the specified product and return the new stock rows."""
 
     metadata: PurchaseEntryNoteMetadata | None = None
     derived_amount: float | None = None
@@ -229,43 +305,51 @@ async def record_purchase_entry(
     if resolved_amount is None or resolved_price is None:
         raise HTTPException(status_code=400, detail="amount and price must be provided or derivable from metadata.")
 
-    draft = PurchaseEntryDraft(
-        amount=resolved_amount,
-        price_per_unit=resolved_price,
-        best_before_date=purchase.best_before_date,
-        purchased_date=purchase.purchased_date,
-        location_id=purchase.location_id,
-        shopping_location_id=purchase.shopping_location_id,
-        note=purchase.note,
-        metadata=metadata,
-    )
+    try:
+        drafts = _build_purchase_drafts(purchase, metadata, resolved_amount, resolved_price)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    recorded_entry: PurchaseEntry | None = None
+    recorded_entries: list[PurchaseEntry] = []
+    baseline_entry_ids: set[int] = set()
 
-    def _record_purchase(manager, payload: PurchaseEntryDraft) -> None:
-        nonlocal recorded_entry
-        recorded_entry, _ = manager.record_purchase_entry(product_id, payload)
+    def _record_purchase(manager, payloads: list[PurchaseEntryDraft]) -> None:
+        nonlocal baseline_entry_ids
+        baseline_view = manager.get_product_inventory(product_id)
+        baseline_entry_ids = {entry.id for entry in baseline_view.stocks}
+        for payload in payloads:
+            resolved_entry, _ = manager.record_purchase_entry(product_id, payload)
+            recorded_entries.append(resolved_entry)
 
-    updated_product = await execute_product_mutation(
-        instance_index,
-        product_id,
-        _record_purchase,
-        draft,
-    )
+    updated_product = await execute_product_mutation(instance_index, product_id, _record_purchase, drafts)
 
-    if recorded_entry is None:
-        raise HTTPException(status_code=500, detail="Failed to persist purchase entry.")
+    if not recorded_entries:
+        raise HTTPException(status_code=500, detail="Failed to persist purchase entries.")
 
-    purchase_epoch = _compose_purchase_timestamp(recorded_entry.purchased_date, instance_index)
+    expected_entries = len(drafts)
+    new_entries = [entry for entry in updated_product.stocks if entry.id not in baseline_entry_ids]
+    new_entries.sort(key=lambda entry: entry.row_created_timestamp)
+    if len(new_entries) < expected_entries:
+        logger.warning(
+            "Purchase entry count mismatch; expected %s new entries but found %s. Falling back to latest entries.",
+            expected_entries,
+            len(new_entries),
+        )
+        newest = sorted(updated_product.stocks, key=lambda entry: entry.row_created_timestamp)
+        new_entries = newest[-expected_entries:]
+    if len(new_entries) > expected_entries:
+        new_entries = new_entries[-expected_entries:]
+
+    purchase_epoch = _compose_purchase_timestamp(recorded_entries[0].purchased_date, instance_index)
     shopping_location_name = await _resolve_shopping_location_name(
-        instance_index, recorded_entry.shopping_location_id
+        instance_index, recorded_entries[0].shopping_location_id
     )
     serialized_product = serialize_inventory_view(updated_product)
     grist_fields = _build_grist_record_fields(
         product=serialized_product,
         purchase=purchase,
         metadata=metadata,
-        recorded_entry=recorded_entry,
+        recorded_entry=recorded_entries[0],
         purchase_epoch=purchase_epoch,
         shopping_location_name=shopping_location_name,
     )
@@ -279,7 +363,8 @@ async def record_purchase_entry(
     except Exception:  # noqa: BLE001
         logger.exception("Failed to post purchase '%s' to Grist", updated_product.product.name)
 
-    return serialized_product
+    return _serialize_stock_entries(new_entries)
+
 
 @router.post(
     "/{instance_index}/products/{product_id}/purchase/derive",

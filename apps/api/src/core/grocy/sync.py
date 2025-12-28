@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Generic, Iterable, Sequence, TypeVar
-
+from typing import Any, Callable, Generic, Sequence, TypeVar
 
 DefinitionT = TypeVar("DefinitionT")
 ExistingT = TypeVar("ExistingT")
@@ -83,9 +82,7 @@ def _extract_identifier(payload: dict[str, Any] | list[dict[str, Any]] | None) -
         return int(payload["id"])
     if isinstance(payload, list):
         identifiers = [
-            int(item["id"])
-            for item in payload
-            if isinstance(item, dict) and "id" in item and str(item["id"]).isdigit()
+            int(item["id"]) for item in payload if isinstance(item, dict) and "id" in item and str(item["id"]).isdigit()
         ]
         if identifiers:
             return identifiers[0]

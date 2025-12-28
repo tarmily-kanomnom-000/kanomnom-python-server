@@ -10,9 +10,18 @@ from core.cache.grocy_shopping_locations_cache import get_grocy_shopping_locatio
 from core.cache.grocy_stock_cache import get_grocy_stock_cache
 from core.cache.grocy_stock_log_cache import get_grocy_stock_log_cache
 from core.grocy.client import GrocyClient
-from core.grocy.models import ProductGroupDefinition, QuantityUnitDefinition, UniversalManifest
+from core.grocy.models import (
+    ProductGroupDefinition,
+    QuantityUnitDefinition,
+    UniversalManifest,
+)
 from core.grocy.responses import GrocyLocation, GrocyShoppingLocation
-from core.grocy.services import ProductGroupService, ProductGroupSyncResult, QuantityUnitService, QuantityUnitSyncResult
+from core.grocy.services import (
+    ProductGroupService,
+    ProductGroupSyncResult,
+    QuantityUnitService,
+    QuantityUnitSyncResult,
+)
 from core.grocy.stock import (
     InventoryCorrection,
     ProductInventoryService,
@@ -96,9 +105,7 @@ class GrocyManager:
         self._refresh_inventory_caches()
         return resolved, response
 
-    def get_purchase_entry_defaults(
-        self, product_id: int, shopping_location_id: int | None
-    ) -> PurchaseEntryDefaults:
+    def get_purchase_entry_defaults(self, product_id: int, shopping_location_id: int | None) -> PurchaseEntryDefaults:
         """Return default metadata suggestions for purchase entry mutations."""
         return self._inventory.build_purchase_defaults(self.instance_index, product_id, shopping_location_id)
 

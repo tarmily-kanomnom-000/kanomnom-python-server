@@ -11,14 +11,13 @@ from core.grocy.note_metadata import (
     decode_structured_note,
 )
 from core.grocy.responses import GrocyProductGroup, GrocyQuantityUnit
-from core.grocy.sync import CreatedEntity, EntitySyncSpecification, EntitySyncer
+from core.grocy.sync import CreatedEntity, EntitySyncer, EntitySyncSpecification
 
 
 class _NamedDefinition(Protocol):
     name: str
 
-    def normalized_name(self) -> str:
-        ...
+    def normalized_name(self) -> str: ...
 
 
 @dataclass
@@ -109,10 +108,7 @@ class ProductGroupService:
             desired_note, desired_allergens = _extract_group_metadata(definition.description)
             current_note = _normalized_description(existing.description)
             current_allergens = getattr(existing, "allergens", ())
-            if (
-                desired_note == current_note
-                and desired_allergens == tuple(current_allergens or ())
-            ):
+            if desired_note == current_note and desired_allergens == tuple(current_allergens or ()):
                 continue
             payload = definition.to_payload(identifier)
             payload["description"] = definition.description
