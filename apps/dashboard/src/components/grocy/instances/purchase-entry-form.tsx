@@ -123,6 +123,9 @@ export function PurchaseEntryForm({
   const [shoppingLocationId, setShoppingLocationId] = useState<number | null>(
     defaultShoppingLocationId,
   );
+  const [shoppingLocationName, setShoppingLocationName] = useState(
+    defaultShoppingLocationName,
+  );
   const [locationError, setLocationError] = useState(false);
   const [shoppingLocationError, setShoppingLocationError] = useState(false);
   const [note, setNote] = useState("");
@@ -203,6 +206,9 @@ export function PurchaseEntryForm({
     resetTaxRate("");
     resetBrand("");
     resetOnSale(false);
+    setLocationId(defaultLocationId);
+    setShoppingLocationId(defaultShoppingLocationId);
+    setShoppingLocationName(defaultShoppingLocationName);
     packageSizeInputRef.current?.focus();
   }, [
     formResetTrigger,
@@ -215,6 +221,9 @@ export function PurchaseEntryForm({
     resetShippingCost,
     resetTaxRate,
     resetOnSale,
+    defaultLocationId,
+    defaultShoppingLocationId,
+    defaultShoppingLocationName,
   ]);
 
   useEffect(() => {
@@ -427,6 +436,12 @@ export function PurchaseEntryForm({
 
   const metadataForSubmit: PurchaseEntryRequestPayload["metadata"] =
     metadataHasValues ? normalizedPurchaseMetadata : null;
+  const normalizedShoppingLocationName = useMemo(
+    () => shoppingLocationName.trim(),
+    [shoppingLocationName],
+  );
+  const hasShoppingLocationSelection =
+    shoppingLocationId !== null || normalizedShoppingLocationName.length > 0;
 
   const canDeriveTotals =
     Boolean(instanceIndex) &&
@@ -495,7 +510,7 @@ export function PurchaseEntryForm({
     Boolean(instanceIndex) &&
     !locationError &&
     !shoppingLocationError &&
-    shoppingLocationId !== null &&
+    hasShoppingLocationSelection &&
     !isSubmitting;
 
   const shouldShowPackageSizeError =
@@ -535,6 +550,10 @@ export function PurchaseEntryForm({
         pricePerUnit: roundToSixDecimals(derivedUnitPrice),
         locationId,
         shoppingLocationId,
+        shoppingLocationName:
+          shoppingLocationId === null && normalizedShoppingLocationName.length
+            ? normalizedShoppingLocationName
+            : null,
         note: note.trim().length ? note.trim() : null,
         metadata: metadataForSubmit,
       };
@@ -768,8 +787,12 @@ export function PurchaseEntryForm({
               defaultOptionLabel={defaultShoppingLocationName}
               placeholder="Search shopping locations…"
               resetLabel="Use default"
+              inputValue={shoppingLocationName}
+              onInputValueChange={setShoppingLocationName}
+              allowCustomValue
               onValidationChange={setShoppingLocationError}
-              errorMessage="Select a shopping location from the list to continue."
+              errorMessage="Select or enter a shopping location to continue."
+              helperText="Type a new name to create it when you record the purchase."
             />
             <SearchableOptionSelect
               label="Location"

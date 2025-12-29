@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from "react";
 
 export type SearchableOption = {
   id: number;
@@ -19,6 +25,9 @@ type SearchableOptionSelectProps = {
   resetLabel?: string;
   onValidationChange?: (hasError: boolean) => void;
   errorMessage?: string;
+  inputValue?: string | null;
+  onInputValueChange?: (value: string) => void;
+  allowCustomValue?: boolean;
 };
 
 export function SearchableOptionSelect({
@@ -33,8 +42,14 @@ export function SearchableOptionSelect({
   resetLabel = "Use default",
   onValidationChange,
   errorMessage = "Select a value from the list to continue.",
+  inputValue: inputValueProp = null,
+  onInputValueChange,
+  allowCustomValue = false,
 }: SearchableOptionSelectProps) {
-  const [inputValue, setInputValue] = useState(() => {
+  const [uncontrolledInputValue, setUncontrolledInputValue] = useState(() => {
+    if (inputValueProp !== null) {
+      return inputValueProp;
+    }
     if (selectedId !== null) {
       const matched = options.find((option) => option.id === selectedId);
       if (matched) {
@@ -48,6 +63,17 @@ export function SearchableOptionSelect({
   });
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const dropdownId = useId();
+  const inputValue =
+    inputValueProp !== null ? inputValueProp : uncontrolledInputValue;
+  const setInputValue = useCallback(
+    (nextValue: string) => {
+      if (inputValueProp === null) {
+        setUncontrolledInputValue(nextValue);
+      }
+      onInputValueChange?.(nextValue);
+    },
+    [inputValueProp, onInputValueChange],
+  );
 
   useEffect(() => {
     if (selectedId === null) {
@@ -57,7 +83,22 @@ export function SearchableOptionSelect({
     if (matched) {
       setInputValue(matched.name);
     }
-  }, [selectedId, options]);
+  }, [selectedId, options, setInputValue]);
+
+  useEffect(() => {
+    const normalized = inputValue.trim().toLowerCase();
+    if (!normalized) {
+      return;
+    }
+    const matched = options.find(
+      (option) => option.name.trim().toLowerCase() === normalized,
+    );
+    if (!matched || matched.id === selectedId) {
+      return;
+    }
+    onSelectedIdChange(matched.id);
+    setInputValue(matched.name);
+  }, [inputValue, options, onSelectedIdChange, selectedId, setInputValue]);
 
   const suggestions = useMemo(() => {
     const normalized = inputValue.trim().toLowerCase();
@@ -70,7 +111,9 @@ export function SearchableOptionSelect({
   }, [inputValue, options]);
 
   const hasError =
-    inputValue.trim().length > 0 && (selectedId === null || selectedId < 0);
+    inputValue.trim().length > 0 &&
+    (selectedId === null || selectedId < 0) &&
+    !allowCustomValue;
   useEffect(() => {
     onValidationChange?.(hasError);
   }, [hasError, onValidationChange]);
@@ -82,6 +125,11 @@ export function SearchableOptionSelect({
     } else {
       setInputValue("");
       onSelectedIdChange(null);
+    }
+    if (inputValueProp !== null) {
+      onInputValueChange?.(
+        defaultOptionId !== null && defaultOptionLabel ? defaultOptionLabel : "",
+      );
     }
   };
 

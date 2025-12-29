@@ -91,6 +91,10 @@ class GrocyClient:
         payload = self._request("GET", "/api/objects/shopping_locations", None)
         return parse_shopping_locations(payload, self._source_timezone)
 
+    def create_shopping_location(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Create a shopping location via Grocy's API."""
+        return self._request("POST", "/api/objects/shopping_locations", payload)
+
     def list_product_groups(self) -> list[GrocyProductGroup]:
         """Fetch product group definitions from Grocy."""
         payload = self._request("GET", "/api/objects/product_groups", None)

@@ -199,6 +199,8 @@ class ProductInventoryService:
         """Return a single product with refreshed stock entries."""
         product = self._get_product(instance_index, product_id)
         entries = self.client.list_product_stock_entries(product_id)
+        stock_log = self._load_stock_log(instance_index)
+        last_update_by_id = _map_last_update(stock_log)
         context = self._build_inventory_context(instance_index)
         return self._create_inventory_view(
             product,
@@ -208,6 +210,7 @@ class ProductInventoryService:
             context.discrete_units,
             context.unit_name_lookup,
             self._settings.cold_start_timestamp,
+            last_update_by_id.get(product_id),
         )
 
     def resolve_inventory_correction(

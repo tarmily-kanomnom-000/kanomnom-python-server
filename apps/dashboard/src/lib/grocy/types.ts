@@ -134,6 +134,7 @@ export type PurchaseEntryRequestPayload = {
   pricePerUnit: number;
   locationId: number | null;
   shoppingLocationId: number | null;
+  shoppingLocationName: string | null;
   note: string | null;
   metadata?: {
     shippingCost?: number | null;

@@ -128,6 +128,38 @@ class GrocyManager:
             self._shopping_locations_cache.save_shopping_locations,
         )
 
+    def ensure_shopping_location(self, name: str) -> GrocyShoppingLocation:
+        """Return an existing shopping location by name or create it when missing."""
+        normalized_name = name.strip()
+        if not normalized_name:
+            raise ValueError("shopping_location_name must not be empty.")
+        existing = self.list_shopping_locations()
+        lookup = {_normalize_shopping_location_name(location.name): location for location in existing}
+        match = lookup.get(_normalize_shopping_location_name(normalized_name))
+        if match is not None:
+            return match
+
+        def _reload_lookup() -> dict[str, GrocyShoppingLocation]:
+            self._shopping_locations_cache.clear_cache(self.instance_index)
+            refreshed = self.list_shopping_locations()
+            return {_normalize_shopping_location_name(location.name): location for location in refreshed}
+
+        payload = {"name": normalized_name, "active": 1}
+        try:
+            self.client.create_shopping_location(payload)
+        except Exception:
+            refreshed_lookup = _reload_lookup()
+            resolved = refreshed_lookup.get(_normalize_shopping_location_name(normalized_name))
+            if resolved is not None:
+                return resolved
+            raise
+
+        refreshed_lookup = _reload_lookup()
+        resolved = refreshed_lookup.get(_normalize_shopping_location_name(normalized_name))
+        if resolved is None:
+            raise RuntimeError(f"Shopping location '{normalized_name}' was not created.")
+        return resolved
+
     def _refresh_inventory_caches(self) -> None:
         self._inventory.invalidate_inventory_caches(self.instance_index)
         self._inventory.refresh_inventory_caches(self.instance_index)
@@ -144,3 +176,7 @@ class GrocyManager:
         fresh = fetcher()
         saver(self.instance_index, fresh)
         return fresh
+
+
+def _normalize_shopping_location_name(value: str) -> str:
+    return value.strip().lower()

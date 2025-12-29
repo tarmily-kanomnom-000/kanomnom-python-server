@@ -120,6 +120,7 @@ def _build_purchase_drafts(
     metadata: PurchaseEntryNoteMetadata | None,
     resolved_amount: float,
     resolved_price: float,
+    shopping_location_id: int | None,
 ) -> list[PurchaseEntryDraft]:
     package_batch = _resolve_package_batch(metadata)
     if package_batch is None:
@@ -142,7 +143,7 @@ def _build_purchase_drafts(
                 best_before_date=purchase.best_before_date,
                 purchased_date=purchase.purchased_date,
                 location_id=purchase.location_id,
-                shopping_location_id=purchase.shopping_location_id,
+                shopping_location_id=shopping_location_id,
                 note=resolved_note,
                 metadata=metadata,
             )
@@ -305,8 +306,10 @@ async def record_purchase_entry(
     if resolved_amount is None or resolved_price is None:
         raise HTTPException(status_code=400, detail="amount and price must be provided or derivable from metadata.")
 
+    shopping_location_id = await _ensure_shopping_location_id(instance_index, purchase)
+
     try:
-        drafts = _build_purchase_drafts(purchase, metadata, resolved_amount, resolved_price)
+        drafts = _build_purchase_drafts(purchase, metadata, resolved_amount, resolved_price, shopping_location_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -519,6 +522,32 @@ def _instance_timezone(instance_index: str) -> ZoneInfo:
         except Exception:  # noqa: BLE001
             pass
     return ZoneInfo("UTC")
+
+
+async def _ensure_shopping_location_id(
+    instance_index: str, purchase: PurchaseEntryRequest
+) -> int | None:
+    if purchase.shopping_location_id is not None:
+        return purchase.shopping_location_id
+
+    raw_name = purchase.shopping_location_name
+    if raw_name is None:
+        return None
+    normalized_name = raw_name.strip()
+    if not normalized_name:
+        return None
+
+    def _resolve_or_create() -> int:
+        manager = governor.manager_for(instance_index)
+        return manager.ensure_shopping_location(normalized_name).id
+
+    try:
+        return await run_in_threadpool(_resolve_or_create)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:  # noqa: BLE001
+        logger.exception("Failed to ensure shopping location for instance %s", instance_index)
+        raise HTTPException(status_code=500, detail="Unable to resolve shopping location.") from error
 
 
 async def _resolve_shopping_location_name(instance_index: str, shopping_location_id: int | None) -> str | None:

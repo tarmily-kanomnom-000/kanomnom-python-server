@@ -131,6 +131,11 @@ function shapePurchasePayload(
   const shoppingLocationId = toOptionalNumber(
     payload.shoppingLocationId ?? payload.shopping_location_id ?? null,
   );
+  const shoppingLocationName = toOptionalString(
+    (payload.shoppingLocationName ??
+      payload.shopping_location_name ??
+      null) as string | null,
+  );
   const note = toOptionalString(payload.note);
   const metadata = toBackendMetadata(
     isRecord(payload.metadata) ? payload.metadata : undefined,
@@ -142,6 +147,7 @@ function shapePurchasePayload(
     purchased_date: purchasedDate,
     location_id: locationId,
     shopping_location_id: shoppingLocationId,
+    shopping_location_name: shoppingLocationName,
     note,
     metadata,
   };

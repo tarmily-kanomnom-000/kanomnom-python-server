@@ -30,6 +30,9 @@
       "type": ["integer", "null"],
       "minimum": 0
     },
+    "shopping_location_name": {
+      "type": ["string", "null"]
+    },
     "note": {
       "type": ["string", "null"]
     },

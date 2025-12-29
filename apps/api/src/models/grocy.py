@@ -101,6 +101,7 @@ class PurchaseEntryRequest(BaseModel):
     purchased_date: date | None = None
     location_id: int | None = None
     shopping_location_id: int | None = None
+    shopping_location_name: str | None = None
     note: str | None = None
     metadata: PurchaseEntryMetadataPayload | None = None
 
