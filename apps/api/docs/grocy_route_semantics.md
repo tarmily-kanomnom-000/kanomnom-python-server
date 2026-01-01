@@ -1,0 +1,31 @@
+# Grocy Route Semantics (FastAPI)
+
+Concise reference for the Grocy API routes and key helpers. Use this to understand behavior, validation, and error mapping without digging through route code or the implementation guide.
+
+## Instances (`apps/api/src/api/routes/grocy/instances.py`)
+- `GET /grocy/instances` (`list_instances`) — Returns every discovered instance plus address/location/shopping-location rosters by pulling managers from the governor. Loads location lists synchronously inside a threadpool; no pagination or filtering today.
+
+## Lifecycle (`.../lifecycle.py`)
+- `POST /grocy/{instance_index}/initialize` (`initialize_instance`) — Seeds product groups and quantity units from the universal manifest via the governor. 404 if metadata missing; 500 if manifest missing. Response includes identifiers and a list of created units/groups.
+
+## Products (`.../products.py` + `helpers.serialize_inventory_view`)
+- `GET /grocy/{instance_index}/products` (`list_products`) — Returns inventory-enriched products. Honors `force_refresh` truthy values {1,true,t,yes,y,on} to invalidate caches for that instance before listing. 404 on missing metadata.
+- `GET /grocy/{instance_index}/products/{product_id}` (`get_product`) — Fetches a single product with fresh stock rows; 404 on missing metadata or product_id.
+- `serialize_inventory_view` — Normalizes structured notes on products/stocks (decodes envelopes, drops empty metadata), validates unit conversions, and maps Grocy unit names across purchase/stock/consume/price contexts for consistent API responses.
+
+## Inventory Corrections (`.../inventory.py`)
+- `POST /grocy/{instance_index}/products/{product_id}/inventory` (`correct_product_inventory`) — Validates note text and optional loss-metadata; applies `InventoryCorrection` via `execute_product_mutation`. Returns refreshed inventory view. 400 on validation errors; 404 on missing metadata/product.
+
+## Purchases (`.../purchases.py`)
+- `GET /grocy/{instance_index}/products/{product_id}/purchase/defaults` — Returns purchase metadata defaults for a product, optionally scoped to `shopping_location_id`. 404 on missing metadata/product.
+- `POST /grocy/{instance_index}/purchases/defaults` — Batch defaults; requires non-empty `product_ids` and returns entries in the same order. 500 if count mismatches, 404 on missing metadata/product.
+- `GET /grocy/purchases/schema` — Serves the shared JSON schema for purchase entry payloads; fails fast if the schema diverges from the Pydantic model.
+- `POST /grocy/{instance_index}/products/{product_id}/purchase` (`record_purchase_entry`) — Normalizes/derives amount + unit price from metadata (package size/quantity/price + conversion_rate); validates note text; optionally creates shopping locations by name; expands package batches into multiple drafts; writes entries via manager; identifies newly created stock rows; posts summarized purchase data to Grist (best-effort). 400 on metadata/note validation; 404 on metadata/product errors; 500 if no entries persisted.
+- `POST /grocy/{instance_index}/products/{product_id}/purchase/derive` — Returns derived amount/unit price/total_usd; 400 unless package_size, package_quantity, package_price, and conversion_rate are provided and positive.
+- Helpers: `_ensure_shopping_location_id` resolves/creates shopping locations (400 on validation, 500 on create failure); `_resolve_shopping_location_name` best-effort lookup for Grist payloads; `_derive_purchase_amount_and_price` enforces positive amounts/totals and includes shipping/tax in unit price.
+
+## Shopping Lists (`.../shopping_list.py`)
+- See `apps/api/docs/shopping_list.md` for endpoints and `apps/api/docs/shopping_list_core.md` for manager/generator semantics (locking, merge rules, enrichment, deleted_product_ids).
+
+## Shared Mutation Helper (`.../helpers.py`)
+- `execute_product_mutation` — Wrapper that runs manager mutations in a threadpool, translates `MetadataNotFoundError`/`ValueError` to 404, propagates Grocy HTTP errors with original status/text, and always returns a refreshed `ProductInventoryView`.

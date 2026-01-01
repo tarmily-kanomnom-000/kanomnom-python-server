@@ -55,6 +55,7 @@ import {
   STOCK_STATUS_LABEL_BY_CATEGORY,
 } from "./product-metrics";
 import { ProductsTable } from "./products-table";
+import { ShoppingListButton } from "./shopping-list-button";
 
 const PRODUCT_SEARCH_PARAM = GROCY_QUERY_PARAMS.inventorySearch;
 const PRODUCT_GROUPS_PARAM = GROCY_QUERY_PARAMS.inventoryGroups;
@@ -741,16 +742,21 @@ export function ProductsPanel({
           ) : null}
         </div>
         {renderModeButtons()}
-        {onRefresh ? (
-          <div className="flex justify-start lg:justify-end">
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={!activeInstanceId || isLoading}
-              className="inline-flex items-center justify-center rounded-full border border-neutral-300 px-4 py-1.5 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-400"
-            >
-              Refresh data
-            </button>
+        {onRefresh || activeInstanceId ? (
+          <div className="flex gap-2 justify-start lg:justify-end">
+            {activeInstanceId ? (
+              <ShoppingListButton instanceIndex={activeInstanceId} />
+            ) : null}
+            {onRefresh ? (
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={!activeInstanceId || isLoading}
+                className="inline-flex items-center justify-center rounded-full border border-neutral-300 px-4 py-1.5 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-400"
+              >
+                Refresh data
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

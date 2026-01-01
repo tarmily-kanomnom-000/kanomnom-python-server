@@ -22,6 +22,7 @@ import {
   readCachedProducts,
   upsertCachedProduct,
 } from "@/lib/offline/grocy-cache";
+import { isOnline } from "@/lib/offline/shopping-list-cache";
 
 const productCache = new Map<string, Promise<GrocyProductInventoryEntry[]>>();
 
@@ -63,9 +64,7 @@ export async function fetchGrocyProduct(
   } catch (error) {
     if (
       cachedProduct &&
-      (typeof navigator === "undefined" ||
-        navigator.onLine === false ||
-        (axios.isAxiosError(error) && !error.response))
+      (!isOnline() || (axios.isAxiosError(error) && !error.response))
     ) {
       return cachedProduct;
     }

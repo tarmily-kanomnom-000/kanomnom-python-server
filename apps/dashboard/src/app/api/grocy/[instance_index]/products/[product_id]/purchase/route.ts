@@ -132,9 +132,9 @@ function shapePurchasePayload(
     payload.shoppingLocationId ?? payload.shopping_location_id ?? null,
   );
   const shoppingLocationName = toOptionalString(
-    (payload.shoppingLocationName ??
-      payload.shopping_location_name ??
-      null) as string | null,
+    (payload.shoppingLocationName ?? payload.shopping_location_name ?? null) as
+      | string
+      | null,
   );
   const note = toOptionalString(payload.note);
   const metadata = toBackendMetadata(

@@ -4,13 +4,17 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
+    "dev:pwa": "SERWIST_ENABLE_DEV=true NEXT_PUBLIC_ENABLE_SW_DEV=true next dev --webpack",
     "build": "next build --webpack",
+    "build:dev-env": "node ./scripts/use-dev-env.js && SERWIST_ENABLE_DEV=true next build --webpack",
     "start": "next start",
+    "start:dev-env": "node ./scripts/use-dev-env.js && next start",
     "lint": "biome check src"
   },
   "dependencies": {
     "@serwist/next": "^9.2.3",
     "@tailwindcss/postcss": "^4.1.18",
+    "@tanstack/react-query": "^5.90.16",
     "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "lightningcss-linux-x64-gnu": "^1.30.2",
@@ -22,8 +26,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
-    "@types/node": "^25.0.1",
     "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^25.0.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "npm-check-updates": "^19.2.0",

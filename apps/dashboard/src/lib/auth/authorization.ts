@@ -35,6 +35,6 @@ export async function requireUser(
   return { session, role };
 }
 
-export function buildRoleHeaders(role: DashboardRole): HeadersInit {
+export function buildRoleHeaders(role: DashboardRole): Record<string, string> {
   return { "X-Dashboard-Role": role };
 }

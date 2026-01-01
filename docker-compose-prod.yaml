@@ -17,7 +17,8 @@ services:
       - proxy
       - database
     volumes:
-      - /home/tarmily/kanomnom-server/kanomnom-python-server/request_dumps:/home/kanomnom-python-server/request_dumps
+      - /home/tarmily/kanomnom-server/kanomnom-python-server/apps/api/shopping_lists:/home/kanomnom-python-server/apps/api/shopping_lists
+      - /home/tarmily/kanomnom-server/kanomnom-python-server/apps/api/request_dumps:/home/kanomnom-python-server/apps/api/request_dumps
 networks:
   proxy:
     external: true

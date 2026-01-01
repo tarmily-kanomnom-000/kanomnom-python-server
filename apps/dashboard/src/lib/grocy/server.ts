@@ -90,7 +90,11 @@ async function requestGrocyProducts(
   if (options?.forceRefresh) {
     url.searchParams.set("force_refresh", "true");
   }
-  if (typeof options?.cacheVersion === "number") {
+  // Only append cache_buster when explicitly refreshing or a version bump occurred.
+  if (
+    typeof options?.cacheVersion === "number" &&
+    (options.forceRefresh || options.cacheVersion > 0)
+  ) {
     url.searchParams.set("cache_buster", String(options.cacheVersion));
   }
   const requestInit: RequestInit & { next?: { revalidate?: number } } = {

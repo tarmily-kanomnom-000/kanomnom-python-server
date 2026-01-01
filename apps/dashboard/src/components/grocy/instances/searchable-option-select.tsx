@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 export type SearchableOption = {
   id: number;
@@ -128,7 +122,9 @@ export function SearchableOptionSelect({
     }
     if (inputValueProp !== null) {
       onInputValueChange?.(
-        defaultOptionId !== null && defaultOptionLabel ? defaultOptionLabel : "",
+        defaultOptionId !== null && defaultOptionLabel
+          ? defaultOptionLabel
+          : "",
       );
     }
   };

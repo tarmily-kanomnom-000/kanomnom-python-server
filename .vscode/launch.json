@@ -16,6 +16,16 @@
             ],
             "jinja": true,
             "justMyCode": true
+        },
+        {
+            "name": "Dashboard: Next.js dev",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "npm run dev -- --hostname 0.0.0.0 --port 3000",
+            "cwd": "${workspaceFolder}/apps/dashboard",
+            "env": {
+                "NEXT_TELEMETRY_DISABLED": "1"
+            }
         }
     ]
 }

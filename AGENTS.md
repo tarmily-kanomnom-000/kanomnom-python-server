@@ -11,6 +11,9 @@ It’s intentionally opinionated, designed for clarity, reliability, and maintai
 - `apps/api/` contains the FastAPI-based Python server. `src/api/` defines HTTP routes, `src/core/` houses Grocy-specific services/caches, and `src/models/` contains typed payloads exposed to clients.
 - `apps/dashboard/` is the Next.js UI runtime. `src/app/` implements routes and API proxies, while `src/components/`, `src/hooks/`, `src/lib/`, `src/queries/`, and `src/utils/` organize reusable UI logic for Grocy features (inventory, purchases, etc.).
 - `apps/api/grocy_manifest/` stores instance manifests plus shared universal definitions that seed Grocy instances.
+- Shopping list docs: API contract at `apps/api/docs/shopping_list.md`; dashboard offline/queue notes in `apps/dashboard/README.md` under PWA section.
+- Broader docs: see `SHOPPING_LIST_IMPLEMENTATION.md` for the implementation guide/plan; phase summaries under `SHOPPING_LIST_PHASE*`; API runtime README in `apps/api/README.md`; dashboard README in `apps/dashboard/README.md`.
+- Core shopping list semantics (merge rules, locking, normalization): `apps/api/docs/shopping_list_core.md`.
 
 Keep this mental map current whenever you add new modules or runtimes—future contributors rely on it to navigate quickly.
 
@@ -18,17 +21,18 @@ Keep this mental map current whenever you add new modules or runtimes—future c
 
 ## 0) TL;DR Principles
 
-- **DRY** first – centralize shared logic.  
-- **Use proven libraries** instead of re-inventing.  
-- **Type everything.**  
-- **Python only:** avoid default function args; use configuration instead.  
-- **Abstraction:** only if it reduces duplication, centralizes logic, or manages cohesive state.  
-- **Refactor aggressively** and remove dead code.  
-- **Keep modules small and scoped.**  
-- **Single source of truth for state.**  
-- **Comments should explain *why*, not *what*.**  
-- **Build for debuggability; fail fast and loudly.**  
-- **Preserve originals when modifying complex systems**.  
+- **DRY** first – centralize shared logic.
+- **Use proven libraries** instead of re-inventing.
+- **Type everything.**
+- **Python only:** avoid default function args; use configuration instead.
+- **Abstraction:** only if it reduces duplication, centralizes logic, or manages cohesive state.
+- **Design for N:** accept iterables/collections even when N=1 initially.
+- **Refactor aggressively** and remove dead code.
+- **Keep modules small and scoped.**
+- **Single source of truth for state.**
+- **Comments should explain *why*, not *what*.**
+- **Build for debuggability; fail fast and loudly.**
+- **Preserve originals when modifying complex systems**.
 - **Before merging:** re-check logic, semantics, and naming.
 
 ---
@@ -116,7 +120,58 @@ During large-scale changes, regressions are easy to introduce. Keeping a working
 
 ---
 
-## 6) File & Module Scope
+## 6) Design for N: Build Scalable APIs from the Start
+
+**Policy:** When designing functions or APIs, default to accepting collections (lists, iterables) even if the initial use case only needs one item.
+
+**Why:**
+Many features start with `N = 1` but inevitably grow to require batch operations. Retrofitting a single-item API to handle multiple items often requires breaking changes, duplicated endpoints, or awkward wrapper functions.
+
+**When to apply:**
+- Functions that operate on domain entities (products, users, transactions, etc.)
+- Operations that could logically be batched (database queries, API calls, validations)
+- Any function where you can imagine "do this for multiple items" being a future requirement
+
+**When to skip:**
+- Pure utility functions with no domain context
+- Operations that are inherently singular (e.g., "get current user session")
+- Cases where batching would complicate the logic without clear benefit
+
+**Examples:**
+
+```python
+# ✅ Good: Designed for N from the start
+def update_product_prices(
+    products: list[ProductUpdate],
+    cfg: UpdateConfig
+) -> list[UpdateResult]:
+    """Update prices for one or more products."""
+    return [_update_single(p, cfg) for p in products]
+
+# Can be called with one item initially
+update_product_prices([single_product], cfg)
+
+# Scales naturally when needed
+update_product_prices(many_products, cfg)
+```
+
+```python
+# 🚫 Avoid: Single-item API that will need retrofitting
+def update_product_price(product: ProductUpdate) -> UpdateResult:
+    """Update price for a single product."""
+    ...
+
+# Later requires either:
+# - A new bulk endpoint: update_product_prices_bulk(...)
+# - Awkward loops in calling code
+# - Breaking changes to accept list[ProductUpdate]
+```
+
+**Key insight:** Starting with an iterable type costs almost nothing but saves significant refactoring later. When in doubt, design for N.
+
+---
+
+## 7) File & Module Scope
 
 Files should represent one logical area. Split when:
 - LOC > ~400–600 and multiple domains coexist.  
@@ -124,7 +179,7 @@ Files should represent one logical area. Split when:
 
 ---
 
-## 7) Single Source of Truth for State
+## 8) Single Source of Truth for State
 
 Centralize state management — no scattered globals or shadow copies.
 
@@ -137,7 +192,7 @@ class SessionState:
 
 ---
 
-## 8) Comments vs. Names
+## 9) Comments vs. Names
 
 - Use names to describe *what* and *how*.  
 - Use comments only for *why* or *data quirks*.
@@ -149,7 +204,7 @@ def normalize_cost(raw: dict[str, str]) -> float: ...
 
 ---
 
-## 9) Debuggable by Design
+## 10) Debuggable by Design
 
 Assume first runs are wrong. Add logging, timing, and observability hooks.
 
@@ -161,7 +216,7 @@ Artifacts (snapshots, dumps) may go to `/tmp` or `./.debug/` as appropriate.
 
 ---
 
-## 10) Fail Fast (No Silent Graceful Fallbacks)
+## 11) Fail Fast (No Silent Graceful Fallbacks)
 
 Raise early and clearly unless explicitly required.
 
@@ -172,7 +227,7 @@ if not os.path.exists(cfg.model_path):
 
 ---
 
-## 11) Keep Names, Docs, and Semantics in Sync
+## 12) Keep Names, Docs, and Semantics in Sync
 
 When refactoring:
 - Update function/class/file names.  
@@ -182,7 +237,7 @@ When refactoring:
 
 ---
 
-## 12) Abstraction Level Checklist
+## 13) Abstraction Level Checklist
 
 Ask before introducing new layers:
 - Does it reduce duplication?  
@@ -193,7 +248,7 @@ Ask before introducing new layers:
 
 ---
 
-## 13) Composite Example
+## 14) Composite Example
 
 **Before**
 ```python
@@ -209,7 +264,7 @@ def normalize(doc: dict[str, str]) -> NormalizedDoc:
 
 ---
 
-## 14) Pre-Merge Checklist (Super Triple-Check)
+## 15) Pre-Merge Checklist (Super Triple-Check)
 
 - [ ] Meets requested requirements  
 - [ ] Logic verified against expected behavior  
@@ -225,13 +280,14 @@ def normalize(doc: dict[str, str]) -> NormalizedDoc:
 
 ---
 
-## 15) Quick Do / Don’t Table
+## 16) Quick Do / Don't Table
 
-| ✅ Do | 🚫 Don’t |
+| ✅ Do | 🚫 Don't |
 |------|-----------|
 | Centralize shared logic and state | Re-implement common utilities |
 | Use libraries for standard tasks | Add pointless wrapper functions |
 | Keep all code typed | Hide defaults in function args |
+| Design APIs to accept N items from start | Build single-item APIs that need retrofitting |
 | Refactor and delete legacy | Maintain parallel state copies |
 | Add debugging/logging hooks | Comment the obvious |
 | Preserve `_original` for complex edits | Overwrite critical systems blindly |

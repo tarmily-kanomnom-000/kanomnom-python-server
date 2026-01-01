@@ -4,10 +4,6 @@ import { useEffect } from "react";
 
 export function ServiceWorkerRegistration(): null {
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") {
-      return;
-    }
-
     if (!("serviceWorker" in navigator)) {
       return;
     }
