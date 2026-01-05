@@ -1,6 +1,7 @@
 import type {
   ConnectivityListener,
   PersistenceListener,
+  SyncInfo,
   SyncListener,
 } from "./types";
 
@@ -12,6 +13,8 @@ const connectivityListeners = new Set<ConnectivityListener>();
 let lastSyncAt: number | null = null;
 let hadSyncDrop = false;
 let currentOnline: boolean | null = null;
+let queueSize = 0;
+let lastSyncError: string | null = null;
 
 export function subscribePersistenceFailure(
   listener: PersistenceListener,
@@ -64,17 +67,28 @@ export function notifyConnectivityStatus(online: boolean): void {
 
 export function subscribeSyncInfo(listener: SyncListener): () => void {
   syncListeners.add(listener);
+  listener(getSyncInfo());
   return () => syncListeners.delete(listener);
 }
 
 export function notifySyncInfo(
-  queueSize: number,
+  queueSizeValue: number,
   lastError: string | null = null,
 ): void {
-  const info = { lastSyncAt, queueSize, hadSyncDrop, lastError };
+  queueSize = Number.isFinite(queueSizeValue) ? queueSizeValue : 0;
+  lastSyncError = lastError;
+  const info = getSyncInfo();
   for (const listener of syncListeners) {
     listener(info);
   }
+}
+
+export function hydrateSyncSnapshot(
+  queueSizeValue: number,
+  error: string | null = null,
+): void {
+  queueSize = Number.isFinite(queueSizeValue) ? queueSizeValue : 0;
+  lastSyncError = error;
 }
 
 export function recordSyncDrop(): void {
@@ -90,4 +104,25 @@ export function getSyncState(): {
   hadSyncDrop: boolean;
 } {
   return { lastSyncAt, hadSyncDrop };
+}
+
+export function getSyncInfo(): SyncInfo {
+  return {
+    lastSyncAt,
+    queueSize,
+    hadSyncDrop,
+    lastError: lastSyncError,
+  };
+}
+
+export function getConnectivitySnapshot(): {
+  online: boolean;
+  persistenceDegraded: boolean;
+  sync: SyncInfo;
+} {
+  return {
+    online: getOnlineStatus(),
+    persistenceDegraded: hasPersistenceFailure(),
+    sync: getSyncInfo(),
+  };
 }

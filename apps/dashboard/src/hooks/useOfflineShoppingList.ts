@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import {
   dispatchShoppingListUpdates,
   persistShoppingListCache,
@@ -12,48 +12,30 @@ import {
   addToSyncQueue,
   clearCachedShoppingList,
   fetchShoppingListWithCache,
-  getOnlineStatus,
-  hasPersistenceFailure,
   isOffline,
-  readSyncQueue,
   setupOnlineEventListeners,
-  subscribeOnlineStatus,
-  subscribePersistenceFailure,
   syncPendingActions,
 } from "@/lib/offline/shopping-list-cache";
+import { useSyncStatus } from "./useSyncStatus";
 
 export function useOfflineShoppingList(instanceIndex: string) {
-  const [isOnline, setIsOnline] = useState(true);
-  const [isPersistenceDegraded, setIsPersistenceDegraded] = useState(false);
+  const syncStatus = useSyncStatus();
 
   useEffect(() => {
-    setIsOnline(getOnlineStatus());
-    setIsPersistenceDegraded(hasPersistenceFailure());
-
-    const unsubscribeOnline = subscribeOnlineStatus((online) => {
-      setIsOnline(online);
-      if (online) {
-        void syncPendingActions();
-      }
-    });
-
-    const unsubscribePersistence = subscribePersistenceFailure(() => {
-      setIsPersistenceDegraded(true);
-    });
-
     // Setup the sync listeners once
     setupOnlineEventListeners();
-
-    return () => {
-      unsubscribeOnline();
-      unsubscribePersistence();
-    };
   }, []);
+
+  useEffect(() => {
+    if (syncStatus.isOnline) {
+      void syncPendingActions();
+    }
+  }, [syncStatus.isOnline]);
 
   const loadActiveListWithCache =
     useCallback(async (): Promise<ShoppingList | null> => {
       // If we have queued actions and we're online, flush them before fetching
-      if (!isOffline() && readSyncQueue().length > 0) {
+      if (!isOffline() && syncStatus.queueSize > 0) {
         await syncPendingActions();
       }
       return fetchShoppingListWithCache(instanceIndex, async () => {
@@ -67,7 +49,7 @@ export function useOfflineShoppingList(instanceIndex: string) {
 
         return await response.json();
       });
-    }, [instanceIndex]);
+    }, [instanceIndex, syncStatus.queueSize]);
 
   const generateListWithCache = useCallback(
     async (merge: boolean = false): Promise<ShoppingList> => {
@@ -288,8 +270,8 @@ export function useOfflineShoppingList(instanceIndex: string) {
   );
 
   return {
-    isOnline,
-    isPersistenceDegraded,
+    isOnline: syncStatus.isOnline,
+    isPersistenceDegraded: syncStatus.persistenceDegraded,
     loadActiveListWithCache,
     generateListWithCache,
     completeListWithCache,

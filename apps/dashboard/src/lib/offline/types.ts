@@ -62,7 +62,7 @@ export type SyncInfo = {
   lastSyncAt: number | null;
   queueSize: number;
   hadSyncDrop: boolean;
-  lastError?: string | null;
+  lastError: string | null;
 };
 export type SyncListener = (info: SyncInfo) => void;
 

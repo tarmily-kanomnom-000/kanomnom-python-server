@@ -1,5 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GrocyProductInventoryEntry } from "@/lib/grocy/types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  buildStorageKey,
+  clearStoredPayload,
+  readStoredPayload,
+  writeStoredPayload,
+} from "@/lib/offline/local-storage";
 
 export type InventoryStagedEntry =
   | {
@@ -145,7 +151,7 @@ export function useInventoryStaging({
   const tareWeight = hasTareWeight ? product.tare_weight : 0;
   const stagingKey =
     instanceIndex !== null
-      ? `inventory-staging:${instanceIndex}:${product.id}`
+      ? buildStorageKey(["inventory-staging", instanceIndex, `${product.id}`])
       : null;
 
   const [state, setState] = useState<StagingState>({
@@ -155,40 +161,38 @@ export function useInventoryStaging({
   });
 
   useEffect(() => {
-    if (!stagingKey || typeof window === "undefined") {
+    if (!stagingKey) {
       return;
     }
-    const raw = window.localStorage.getItem(stagingKey);
-    if (!raw) {
+    const payload = readStoredPayload<{
+      entries?: unknown;
+      updatedAt?: number;
+      interpretation?: StagedInterpretation;
+      direction?: DeltaDirection;
+    }>(stagingKey);
+    if (!payload) {
       return;
     }
     try {
-      const parsed = JSON.parse(raw) as {
-        entries?: unknown;
-        updatedAt?: number;
-        interpretation?: StagedInterpretation;
-        direction?: DeltaDirection;
-      };
       const updatedAt =
-        typeof parsed.updatedAt === "number" &&
-        Number.isFinite(parsed.updatedAt)
-          ? parsed.updatedAt
+        typeof payload.updatedAt === "number" && Number.isFinite(payload.updatedAt)
+          ? payload.updatedAt
           : 0;
       if (!updatedAt || Date.now() - updatedAt > STAGING_TTL_MS) {
-        window.localStorage.removeItem(stagingKey);
+        clearStoredPayload(stagingKey);
         return;
       }
       const interpretation: StagedInterpretation =
-        parsed.interpretation === "delta" ? "delta" : "absolute";
+        payload.interpretation === "delta" ? "delta" : "absolute";
       const direction: DeltaDirection =
-        parsed.direction === "subtract" ? "subtract" : "add";
+        payload.direction === "subtract" ? "subtract" : "add";
       const hydrated = sanitizeStagedEntries(
-        parsed.entries,
+        payload.entries,
         hasTareWeight,
         interpretation === "delta",
       );
       if (!hydrated.length) {
-        window.localStorage.removeItem(stagingKey);
+        clearStoredPayload(stagingKey);
         return;
       }
       setState({
@@ -196,31 +200,35 @@ export function useInventoryStaging({
         stagedInterpretation: interpretation,
         deltaDirection: direction,
       });
-    } catch {
-      window.localStorage.removeItem(stagingKey);
+    } catch (error) {
+      console.warn("Failed to hydrate inventory staging state; clearing", {
+        stagingKey,
+        error,
+      });
+      clearStoredPayload(stagingKey);
     }
   }, [stagingKey, hasTareWeight]);
 
   useEffect(() => {
-    if (!stagingKey || typeof window === "undefined") {
+    if (!stagingKey) {
       return;
     }
     if (state.stagedEntries.length === 0) {
-      window.localStorage.removeItem(stagingKey);
+      clearStoredPayload(stagingKey);
       return;
     }
     try {
-      window.localStorage.setItem(
+      writeStoredPayload(stagingKey, {
+        updatedAt: Date.now(),
+        entries: state.stagedEntries,
+        interpretation: state.stagedInterpretation,
+        direction: state.deltaDirection,
+      });
+    } catch (error) {
+      console.warn("Failed to persist inventory staging state", {
         stagingKey,
-        JSON.stringify({
-          updatedAt: Date.now(),
-          entries: state.stagedEntries,
-          interpretation: state.stagedInterpretation,
-          direction: state.deltaDirection,
-        }),
-      );
-    } catch {
-      // Ignore write errors (e.g., storage quota).
+        error,
+      });
     }
   }, [state, stagingKey]);
 

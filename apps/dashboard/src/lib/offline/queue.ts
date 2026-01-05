@@ -2,6 +2,7 @@ import type { ShoppingList, ShoppingListItem } from "@/lib/grocy/shopping-list-t
 
 import { readCache, syncQueueKey, writeCache } from "./storage";
 import {
+  hydrateSyncSnapshot,
   notifySyncInfo,
   recordSyncDrop,
   setLastSyncAt,
@@ -332,3 +333,7 @@ export function markSyncDrop(queueSize: number): void {
   recordSyncDrop();
   notifySyncInfo(queueSize, "dropped_failed_action");
 }
+
+const initialQueueSize =
+  typeof window !== "undefined" ? readSyncQueue().length : 0;
+hydrateSyncSnapshot(initialQueueSize);

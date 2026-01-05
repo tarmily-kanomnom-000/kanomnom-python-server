@@ -182,6 +182,7 @@ Files should represent one logical area. Split when:
 ## 8) Single Source of Truth for State
 
 Centralize state management — no scattered globals or shadow copies.
+- Route state reads/writes through a controlled API (methods, setters, commands) when there’s logic, invariants, or coordination to enforce. Raw access is fine only for trivial, inert state where an API would add noise without protecting anything.
 
 ```python
 class SessionState:

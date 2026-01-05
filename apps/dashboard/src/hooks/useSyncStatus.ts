@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import {
   getOnlineStatus,
   hasPersistenceFailure,
-  readSyncQueue,
+  getSyncInfo,
   subscribeOnlineStatus,
   subscribePersistenceFailure,
   subscribeSyncInfo,
 } from "@/lib/offline/shopping-list-cache";
+
+const initialSyncSnapshot = getSyncInfo();
 
 type SyncStatus = {
   isOnline: boolean;
@@ -14,17 +16,17 @@ type SyncStatus = {
   lastSyncAt: number | null;
   persistenceDegraded: boolean;
   hadSyncDrop: boolean;
-  lastError?: string | null;
+  lastError: string | null;
 };
 
 export function useSyncStatus(): SyncStatus {
   const [status, setStatus] = useState<SyncStatus>({
     isOnline: getOnlineStatus(),
-    queueSize: readSyncQueue().length,
-    lastSyncAt: null,
+    queueSize: initialSyncSnapshot.queueSize,
+    lastSyncAt: initialSyncSnapshot.lastSyncAt,
     persistenceDegraded: hasPersistenceFailure(),
-    hadSyncDrop: false,
-    lastError: null,
+    hadSyncDrop: initialSyncSnapshot.hadSyncDrop,
+    lastError: initialSyncSnapshot.lastError,
   });
 
   useEffect(() => {
@@ -41,17 +43,20 @@ export function useSyncStatus(): SyncStatus {
         queueSize: info.queueSize,
         lastSyncAt: info.lastSyncAt,
         hadSyncDrop: info.hadSyncDrop,
-        lastError: info.lastError ?? prev.lastError,
+        lastError: info.lastError,
       }));
     });
 
     // Initial snapshot
+    const syncSnapshot = getSyncInfo();
     setStatus((prev) => ({
       ...prev,
       isOnline: getOnlineStatus(),
-      queueSize: readSyncQueue().length,
+      queueSize: syncSnapshot.queueSize,
+      lastSyncAt: syncSnapshot.lastSyncAt,
+      hadSyncDrop: syncSnapshot.hadSyncDrop,
       persistenceDegraded: hasPersistenceFailure(),
-      lastError: null,
+      lastError: syncSnapshot.lastError,
     }));
 
     return () => {

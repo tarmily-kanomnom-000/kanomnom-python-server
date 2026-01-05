@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { useOfflineShoppingList } from "@/hooks/useOfflineShoppingList";
+import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { readCachedShoppingList } from "@/lib/offline/shopping-list-cache";
 
 interface ShoppingListButtonProps {
@@ -15,8 +16,8 @@ export function ShoppingListButton({ instanceIndex }: ShoppingListButtonProps) {
   const [hasActiveList, setHasActiveList] = useState<boolean | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasPrefetched, setHasPrefetched] = useState(false);
-  const { isOnline, loadActiveListWithCache } =
-    useOfflineShoppingList(instanceIndex);
+  const { loadActiveListWithCache } = useOfflineShoppingList(instanceIndex);
+  const { isOnline } = useSyncStatus();
   const prefetchShoppingList = useCallback(() => {
     void router.prefetch(`/inventory/${instanceIndex}/shopping-list`);
   }, [instanceIndex, router]);

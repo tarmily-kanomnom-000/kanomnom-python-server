@@ -73,7 +73,6 @@ export function useShoppingListController(
   );
 
   const {
-    isOnline: offlineOnline,
     loadActiveListWithCache,
     generateListWithCache,
     completeListWithCache,
