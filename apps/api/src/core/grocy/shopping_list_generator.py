@@ -6,7 +6,7 @@ from datetime import datetime
 
 from core.cache.grocy_shopping_locations_cache import GrocyShoppingLocationsCacheManager
 from core.grocy.price_analyzer import PriceAnalyzer
-from core.grocy.stock import ProductInventoryService
+from core.grocy.inventory import ProductInventoryService
 
 logger = logging.getLogger(__name__)
 

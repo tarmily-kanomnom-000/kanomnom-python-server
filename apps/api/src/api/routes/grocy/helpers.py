@@ -13,7 +13,7 @@ from core.grocy.note_metadata import (
     ProductUnitConversion,
     decode_structured_note,
 )
-from core.grocy.stock import ProductInventoryView
+from core.grocy.inventory import ProductInventoryView
 from models.grocy import GrocyProductInventoryEntry, GrocyStockEntryPayload
 
 from .dependencies import governor

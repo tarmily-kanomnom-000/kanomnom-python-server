@@ -16,7 +16,13 @@ const subscribeToSearchChanges = (onChange: () => void): (() => void) => {
   if (typeof window === "undefined") {
     return () => {};
   }
-  const handler = () => onChange();
+  const handler = () => {
+    if (typeof queueMicrotask === "function") {
+      queueMicrotask(onChange);
+    } else {
+      setTimeout(onChange, 0);
+    }
+  };
   window.addEventListener("popstate", handler);
   window.addEventListener(SEARCH_PARAM_CHANGE_EVENT, handler);
   return () => {

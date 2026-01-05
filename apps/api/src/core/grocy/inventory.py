@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from datetime import date, datetime
 from typing import Any
 
 from core.cache.grocy_product_cache import GrocyProductCacheManager
@@ -11,17 +10,31 @@ from core.cache.grocy_quantity_units_cache import GrocyQuantityUnitsCacheManager
 from core.cache.grocy_stock_cache import GrocyStockCacheManager
 from core.cache.grocy_stock_log_cache import GrocyStockLogCacheManager
 from core.grocy.client import GrocyClient
-from core.grocy.note_metadata import (
-    InventoryCorrectionNoteMetadata,
-    PurchaseEntryNoteMetadata,
-    encode_structured_note,
-)
+from core.grocy.note_metadata import InventoryCorrectionNoteMetadata
 from core.grocy.responses import (
     GrocyProduct,
     GrocyProductGroup,
     GrocyQuantityUnit,
     GrocyStockEntry,
     GrocyStockLogEntry,
+)
+
+from .purchases import (
+    PurchaseEntry,
+    PurchaseEntryDefaults,
+    PurchaseEntryDraft,
+    build_purchase_defaults,
+    resolve_purchase_entry,
+)
+from .stock_helpers import (
+    build_unit_name_lookup,
+    default_best_before_date,
+    group_stock_entries,
+    latest_entry_timestamp,
+    map_discrete_units,
+    map_last_update,
+    map_unit_names,
+    resolve_unit_name,
 )
 
 
@@ -69,6 +82,8 @@ class InventoryCorrection:
     metadata: InventoryCorrectionNoteMetadata | None = None
 
     def to_payload(self) -> dict[str, Any]:
+        from core.grocy.note_metadata import encode_structured_note
+
         note_payload = encode_structured_note(self.note, self.metadata)
         payload: dict[str, Any] = {
             "new_amount": self.new_amount,
@@ -93,65 +108,6 @@ class InventoryAdjustment:
     location_id: int | None
     note: str | None
     metadata: InventoryCorrectionNoteMetadata | None = None
-
-
-@dataclass(frozen=True)
-class PurchaseEntryDraft:
-    """Raw purchase entry payload provided by callers."""
-
-    amount: float
-    price_per_unit: float
-    best_before_date: date | None
-    purchased_date: date | None
-    location_id: int | None
-    shopping_location_id: int | None
-    note: str | None
-    metadata: PurchaseEntryNoteMetadata | None = None
-
-
-@dataclass(frozen=True)
-class PurchaseEntry:
-    """Purchase entry resolved with defaults before persisting."""
-
-    amount: float
-    price_per_unit: float
-    best_before_date: date | None
-    purchased_date: date
-    location_id: int | None
-    shopping_location_id: int | None
-    note: str | None
-
-    def to_payload(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "amount": self.amount,
-            "transaction_type": "purchase",
-            "price": self.price_per_unit,
-            "purchased_date": self.purchased_date.isoformat(),
-        }
-        if self.best_before_date is not None:
-            payload["best_before_date"] = self.best_before_date.isoformat()
-        if self.location_id is not None:
-            payload["location_id"] = self.location_id
-        if self.shopping_location_id is not None:
-            payload["shopping_location_id"] = self.shopping_location_id
-        if self.note:
-            payload["note"] = self.note
-        return payload
-
-
-@dataclass(frozen=True)
-class PurchaseEntryDefaults:
-    """Default metadata suggestions for a purchase entry."""
-
-    shipping_cost: float
-    tax_rate: float
-    on_sale: bool
-    brand: str | None = None
-    package_size: float | None = None
-    package_price: float | None = None
-    package_quantity: float | None = None
-    currency: str | None = None
-    conversion_rate: float | None = None
 
 
 class ProductInventoryService:
@@ -179,9 +135,9 @@ class ProductInventoryService:
         """Return Grocy products with stock quantities and recency information."""
         products = self._load_products(instance_index)
         stock_log = self._load_stock_log(instance_index)
-        last_update_by_id = _map_last_update(stock_log)
+        last_update_by_id = map_last_update(stock_log)
         stock_entries = self._load_stock_entries(instance_index)
-        stock_entries_by_product = _group_stock_entries(stock_entries)
+        stock_entries_by_product = group_stock_entries(stock_entries)
         fallback = self._settings.cold_start_timestamp
         context = self._build_inventory_context(instance_index)
         enriched = []
@@ -211,7 +167,7 @@ class ProductInventoryService:
         product = self._get_product(instance_index, product_id)
         entries = self.client.list_product_stock_entries(product_id)
         stock_log = self._load_stock_log(instance_index)
-        last_update_by_id = _map_last_update(stock_log)
+        last_update_by_id = map_last_update(stock_log)
         context = self._build_inventory_context(instance_index)
         return self._create_inventory_view(
             product,
@@ -234,7 +190,7 @@ class ProductInventoryService:
         product = self._get_product(instance_index, product_id)
         best_before_date = correction.best_before_date
         if best_before_date is None:
-            best_before_date = _default_best_before_date(product)
+            best_before_date = default_best_before_date(product)
         location_id = correction.location_id if correction.location_id is not None else product.location_id
         return InventoryCorrection(
             new_amount=correction.new_amount,
@@ -252,31 +208,8 @@ class ProductInventoryService:
     ) -> PurchaseEntry:
         """Fill missing purchase entry fields using product defaults."""
         product = self._get_product(instance_index, product_id)
-        tare_weight = product.tare_weight if product.enable_tare_weight_handling and product.tare_weight > 0 else 0
-        if tare_weight > 0:
-            current_stock = self._current_stock_amount(product_id)
-            amount = entry.amount + current_stock + tare_weight
-        else:
-            amount = entry.amount
-        best_before_date = entry.best_before_date
-        if best_before_date is None:
-            best_before_date = _default_best_before_date(product)
-        purchased_date = entry.purchased_date or date.today()
-        location_id = entry.location_id if entry.location_id is not None else product.location_id
-        shopping_location_id = (
-            entry.shopping_location_id if entry.shopping_location_id is not None else product.shopping_location_id
-        )
-        rounded_price = _round_price(entry.price_per_unit)
-        note_payload = encode_structured_note(entry.note, entry.metadata)
-        return PurchaseEntry(
-            amount=amount,
-            price_per_unit=rounded_price,
-            best_before_date=best_before_date,
-            purchased_date=purchased_date,
-            location_id=location_id,
-            shopping_location_id=shopping_location_id,
-            note=note_payload,
-        )
+        current_stock = self._current_stock_amount(product_id)
+        return resolve_purchase_entry(product, entry, current_stock)
 
     def resolve_inventory_adjustment(
         self,
@@ -288,7 +221,7 @@ class ProductInventoryService:
         product = self._get_product(instance_index, product_id)
         best_before_date = adjustment.best_before_date
         if best_before_date is None:
-            best_before_date = _default_best_before_date(product)
+            best_before_date = default_best_before_date(product)
         location_id = adjustment.location_id if adjustment.location_id is not None else product.location_id
         current_stock = self._current_stock_amount(product_id)
         if product.enable_tare_weight_handling and product.tare_weight > 0:
@@ -316,19 +249,8 @@ class ProductInventoryService:
         _shopping_location_id: int | None,
     ) -> PurchaseEntryDefaults:
         """Return default metadata used to pre-populate purchase entries."""
-        # Touch the product so invalid identifiers fail fast and future heuristics have context.
         self._get_product(instance_index, product_id)
-        return PurchaseEntryDefaults(
-            shipping_cost=0.0,
-            tax_rate=0.0,
-            on_sale=False,
-            brand=None,
-            package_size=None,
-            package_price=None,
-            package_quantity=None,
-            currency="USD",
-            conversion_rate=1.0,
-        )
+        return build_purchase_defaults(self._get_product(instance_index, product_id))
 
     def invalidate_inventory_caches(self, instance_index: str) -> None:
         """Invalidate cached stock artifacts so corrections are reflected on next read."""
@@ -400,12 +322,12 @@ class ProductInventoryService:
         """Load shared product-group and quantity-unit data for inventory views."""
         groups = self._load_product_groups(instance_index)
         units = self._load_quantity_units(instance_index)
-        unit_names_map = _map_unit_names(units)
+        unit_names_map = map_unit_names(units)
         return InventoryContext(
             groups_by_id={group.id: group.name for group in groups},
             unit_names=unit_names_map,
-            discrete_units=_map_discrete_units(units),
-            unit_name_lookup=_build_unit_name_lookup(unit_names_map),
+            discrete_units=map_discrete_units(units),
+            unit_name_lookup=build_unit_name_lookup(unit_names_map),
         )
 
     def _load_product_groups(self, instance_index: str) -> list[GrocyProductGroup]:
@@ -443,90 +365,16 @@ class ProductInventoryService:
         fallback_timestamp: datetime,
         last_updated_override: datetime | None = None,
     ) -> ProductInventoryView:
-        last_updated = last_updated_override or _latest_entry_timestamp(entries, fallback_timestamp)
+        last_updated = last_updated_override or latest_entry_timestamp(entries, fallback_timestamp)
         return ProductInventoryView(
             product=product,
             last_updated_at=last_updated,
             product_group_name=groups_by_id.get(product.product_group_id),
-            purchase_unit_name=_resolve_unit_name(product.qu_id_purchase, unit_names),
-            stock_unit_name=_resolve_unit_name(product.qu_id_stock, unit_names),
-            consume_unit_name=_resolve_unit_name(product.qu_id_consume, unit_names),
-            price_unit_name=_resolve_unit_name(product.qu_id_price, unit_names),
+            purchase_unit_name=resolve_unit_name(product.qu_id_purchase, unit_names),
+            stock_unit_name=resolve_unit_name(product.qu_id_stock, unit_names),
+            consume_unit_name=resolve_unit_name(product.qu_id_consume, unit_names),
+            price_unit_name=resolve_unit_name(product.qu_id_price, unit_names),
             unit_name_lookup=unit_name_lookup,
             discrete_units=discrete_units,
             stocks=entries,
         )
-
-
-def _map_last_update(stock_log_entries: list[GrocyStockLogEntry]) -> dict[int, datetime]:
-    """Determine the most recent stock log timestamp per product id."""
-    last_update: dict[int, datetime] = {}
-    for entry in stock_log_entries:
-        product_id = entry.product_id
-        timestamp = entry.row_created_timestamp
-        current = last_update.get(product_id)
-        if current is None or timestamp > current:
-            last_update[product_id] = timestamp
-    return last_update
-
-
-def _latest_entry_timestamp(entries: list[GrocyStockEntry], fallback: datetime) -> datetime:
-    latest = fallback
-    for entry in entries:
-        if entry.row_created_timestamp > latest:
-            latest = entry.row_created_timestamp
-    return latest
-
-
-def _group_stock_entries(entries: list[GrocyStockEntry]) -> dict[int, list[GrocyStockEntry]]:
-    grouped: dict[int, list[GrocyStockEntry]] = {}
-    for entry in entries:
-        grouped.setdefault(entry.product_id, []).append(entry)
-    return grouped
-
-
-def _map_unit_names(units: list[GrocyQuantityUnit]) -> dict[int, str]:
-    return {unit.id: unit.name for unit in units}
-
-
-def _map_discrete_units(units: list[GrocyQuantityUnit]) -> dict[str, bool]:
-    mapping: dict[str, bool] = {}
-    for unit in units:
-        if unit.is_discrete is None:
-            continue
-        normalized = unit.name.strip().lower()
-        if not normalized:
-            continue
-        mapping[normalized] = unit.is_discrete
-    return mapping
-
-
-def _build_unit_name_lookup(unit_names: dict[int, str]) -> dict[str, str]:
-    """Create a lookup table of normalized unit names to their canonical display form."""
-    lookup: dict[str, str] = {}
-    for name in unit_names.values():
-        if not name:
-            continue
-        normalized = name.strip().lower()
-        if not normalized:
-            continue
-        lookup.setdefault(normalized, name)
-    return lookup
-
-
-def _resolve_unit_name(unit_id: int | None, names_by_id: dict[int, str]) -> str | None:
-    if unit_id is None:
-        return None
-    return names_by_id.get(unit_id)
-
-
-def _default_best_before_date(product: GrocyProduct) -> date | None:
-    days = product.default_best_before_days
-    if days <= 0:
-        return None
-    return date.today() + timedelta(days=days)
-
-
-def _round_price(value: float) -> float:
-    quantized = Decimal(value).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
-    return float(quantized)

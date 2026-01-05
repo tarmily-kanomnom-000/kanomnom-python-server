@@ -24,6 +24,26 @@ Concise reference for the Grocy API routes and key helpers. Use this to understa
 - `POST /grocy/{instance_index}/products/{product_id}/purchase/derive` — Returns derived amount/unit price/total_usd; 400 unless package_size, package_quantity, package_price, and conversion_rate are provided and positive.
 - Helpers: `_ensure_shopping_location_id` resolves/creates shopping locations (400 on validation, 500 on create failure); `_resolve_shopping_location_name` best-effort lookup for Grist payloads; `_derive_purchase_amount_and_price` enforces positive amounts/totals and includes shipping/tax in unit price.
 
+### Tare handling (inventory and purchases)
+- Definitions:
+  - **Gross** = tare_weight + net. Grocy requires gross when you write stock rows.
+  - **Net** = what you actually have on hand. Grocy’s read endpoints (stock/product) return net; tare is already removed.
+- What to send:
+  - Purchases (tare-enabled): send `current_net + purchased_net + tare`. Grocy subtracts tare once and the net stock ends up correct, even with multiple package drafts.
+  - Inventory absolute corrections (tare-enabled): must send `target_net + tare`. If you send net, Grocy subtracts tare and undercounts by `tare_weight`.
+  - Inventory delta adjustments (tare-enabled): send `current_net + delta + tare` as the gross new total.
+- Why purchase drafts don’t snowball: each draft pulls `current_net` from Grocy, adds the new purchased amount plus tare, and Grocy subtracts tare once. Net stock advances by the purchased amount per draft (no double-adding prior purchases).
+- Pitfalls to avoid:
+  - Never submit a net absolute correction for a tare product; always add tare before calling Grocy.
+  - Do not treat Grocy’s `current_stock` as gross—it is net. Adding tare to a gross baseline will inflate stock.
+  - UI/UX should state whether the user is entering net or gross; the backend must convert to gross before submit.
+
+### Code layout (core)
+- Inventory logic lives in `apps/api/src/core/grocy/inventory.py` (inventory views, corrections/adjustments, cache loading).
+- Purchase resolution/defaults live in `apps/api/src/core/grocy/purchases.py`.
+- Shared stock helpers (unit mapping, last-update mapping, price rounding, default best-before) live in `apps/api/src/core/grocy/stock_helpers.py`.
+- `stock.py` now re-exports the primary dataclasses/services to preserve imports; prefer the concrete modules above for new code.
+
 ## Shopping Lists (`.../shopping_list.py`)
 - See `apps/api/docs/shopping_list.md` for endpoints and `apps/api/docs/shopping_list_core.md` for manager/generator semantics (locking, merge rules, enrichment, deleted_product_ids).
 

@@ -5,10 +5,8 @@ import {
   defaultPurchaseCurrency,
   purchaseCurrencyOptions,
 } from "@/config/purchase";
-import { useDirtyStringField } from "@/hooks/use-dirty-string-field";
 import { useMeasuredElementHeight } from "@/hooks/use-measured-element-height";
 import {
-  fetchPurchaseEntryCalculation,
   fetchPurchaseEntryDefaults,
   submitPurchaseEntry,
 } from "@/lib/grocy/client";
@@ -23,7 +21,14 @@ import {
   roundToSixDecimals,
 } from "./form-utils";
 import { resolveQuantityUnit } from "./helpers";
-import { SearchableOptionSelect } from "./searchable-option-select";
+import { DateField } from "./shared/date-field";
+import { DerivedTotalsPanel } from "./shared/derived-totals-panel";
+import { NoteField } from "./shared/note-field";
+import { PurchaseLocationSection } from "./shared/purchase-location-section";
+import { PurchasePackageFields } from "./shared/purchase-package-fields";
+import { StatusMessage } from "./shared/status-message";
+import { usePurchaseDerivation } from "./shared/use-purchase-derivation";
+import { usePurchaseMetadata } from "./shared/use-purchase-metadata";
 
 type PurchaseEntryFormProps = {
   product: GrocyProductInventoryEntry;
@@ -63,35 +68,45 @@ export function PurchaseEntryForm({
   const purchaseUnit = resolveQuantityUnit(product);
   const packageSizeInputRef = useRef<HTMLInputElement | null>(null);
   const {
-    value: packageSize,
-    set: setPackageSize,
-    hydrate: hydratePackageSize,
-    reset: resetPackageSize,
-  } = useDirtyStringField("");
-  const {
-    value: packageQuantity,
-    set: setPackageQuantity,
-    hydrate: hydratePackageQuantity,
-    reset: resetPackageQuantity,
-  } = useDirtyStringField("");
-  const {
-    value: packagePrice,
-    set: setPackagePrice,
-    hydrate: hydratePackagePrice,
-    reset: resetPackagePrice,
-  } = useDirtyStringField("");
-  const {
-    value: currencyValue,
-    set: setCurrencyValue,
-    hydrate: hydrateCurrencyValue,
-    reset: resetCurrencyValue,
-  } = useDirtyStringField(defaultPurchaseCurrency);
-  const {
-    value: conversionRate,
-    set: setConversionRate,
-    hydrate: hydrateConversionRate,
-    reset: resetConversionRate,
-  } = useDirtyStringField("1");
+    packageSize,
+    setPackageSize,
+    packageQuantity,
+    setPackageQuantity,
+    packagePrice,
+    setPackagePrice,
+    currencyValue,
+    setCurrencyValue,
+    conversionRate,
+    setConversionRate,
+    shippingCost,
+    setShippingCost,
+    taxRate,
+    setTaxRate,
+    brand,
+    setBrand,
+    onSale,
+    setOnSale,
+    resetAll: resetPurchaseMetadata,
+    applyDefaults: applyMetadataDefaults,
+    packageSizeHasValue,
+    packageQuantityHasValue,
+    packagePriceHasValue,
+    conversionRateHasValue,
+    shippingCostHasValue,
+    taxRateHasValue,
+    isPackageSizeValid,
+    isPackageQuantityValid,
+    isPackagePriceValid,
+    isConversionRateValid,
+    isShippingCostValid,
+    isTaxRateValid,
+    normalizedPurchaseMetadata,
+    metadataHasValues,
+    canDeriveTotals,
+  } = usePurchaseMetadata({
+    defaultCurrency: defaultPurchaseCurrency,
+    normalizeCurrency,
+  });
   const defaultBestBefore = useMemo(
     () => computeDefaultBestBeforeDate(product.default_best_before_days),
     [product.default_best_before_days],
@@ -131,47 +146,6 @@ export function PurchaseEntryForm({
   const [locationError, setLocationError] = useState(false);
   const [shoppingLocationError, setShoppingLocationError] = useState(false);
   const [note, setNote] = useState("");
-  const {
-    value: shippingCost,
-    set: setShippingCost,
-    hydrate: hydrateShippingCost,
-    reset: resetShippingCost,
-  } = useDirtyStringField("");
-  const {
-    value: taxRate,
-    set: setTaxRate,
-    hydrate: hydrateTaxRate,
-    reset: resetTaxRate,
-  } = useDirtyStringField("");
-  const {
-    value: brand,
-    set: setBrand,
-    hydrate: hydrateBrand,
-    reset: resetBrand,
-  } = useDirtyStringField("");
-  const [onSale, setOnSaleState] = useState(false);
-  const onSaleDirtyRef = useRef(false);
-  const setOnSale = useCallback((nextValue: boolean) => {
-    onSaleDirtyRef.current = true;
-    setOnSaleState(nextValue);
-  }, []);
-  const hydrateOnSale = useCallback((nextValue: boolean) => {
-    if (onSaleDirtyRef.current) {
-      return;
-    }
-    setOnSaleState(nextValue);
-  }, []);
-  const resetOnSale = useCallback((nextValue: boolean) => {
-    onSaleDirtyRef.current = false;
-    setOnSaleState(nextValue);
-  }, []);
-  const [derivedTotals, setDerivedTotals] = useState<{
-    amount: number | null;
-    unitPrice: number | null;
-    totalUsd: number | null;
-  }>({ amount: null, unitPrice: null, totalUsd: null });
-  const [deriveError, setDeriveError] = useState<string | null>(null);
-  const deriveRequestId = useRef(0);
   const [leftColumnRef, leftColumnHeight] =
     useMeasuredElementHeight<HTMLDivElement>();
   const [statusMessage, setStatusMessage] = useState<{
@@ -199,30 +173,14 @@ export function PurchaseEntryForm({
   useEffect(() => {
     void formResetTrigger;
     setShowValidationErrors(false);
-    resetPackageSize("");
-    resetPackageQuantity("");
-    resetPackagePrice("");
-    resetCurrencyValue(defaultPurchaseCurrency);
-    resetConversionRate("1");
-    resetShippingCost("");
-    resetTaxRate("");
-    resetBrand("");
-    resetOnSale(false);
+    resetPurchaseMetadata();
     setLocationId(defaultLocationId);
     setShoppingLocationId(defaultShoppingLocationId);
     setShoppingLocationName(defaultShoppingLocationName);
     packageSizeInputRef.current?.focus();
   }, [
     formResetTrigger,
-    resetBrand,
-    resetConversionRate,
-    resetCurrencyValue,
-    resetPackagePrice,
-    resetPackageQuantity,
-    resetPackageSize,
-    resetShippingCost,
-    resetTaxRate,
-    resetOnSale,
+    resetPurchaseMetadata,
     defaultLocationId,
     defaultShoppingLocationId,
     defaultShoppingLocationName,
@@ -232,65 +190,6 @@ export function PurchaseEntryForm({
     void formResetTrigger;
     setPurchasedDate(resolvedDefaultPurchasedDate);
   }, [formResetTrigger, resolvedDefaultPurchasedDate]);
-
-  const applyMetadataDefaults = useCallback(
-    (metadata: PurchaseEntryDefaults["metadata"] | null): void => {
-      const sizeValue =
-        metadata && metadata.packageSize !== null
-          ? metadata.packageSize.toString()
-          : "";
-      hydratePackageSize(sizeValue);
-
-      const quantityValue =
-        metadata && metadata.quantity !== null
-          ? metadata.quantity.toString()
-          : "";
-      hydratePackageQuantity(quantityValue);
-
-      const priceValue =
-        metadata && metadata.packagePrice !== null
-          ? metadata.packagePrice.toString()
-          : "";
-      hydratePackagePrice(priceValue);
-
-      const currency = normalizeCurrency(metadata?.currency ?? null);
-      hydrateCurrencyValue(currency);
-
-      const rateValue =
-        metadata && metadata.conversionRate !== null
-          ? metadata.conversionRate.toString()
-          : "1";
-      hydrateConversionRate(rateValue);
-
-      const shippingValue =
-        metadata && metadata.shippingCost !== null
-          ? metadata.shippingCost.toString()
-          : "";
-      hydrateShippingCost(shippingValue);
-
-      const taxValue =
-        metadata && metadata.taxRate !== null
-          ? metadata.taxRate.toString()
-          : "";
-      hydrateTaxRate(taxValue);
-
-      const trimmedBrand = metadata?.brand?.trim() ?? "";
-      hydrateBrand(trimmedBrand);
-      hydrateOnSale(metadata?.onSale ?? false);
-    },
-    [
-      hydrateBrand,
-      hydrateConversionRate,
-      hydrateCurrencyValue,
-      hydratePackagePrice,
-      hydratePackageQuantity,
-      hydratePackageSize,
-      hydrateShippingCost,
-      hydrateTaxRate,
-      normalizeCurrency,
-      hydrateOnSale,
-    ],
-  );
 
   useEffect(() => {
     const targetShoppingLocationId = shoppingLocationId ?? null;
@@ -346,96 +245,6 @@ export function PurchaseEntryForm({
     applyMetadataDefaults,
   ]);
 
-  const packageSizeHasValue = packageSize.trim().length > 0;
-  const packageSizeNumber = Number(packageSize);
-  const isPackageSizeValid =
-    packageSizeHasValue &&
-    Number.isFinite(packageSizeNumber) &&
-    packageSizeNumber > 0;
-  const packageQuantityHasValue = packageQuantity.trim().length > 0;
-  const packageQuantityNumber = Number(packageQuantity);
-  const isPackageQuantityValid =
-    packageQuantityHasValue &&
-    Number.isFinite(packageQuantityNumber) &&
-    packageQuantityNumber > 0;
-  const packagePriceHasValue = packagePrice.trim().length > 0;
-  const packagePriceNumber = Number(packagePrice);
-  const isPackagePriceValid =
-    packagePriceHasValue &&
-    Number.isFinite(packagePriceNumber) &&
-    packagePriceNumber > 0;
-  const conversionRateHasValue = conversionRate.trim().length > 0;
-  const conversionRateNumber = Number(conversionRate);
-  const isConversionRateValid =
-    conversionRateHasValue &&
-    Number.isFinite(conversionRateNumber) &&
-    conversionRateNumber > 0;
-
-  const shippingCostHasValue = shippingCost.trim().length > 0;
-  const shippingCostNumber = Number(shippingCost);
-  const isShippingCostValid =
-    !shippingCostHasValue ||
-    (Number.isFinite(shippingCostNumber) && shippingCostNumber >= 0);
-  const taxRateHasValue = taxRate.trim().length > 0;
-  const taxRateNumber = Number(taxRate);
-  const isTaxRateValid =
-    !taxRateHasValue || (Number.isFinite(taxRateNumber) && taxRateNumber >= 0);
-
-  type PurchaseMetadataPayload = {
-    shippingCost: number | null;
-    taxRate: number | null;
-    brand: string | null;
-    packageSize: number | null;
-    packagePrice: number | null;
-    quantity: number | null;
-    currency: string | null;
-    conversionRate: number | null;
-    onSale: boolean;
-  };
-
-  const normalizedPurchaseMetadata = useMemo<PurchaseMetadataPayload>(() => {
-    const trimmedBrand = brand.trim();
-    return {
-      shippingCost:
-        isShippingCostValid && shippingCostHasValue ? shippingCostNumber : null,
-      taxRate: isTaxRateValid && taxRateHasValue ? taxRateNumber : null,
-      brand: trimmedBrand.length ? trimmedBrand : null,
-      packageSize: isPackageSizeValid ? packageSizeNumber : null,
-      packagePrice: isPackagePriceValid ? packagePriceNumber : null,
-      quantity: isPackageQuantityValid ? packageQuantityNumber : null,
-      currency: normalizeCurrency(currencyValue),
-      conversionRate: isConversionRateValid ? conversionRateNumber : null,
-      onSale,
-    };
-  }, [
-    brand,
-    currencyValue,
-    onSale,
-    isConversionRateValid,
-    conversionRateNumber,
-    isPackagePriceValid,
-    packagePriceNumber,
-    isPackageQuantityValid,
-    packageQuantityNumber,
-    isPackageSizeValid,
-    packageSizeNumber,
-    isShippingCostValid,
-    shippingCostHasValue,
-    shippingCostNumber,
-    isTaxRateValid,
-    taxRateHasValue,
-    taxRateNumber,
-    normalizeCurrency,
-  ]);
-
-  const metadataHasValues = useMemo(
-    () =>
-      Object.values(normalizedPurchaseMetadata).some(
-        (value) => value !== null && value !== "",
-      ),
-    [normalizedPurchaseMetadata],
-  );
-
   const metadataForSubmit: PurchaseEntryRequestPayload["metadata"] =
     metadataHasValues ? normalizedPurchaseMetadata : null;
   const normalizedShoppingLocationName = useMemo(
@@ -445,51 +254,12 @@ export function PurchaseEntryForm({
   const hasShoppingLocationSelection =
     shoppingLocationId !== null || normalizedShoppingLocationName.length > 0;
 
-  const canDeriveTotals =
-    Boolean(instanceIndex) &&
-    normalizedPurchaseMetadata.packageSize !== null &&
-    normalizedPurchaseMetadata.quantity !== null &&
-    normalizedPurchaseMetadata.packagePrice !== null &&
-    normalizedPurchaseMetadata.conversionRate !== null;
-
-  useEffect(() => {
-    if (!canDeriveTotals || !instanceIndex) {
-      setDerivedTotals({ amount: null, unitPrice: null, totalUsd: null });
-      setDeriveError(null);
-      return;
-    }
-    const requestId = deriveRequestId.current + 1;
-    deriveRequestId.current = requestId;
-    setDeriveError(null);
-    const loadDerivation = async () => {
-      try {
-        const result = await fetchPurchaseEntryCalculation(
-          instanceIndex,
-          product.id,
-          normalizedPurchaseMetadata,
-        );
-        if (deriveRequestId.current !== requestId) {
-          return;
-        }
-        setDerivedTotals({
-          amount: result.amount,
-          unitPrice: result.unitPrice,
-          totalUsd: result.totalUsd,
-        });
-      } catch (error) {
-        if (deriveRequestId.current !== requestId) {
-          return;
-        }
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Unable to compute purchase totals.";
-        setDerivedTotals({ amount: null, unitPrice: null, totalUsd: null });
-        setDeriveError(message);
-      }
-    };
-    void loadDerivation();
-  }, [canDeriveTotals, instanceIndex, normalizedPurchaseMetadata, product.id]);
+  const { derivedTotals, deriveError } = usePurchaseDerivation({
+    instanceIndex,
+    productId: product.id,
+    metadata: normalizedPurchaseMetadata,
+    canDeriveTotals,
+  });
 
   const derivedAmount = derivedTotals.amount;
   const derivedUnitPrice = derivedTotals.unitPrice;
@@ -585,243 +355,83 @@ export function PurchaseEntryForm({
       <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-5" ref={leftColumnRef}>
           <div className="grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  Package size
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.0001"
-                    value={packageSize}
-                    ref={packageSizeInputRef}
-                    onChange={(event) => {
-                      setPackageSize(event.target.value);
-                      if (statusMessage?.type === "error") {
-                        setStatusMessage(null);
-                      }
-                    }}
-                    className={`w-full rounded-2xl border px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none ${
-                      shouldShowPackageSizeError
-                        ? "border-rose-400 focus:border-rose-500"
-                        : "border-neutral-200"
-                    }`}
-                    placeholder="e.g. 2.5"
-                  />
-                  {purchaseUnit ? (
-                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-neutral-500">
-                      {purchaseUnit}
-                    </span>
-                  ) : null}
-                </div>
-                {shouldShowPackageSizeError ? (
-                  <p className="text-xs text-rose-600">
-                    Package size is required and must be greater than 0.
-                  </p>
-                ) : (
-                  <p className="text-xs text-neutral-500">
-                    Number of {purchaseUnit ?? "units"} contained in each
-                    package.
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  Package quantity
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={packageQuantity}
-                  onChange={(event) => {
-                    setPackageQuantity(event.target.value);
-                    if (statusMessage?.type === "error") {
-                      setStatusMessage(null);
-                    }
-                  }}
-                  className={`w-full rounded-2xl border px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none ${
-                    shouldShowPackageQuantityError
-                      ? "border-rose-400 focus:border-rose-500"
-                      : "border-neutral-200"
-                  }`}
-                  placeholder="e.g. 3"
-                />
-                {shouldShowPackageQuantityError ? (
-                  <p className="text-xs text-rose-600">
-                    Quantity is required and must be greater than 0.
-                  </p>
-                ) : (
-                  <p className="text-xs text-neutral-500">
-                    Number of packages purchased during this entry.
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  Package price (local currency)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={packagePrice}
-                  onChange={(event) => {
-                    setPackagePrice(event.target.value);
-                    if (statusMessage?.type === "error") {
-                      setStatusMessage(null);
-                    }
-                  }}
-                  className={`w-full rounded-2xl border px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none ${
-                    shouldShowPackagePriceError
-                      ? "border-rose-400 focus:border-rose-500"
-                      : "border-neutral-200"
-                  }`}
-                  placeholder="e.g. 12.50"
-                />
-                {shouldShowPackagePriceError ? (
-                  <p className="text-xs text-rose-600">
-                    Package price is required and must be greater than 0.
-                  </p>
-                ) : (
-                  <p className="text-xs text-neutral-500">
-                    Cost of a single package before shipping or tax.
-                  </p>
-                )}
-                <label className="mt-2 flex items-center gap-2 text-sm font-semibold text-neutral-900">
-                  <input
-                    type="checkbox"
-                    checked={onSale}
-                    onChange={(event) => setOnSale(event.target.checked)}
-                    className="h-4 w-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900"
-                  />
-                  <span>On sale</span>
-                </label>
-              </div>
-            </div>
+            <PurchasePackageFields
+              purchaseUnit={purchaseUnit}
+              packageSize={packageSize}
+              setPackageSize={setPackageSize}
+              packageQuantity={packageQuantity}
+              setPackageQuantity={setPackageQuantity}
+              packagePrice={packagePrice}
+              setPackagePrice={setPackagePrice}
+              onSale={onSale}
+              setOnSale={setOnSale}
+              shouldShowPackageSizeError={shouldShowPackageSizeError}
+              shouldShowPackageQuantityError={shouldShowPackageQuantityError}
+              shouldShowPackagePriceError={shouldShowPackagePriceError}
+              statusMessageType={statusMessage?.type ?? null}
+              clearStatusMessage={() => setStatusMessage(null)}
+            />
             <div className="space-y-4 md:ml-auto md:w-full">
-              <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  Derived totals
-                </p>
-                <dl className="mt-2 space-y-1 text-sm text-neutral-700">
-                  <div className="flex items-center justify-between">
-                    <dt>Units purchased</dt>
-                    <dd className="font-semibold">
-                      {derivedAmount !== null
-                        ? `${roundToSixDecimals(derivedAmount).toFixed(6)}${purchaseUnit ? ` ${purchaseUnit}` : ""}`
-                        : "—"}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <dt>Total cost (USD)</dt>
-                    <dd className="font-semibold">
-                      {formattedTotalUsd ?? "—"}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <dt>Unit price (USD)</dt>
-                    <dd className="font-semibold">
-                      {formattedUnitPrice ?? "—"}
-                    </dd>
-                  </div>
-                </dl>
-                {deriveError ? (
-                  <p className="mt-2 text-xs text-rose-600">{deriveError}</p>
-                ) : null}
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                    Purchased date
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPurchasedDate(resolvedDefaultPurchasedDate);
-                    }}
-                    className="rounded-full border border-neutral-200 px-3 py-1 text-[11px] font-semibold text-neutral-600 transition hover:border-neutral-900 hover:text-neutral-900"
-                  >
-                    Use selected default
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={purchasedDate}
-                    onChange={(event) => setPurchasedDate(event.target.value)}
-                    className="w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                    Best before date
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setBestBeforeDate(defaultBestBefore)}
-                    className="rounded-full border border-neutral-200 px-3 py-1 text-[11px] font-semibold text-neutral-600 transition hover:border-neutral-900 hover:text-neutral-900"
-                  >
-                    Use default
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={bestBeforeDate}
-                    onChange={(event) => setBestBeforeDate(event.target.value)}
-                    className="w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none"
-                  />
-                </div>
-              </div>
+              <DerivedTotalsPanel
+                derivedAmount={
+                  derivedAmount !== null
+                    ? Number(roundToSixDecimals(derivedAmount).toFixed(6))
+                    : null
+                }
+                derivedUnitPrice={
+                  derivedUnitPrice !== null
+                    ? Number(roundToSixDecimals(derivedUnitPrice).toFixed(6))
+                    : null
+                }
+                derivedTotalUsd={
+                  derivedTotalUsd !== null
+                    ? Number(roundToSixDecimals(derivedTotalUsd).toFixed(2))
+                    : null
+                }
+                unitLabel={purchaseUnit}
+                unitPriceFormatter={(value) =>
+                  roundToSixDecimals(value).toFixed(6)
+                }
+                totalFormatter={(value) => roundToSixDecimals(value).toFixed(2)}
+                error={deriveError}
+              />
+              <DateField
+                label="Purchased date"
+                value={purchasedDate}
+                onChange={setPurchasedDate}
+                onUseDefault={() =>
+                  setPurchasedDate(resolvedDefaultPurchasedDate)
+                }
+              />
+              <DateField
+                label="Best before date"
+                value={bestBeforeDate}
+                onChange={setBestBeforeDate}
+                onUseDefault={() => setBestBeforeDate(defaultBestBefore)}
+              />
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <SearchableOptionSelect
-              label="Shopping location"
-              options={shoppingLocationOptions}
-              selectedId={shoppingLocationId}
-              onSelectedIdChange={setShoppingLocationId}
-              defaultOptionId={defaultShoppingLocationId}
-              defaultOptionLabel={defaultShoppingLocationName}
-              placeholder="Search shopping locations…"
-              resetLabel="Use default"
-              inputValue={shoppingLocationName}
-              onInputValueChange={setShoppingLocationName}
-              allowCustomValue
-              onValidationChange={setShoppingLocationError}
-              errorMessage="Select or enter a shopping location to continue."
-              helperText="Type a new name to create it when you record the purchase."
-            />
-            <SearchableOptionSelect
-              label="Location"
-              options={locationOptions}
-              selectedId={locationId}
-              onSelectedIdChange={setLocationId}
-              defaultOptionId={defaultLocationId}
-              defaultOptionLabel={defaultLocationName}
-              placeholder="Search locations…"
-              resetLabel="Use default"
-              onValidationChange={setLocationError}
-              errorMessage="Select a location from the list to continue."
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-              Note
-            </label>
-            <textarea
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              rows={3}
-              className="w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none"
-              placeholder="Optional context for this purchase"
-            />
-          </div>
+          <PurchaseLocationSection
+            shoppingLocationOptions={shoppingLocationOptions}
+            shoppingLocationId={shoppingLocationId}
+            shoppingLocationName={shoppingLocationName}
+            defaultShoppingLocationId={defaultShoppingLocationId}
+            defaultShoppingLocationName={defaultShoppingLocationName}
+            onShoppingLocationIdChange={setShoppingLocationId}
+            onShoppingLocationNameChange={setShoppingLocationName}
+            setShoppingLocationError={setShoppingLocationError}
+            locationOptions={locationOptions}
+            locationId={locationId}
+            defaultLocationId={defaultLocationId}
+            defaultLocationName={defaultLocationName}
+            onLocationIdChange={setLocationId}
+            setLocationError={setLocationError}
+          />
+          <NoteField
+            value={note}
+            onChange={setNote}
+            placeholder="Optional context for this purchase"
+          />
         </div>
         <div
           className="md:h-full"
@@ -965,17 +575,7 @@ export function PurchaseEntryForm({
           </div>
         </div>
       </div>
-      {statusMessage ? (
-        <p
-          className={`rounded-2xl px-4 py-3 text-sm ${
-            statusMessage.type === "success"
-              ? "bg-emerald-50 text-emerald-800"
-              : "bg-rose-50 text-rose-700"
-          }`}
-        >
-          {statusMessage.text}
-        </p>
-      ) : null}
+      <StatusMessage status={statusMessage} />
     </form>
   );
 }

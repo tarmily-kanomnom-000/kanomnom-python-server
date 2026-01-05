@@ -10,11 +10,17 @@ from core.cache.grocy_shopping_locations_cache import get_grocy_shopping_locatio
 from core.cache.grocy_stock_cache import get_grocy_stock_cache
 from core.cache.grocy_stock_log_cache import get_grocy_stock_log_cache
 from core.grocy.client import GrocyClient
+from core.grocy.inventory import InventoryAdjustment, InventoryCorrection, ProductInventoryService, ProductInventoryView, StockUpdateSettings
 from core.grocy.models import (
     ProductGroupDefinition,
     QuantityUnitDefinition,
     ShoppingLocationDefinition,
     UniversalManifest,
+)
+from core.grocy.purchases import (
+    PurchaseEntry,
+    PurchaseEntryDefaults,
+    PurchaseEntryDraft,
 )
 from core.grocy.responses import GrocyLocation, GrocyShoppingLocation
 from core.grocy.services import (
@@ -24,16 +30,6 @@ from core.grocy.services import (
     QuantityUnitSyncResult,
     ShoppingLocationService,
     ShoppingLocationSyncResult,
-)
-from core.grocy.stock import (
-    InventoryAdjustment,
-    InventoryCorrection,
-    ProductInventoryService,
-    ProductInventoryView,
-    PurchaseEntry,
-    PurchaseEntryDefaults,
-    PurchaseEntryDraft,
-    StockUpdateSettings,
 )
 from core.grocy.sync import EntitySyncer
 
