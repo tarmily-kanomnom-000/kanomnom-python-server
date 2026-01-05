@@ -18,8 +18,8 @@ from core.grocy.note_metadata import (
     decode_structured_note,
     validate_note_text,
 )
-from core.grocy.responses import GrocyStockEntry
 from core.grocy.purchases import PurchaseEntry, PurchaseEntryDraft
+from core.grocy.responses import GrocyStockEntry
 from models.grocy import (
     GrocyProductInventoryEntry,
     GrocyStockEntryPayload,

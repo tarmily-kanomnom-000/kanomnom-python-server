@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   getOnlineStatus,
-  hasPersistenceFailure,
   getSyncInfo,
+  hasPersistenceFailure,
   subscribeOnlineStatus,
   subscribePersistenceFailure,
   subscribeSyncInfo,

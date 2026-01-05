@@ -5,8 +5,8 @@ import uuid
 from datetime import datetime
 
 from core.cache.grocy_shopping_locations_cache import GrocyShoppingLocationsCacheManager
-from core.grocy.price_analyzer import PriceAnalyzer
 from core.grocy.inventory import ProductInventoryService
+from core.grocy.price_analyzer import PriceAnalyzer
 
 logger = logging.getLogger(__name__)
 

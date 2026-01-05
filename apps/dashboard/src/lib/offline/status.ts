@@ -47,6 +47,14 @@ export function getOnlineStatus(): boolean {
   return currentOnline;
 }
 
+export function isOffline(): boolean {
+  return !getOnlineStatus();
+}
+
+export function isOnline(): boolean {
+  return getOnlineStatus();
+}
+
 export function setOnlineStatus(online: boolean): void {
   currentOnline = online;
 }

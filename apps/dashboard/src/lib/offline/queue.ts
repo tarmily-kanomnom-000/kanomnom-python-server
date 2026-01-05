@@ -1,12 +1,12 @@
-import type { ShoppingList, ShoppingListItem } from "@/lib/grocy/shopping-list-types";
-
-import { readCache, syncQueueKey, writeCache } from "./storage";
+import type { ShoppingList } from "@/lib/grocy/shopping-list-types";
+import { mergeIntoSnapshot, mergePendingUpdates } from "./queue-utils";
 import {
   hydrateSyncSnapshot,
   notifySyncInfo,
   recordSyncDrop,
   setLastSyncAt,
 } from "./status";
+import { readCache, syncQueueKey, writeCache } from "./storage";
 import type {
   AddItemPayload,
   PendingAction,
@@ -32,96 +32,6 @@ export function removeFromSyncQueue(actionId: string): void {
 
 export function clearSyncQueue(): void {
   writeSyncQueue([]);
-}
-
-function mergeUpdates(
-  existing: any[] = [],
-  incoming: any[] = [],
-  incomingTimestamp: number,
-): any[] {
-  const byId = new Map<
-    string,
-    {
-      data: any;
-      ts: number;
-    }
-  >();
-  for (const update of existing) {
-    if (update?.item_id) {
-      const ts =
-        typeof update.last_modified_at === "string"
-          ? Date.parse(update.last_modified_at)
-          : 0;
-      byId.set(update.item_id, { data: update, ts });
-    }
-  }
-  for (const update of incoming) {
-    if (update?.item_id) {
-      const existingEntry = byId.get(update.item_id);
-      if (!existingEntry || existingEntry.ts <= incomingTimestamp) {
-        byId.set(update.item_id, {
-          data: { ...(existingEntry?.data ?? {}), ...update },
-          ts: incomingTimestamp,
-        });
-      }
-    }
-  }
-  return Array.from(byId.values()).map((entry) => entry.data);
-}
-
-function mergeIntoSnapshot(
-  snapshot: Extract<PendingAction, { action: "replay_snapshot" }>,
-  incoming: Omit<PendingAction, "id" | "timestamp">,
-): Extract<PendingAction, { action: "replay_snapshot" }> {
-  const payload = { ...(snapshot.payload ?? {}) } as SnapshotPayload;
-  const nowTs = Date.now();
-  switch (incoming.action) {
-    case "update_item":
-      payload.updates = mergeUpdates(
-        payload.updates,
-        "updates" in incoming.payload && Array.isArray(incoming.payload.updates)
-          ? incoming.payload.updates
-          : [],
-        nowTs,
-      );
-      break;
-    case "add_item":
-      if (payload.list?.items) {
-        const itemToAdd =
-          "item" in incoming.payload ? incoming.payload.item : null;
-        if (
-          itemToAdd &&
-          typeof itemToAdd === "object" &&
-          "id" in itemToAdd &&
-          "product_id" in itemToAdd
-        ) {
-          payload.list.items = [
-            ...payload.list.items,
-            itemToAdd as ShoppingListItem,
-          ];
-        }
-      }
-      break;
-    case "remove_item":
-      if (payload.list?.items) {
-        const itemId =
-          "item_id" in incoming.payload ? incoming.payload.item_id : null;
-        if (!itemId) {
-          break;
-        }
-        payload.list.items = payload.list.items.filter(
-          (item: any) => item.id !== itemId,
-        );
-      }
-      break;
-    default:
-      break;
-  }
-  return {
-    ...snapshot,
-    payload,
-    timestamp: Date.now(),
-  };
 }
 
 export function addToSyncQueue(
@@ -187,7 +97,7 @@ export function addToSyncQueue(
               : Date.now();
           return ts >= latestGranularTs;
         }) ?? [];
-      const mergedUpdates = mergeUpdates(
+      const mergedUpdates = mergePendingUpdates(
         "updates" in existing.payload && Array.isArray(existing.payload.updates)
           ? existing.payload.updates
           : [],
@@ -250,7 +160,7 @@ export function addToSyncQueue(
         PendingAction,
         { action: "replay_snapshot" }
       >;
-      const updatedSnapshot = mergeIntoSnapshot(existing, action);
+      const updatedSnapshot = mergeIntoSnapshot(existing, action, incomingTs);
       const latestPayloadTs = Math.max(
         incomingTs,
         ...(existing.payload?.updates ?? []).map((update: any) =>

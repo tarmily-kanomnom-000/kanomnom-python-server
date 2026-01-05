@@ -10,7 +10,13 @@ from core.cache.grocy_shopping_locations_cache import get_grocy_shopping_locatio
 from core.cache.grocy_stock_cache import get_grocy_stock_cache
 from core.cache.grocy_stock_log_cache import get_grocy_stock_log_cache
 from core.grocy.client import GrocyClient
-from core.grocy.inventory import InventoryAdjustment, InventoryCorrection, ProductInventoryService, ProductInventoryView, StockUpdateSettings
+from core.grocy.inventory import (
+    InventoryAdjustment,
+    InventoryCorrection,
+    ProductInventoryService,
+    ProductInventoryView,
+    StockUpdateSettings,
+)
 from core.grocy.models import (
     ProductGroupDefinition,
     QuantityUnitDefinition,

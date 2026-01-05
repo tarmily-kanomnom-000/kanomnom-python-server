@@ -8,12 +8,12 @@ from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 
 from core.grocy.exceptions import MetadataNotFoundError
+from core.grocy.inventory import ProductInventoryView
 from core.grocy.note_metadata import (
     ProductDescriptionMetadata,
     ProductUnitConversion,
     decode_structured_note,
 )
-from core.grocy.inventory import ProductInventoryView
 from models.grocy import GrocyProductInventoryEntry, GrocyStockEntryPayload
 
 from .dependencies import governor

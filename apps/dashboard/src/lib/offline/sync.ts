@@ -7,12 +7,19 @@ import {
   removeFromSyncQueue,
   writeSyncQueue,
 } from "./queue";
+import { mergePendingUpdates } from "./queue-utils";
+import { getOnlineStatus, isOffline, notifySyncInfo } from "./status";
 import {
   clearCachedShoppingList,
   readCachedShoppingList,
   writeCachedShoppingList,
 } from "./storage";
-import { getOnlineStatus, notifySyncInfo } from "./status";
+import {
+  incrementFailureCount,
+  isPermanentFailure,
+  MAX_RETRIES,
+  statusFromError,
+} from "./sync-utils";
 import type { PendingAction } from "./types";
 
 async function refreshActiveListCache(instanceIndex: string): Promise<void> {
@@ -43,14 +50,6 @@ async function refreshActiveListCache(instanceIndex: string): Promise<void> {
   }
 }
 
-export function isOffline(): boolean {
-  return !getOnlineStatus();
-}
-
-export function isOnline(): boolean {
-  return getOnlineStatus();
-}
-
 export async function fetchShoppingListWithCache(
   instanceIndex: string,
   fetcher: () => Promise<ShoppingList | null>,
@@ -70,7 +69,10 @@ export async function fetchShoppingListWithCache(
     return result;
   } catch (error) {
     if (cached !== null) {
-      console.warn("Failed to fetch shopping list, using cached version", error);
+      console.warn(
+        "Failed to fetch shopping list, using cached version",
+        error,
+      );
       return cached;
     }
     throw error;
@@ -125,21 +127,6 @@ export async function syncPendingActions(): Promise<void> {
     return;
   }
 
-  const mergeUpdates = (existing: any[] = [], incoming: any[] = []): any[] => {
-    const byId = new Map<string, any>();
-    for (const update of existing) {
-      if (update?.item_id) {
-        byId.set(update.item_id, update);
-      }
-    }
-    for (const update of incoming) {
-      if (update?.item_id) {
-        byId.set(update.item_id, { ...byId.get(update.item_id), ...update });
-      }
-    }
-    return Array.from(byId.values());
-  };
-
   const batched: PendingAction[] = [];
   for (const action of refreshedQueue) {
     if (action.action !== "update_item") {
@@ -155,9 +142,10 @@ export async function syncPendingActions(): Promise<void> {
       batched.push(action);
       continue;
     }
-    const mergedUpdates = mergeUpdates(
+    const mergedUpdates = mergePendingUpdates(
       Array.isArray(last.payload.updates) ? last.payload.updates : [],
       Array.isArray(action.payload.updates) ? action.payload.updates : [],
+      action.timestamp,
     );
     batched[batched.length - 1] = {
       ...last,
@@ -169,7 +157,6 @@ export async function syncPendingActions(): Promise<void> {
   console.log(`Syncing ${batched.length} pending shopping list actions...`);
   notifySyncInfo(batched.length);
 
-  const MAX_RETRIES = 3;
   for (const action of batched) {
     try {
       await executePendingAction(action);
@@ -177,13 +164,10 @@ export async function syncPendingActions(): Promise<void> {
       console.log(`Synced action: ${action.action}`, action);
       markSyncSuccess(readSyncQueue().length);
     } catch (error) {
-      const failures = (action.failureCount ?? 0) + 1;
-      const isAxiosResponse =
-        typeof error === "object" &&
-        error !== null &&
-        "status" in (error as any);
-      const status = isAxiosResponse ? (error as any).status : undefined;
-      const isPermanent = status && status >= 400 && status < 500;
+      const status = statusFromError(error);
+      const isPermanent = isPermanentFailure(status);
+      const updatedAction = incrementFailureCount(action);
+      const failures = updatedAction.failureCount ?? 0;
 
       if (isPermanent || failures >= MAX_RETRIES) {
         console.error(
@@ -198,12 +182,10 @@ export async function syncPendingActions(): Promise<void> {
         `Requeueing failed action (${failures}/${MAX_RETRIES}): ${action.action}`,
         { status, error },
       );
-      const remaining = readSyncQueue().filter((entry) => entry.id !== action.id);
-      remaining.push({
-        ...action,
-        failureCount: failures,
-        timestamp: Date.now(),
-      });
+      const remaining = readSyncQueue().filter(
+        (entry) => entry.id !== action.id,
+      );
+      remaining.push(updatedAction);
       writeSyncQueue(remaining);
       notifySyncInfo(remaining.length, "requeued_failed_action");
     }

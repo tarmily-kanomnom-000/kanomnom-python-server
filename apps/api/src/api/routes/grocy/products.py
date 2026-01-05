@@ -8,7 +8,8 @@ from fastapi.concurrency import run_in_threadpool
 from core.grocy.exceptions import MetadataNotFoundError
 from models.grocy import GrocyProductInventoryEntry, GrocyProductsResponse
 
-from .dependencies import governor, router
+from .common import parse_force_refresh, with_grocy_manager
+from .dependencies import router
 from .helpers import serialize_inventory_view
 
 
@@ -19,15 +20,8 @@ class GrocyProductsQuery:
     force_refresh: bool
 
 
-_TRUE_QUERY_VALUES = {"1", "true", "t", "yes", "y", "on"}
-
-
 def _parse_products_query(request: Request) -> GrocyProductsQuery:
-    value = request.query_params.get("force_refresh")
-    if value is None:
-        return GrocyProductsQuery(force_refresh=False)
-    normalized = value.strip().lower()
-    return GrocyProductsQuery(force_refresh=normalized in _TRUE_QUERY_VALUES)
+    return GrocyProductsQuery(force_refresh=parse_force_refresh(request))
 
 
 @router.get("/{instance_index}/products", response_model=GrocyProductsResponse)
@@ -36,10 +30,14 @@ async def list_products(instance_index: str, request: Request) -> GrocyProductsR
     query = _parse_products_query(request)
 
     def _load_products():
-        manager = governor.manager_for(instance_index)
-        if query.force_refresh:
-            manager.force_refresh_product_inventory()
-        return manager.list_product_inventory()
+        return with_grocy_manager(
+            instance_index,
+            lambda manager: (
+                manager.force_refresh_product_inventory() or manager.list_product_inventory()
+                if query.force_refresh
+                else manager.list_product_inventory()
+            ),
+        )
 
     try:
         inventory_views = await run_in_threadpool(_load_products)
@@ -56,8 +54,7 @@ async def get_product(instance_index: str, product_id: int) -> GrocyProductInven
     """Return a single Grocy product with fresh stock entries."""
 
     def _load_product():
-        manager = governor.manager_for(instance_index)
-        return manager.get_product_inventory(product_id)
+        return with_grocy_manager(instance_index, lambda manager: manager.get_product_inventory(product_id))
 
     try:
         inventory_view = await run_in_threadpool(_load_product)

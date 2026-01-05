@@ -2,8 +2,6 @@
 
 import { useMemo } from "react";
 
-import type { DashboardRole } from "@/lib/auth/types";
-
 type ProductInteractionMode = "details" | "purchase" | "inventory";
 
 const PRODUCT_MODE_OPTIONS: Array<{

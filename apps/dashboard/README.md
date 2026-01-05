@@ -83,6 +83,7 @@ Whenever you add or rename fields in the Python models, mirror the change in the
 ### Best Practices
 
 - **Single source of truth:** All Grocy calls go through `src/lib/grocy` (server or client). Never hit the FastAPI host directly from React components—always go through the `/api/grocy` routes or the shared helpers.
+- **Unified connectivity + cache keys:** Online/offline state comes only from `src/lib/offline/status.ts` (re-exported via `shopping-list-cache.ts`); Grocy/shopping-list cache keys come from `src/lib/offline/cache-keys.ts`.
 - **Type everything:** Reuse the models in `src/lib/grocy/types.ts` throughout components, queries, and API handlers to avoid drift with the FastAPI schema.
 - **Cache intentionally:** Use the existing `React.cache` wrappers server-side and the in-memory cache or query helpers client-side. If a call needs fresh data, pass `forceRefresh` to the client helper or `useForceCache=false` to the query builder, and make sure any new mutation invalidates the Grocy product caches by calling the provided helpers.
 - **Invalidate after mutations:** When adding new Grocy actions (consumption, transfers, etc.), always call both the server (`invalidateGrocyProductsCache`) and client (`invalidateGrocyProductsClientCache`) helpers after the mutation completes so instance/product caches stay coherent.

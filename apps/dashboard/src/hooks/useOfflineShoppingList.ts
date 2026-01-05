@@ -198,7 +198,6 @@ export function useOfflineShoppingList(instanceIndex: string) {
         instanceIndex,
         list,
         updates,
-        isOnline: true,
         queueFn: async (l, u) => {
           addToSyncQueue({
             action: "update_item",

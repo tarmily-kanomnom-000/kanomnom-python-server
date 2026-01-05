@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import HTTPException
 
-from core.grocy.note_metadata import InventoryCorrectionNoteMetadata, validate_note_text
 from core.grocy.inventory import InventoryAdjustment, InventoryCorrection
+from core.grocy.note_metadata import InventoryCorrectionNoteMetadata, validate_note_text
 from models.grocy import (
     GrocyProductInventoryEntry,
     InventoryAdjustmentRequest,

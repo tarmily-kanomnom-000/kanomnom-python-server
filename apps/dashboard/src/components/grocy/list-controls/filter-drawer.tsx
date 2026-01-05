@@ -2,10 +2,7 @@
 
 import { useMemo } from "react";
 
-import {
-  DateFilterEditor,
-  NumericFilterEditor,
-} from "./filter-editors";
+import { DateFilterEditor, NumericFilterEditor } from "./filter-editors";
 import type {
   DateRange,
   FilterConfig,

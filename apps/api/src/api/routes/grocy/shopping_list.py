@@ -13,6 +13,7 @@ from core.grocy.shopping_list_generator import ShoppingListGenerator
 from core.grocy.shopping_list_manager import ShoppingListManager
 from models.shopping_list import (
     AddItemRequest,
+    BulkItemUpdate,
     BulkUpdateRequest,
     GenerateListRequest,
     ShoppingList,
@@ -20,7 +21,8 @@ from models.shopping_list import (
 )
 from models.shopping_list_remove import BulkRemoveRequest
 
-from .dependencies import SERVICE_ROOT, governor, router
+from .common import build_price_analyzer, get_manager, load_shopping_locations
+from .dependencies import SERVICE_ROOT, router
 
 # Shopping lists are stored in apps/api/shopping_lists
 SHOPPING_LISTS_ROOT = SERVICE_ROOT / "shopping_lists"
@@ -35,14 +37,13 @@ def _get_manager() -> ShoppingListManager:
 async def _get_generator(instance_index: str, with_price_analyzer: bool = False) -> ShoppingListGenerator:
     """Get shopping list generator instance"""
     try:
-        manager = await run_in_threadpool(governor.manager_for, instance_index)
+        manager = await get_manager(instance_index)
         inventory_service = manager._inventory
         shopping_locations_cache = get_grocy_shopping_locations_cache()
 
         price_analyzer = None
         if with_price_analyzer:
-            grocy_client = manager.client
-            price_analyzer = PriceAnalyzer(grocy_client)
+            price_analyzer = build_price_analyzer(instance_index)
 
         return ShoppingListGenerator(inventory_service, shopping_locations_cache, price_analyzer)
     except Exception as exc:
@@ -51,17 +52,12 @@ async def _get_generator(instance_index: str, with_price_analyzer: bool = False)
 
 async def _get_price_analyzer(instance_index: str) -> PriceAnalyzer:
     """Get price analyzer instance"""
-    try:
-        manager = await run_in_threadpool(governor.manager_for, instance_index)
-        grocy_client = manager.client
-        return PriceAnalyzer(grocy_client)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to initialize price analyzer: {exc!s}") from exc
+    return build_price_analyzer(instance_index)
 
 
 async def _build_item_data(instance_index: str, request: AddItemRequest, price_analyzer: PriceAnalyzer | None = None) -> dict:
     """Build a shopping list item payload with price/location enrichment."""
-    grocy_manager = await run_in_threadpool(governor.manager_for, instance_index)
+    grocy_manager = await get_manager(instance_index)
     inventory_service = grocy_manager._inventory
 
     products_with_inv = await run_in_threadpool(inventory_service.list_products_with_inventory, instance_index)
@@ -82,8 +78,7 @@ async def _build_item_data(instance_index: str, request: AddItemRequest, price_a
         for stock in product_view.stocks:
             current_stock += stock.amount
 
-    shopping_locations_cache = get_grocy_shopping_locations_cache()
-    shopping_locations = await run_in_threadpool(shopping_locations_cache.load_shopping_locations, instance_index)
+    shopping_locations = await load_shopping_locations(instance_index)
     location_names = {}
     if shopping_locations:
         location_names = {loc.id: loc.name for loc in shopping_locations}
@@ -222,6 +217,16 @@ async def remove_item(
         ) from exc
 
 
+def _serialize_updates(updates: list[BulkItemUpdate]) -> list[dict]:
+    """
+    Convert BulkItemUpdate models into dicts while preserving only caller-specified fields.
+
+    Using exclude_unset avoids sending implicit null shopping_location fields during status-only
+    updates, which previously cleared locations and pushed items into the UNKNOWN section.
+    """
+    return [update.model_dump(exclude_unset=True) for update in updates]
+
+
 @router.patch(
     "/{instance_index}/shopping-list/items/bulk",
     response_model=list[ShoppingListItem],
@@ -254,19 +259,7 @@ async def bulk_update_items(
     manager = _get_manager()
 
     try:
-        # Convert Pydantic models to dicts for the manager
-        updates_dict = [
-            {
-                "item_id": update.item_id,
-                "status": update.status,
-                "quantity_purchased": update.quantity_purchased,
-                "notes": update.notes,
-                "checked_at": update.checked_at,
-                "shopping_location_id": update.shopping_location_id,
-                "shopping_location_name": update.shopping_location_name,
-            }
-            for update in request.updates
-        ]
+        updates_dict = _serialize_updates(request.updates)
 
         updated_items = await run_in_threadpool(
             manager.bulk_update_items,

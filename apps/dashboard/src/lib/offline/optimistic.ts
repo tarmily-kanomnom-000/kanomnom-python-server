@@ -1,8 +1,8 @@
 import type {
-  PendingAction,
-  SnapshotPayload,
-} from "@/lib/offline/types";
-import type { ShoppingList, ShoppingListItem } from "@/lib/grocy/shopping-list-types";
+  ShoppingList,
+  ShoppingListItem,
+} from "@/lib/grocy/shopping-list-types";
+import type { PendingAction, SnapshotPayload } from "@/lib/offline/types";
 
 export function applyOptimisticUpdate(
   list: ShoppingList,

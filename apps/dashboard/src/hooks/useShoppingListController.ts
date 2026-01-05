@@ -93,6 +93,14 @@ export function useShoppingListController(
   const keepScrollPosition = useScrollPreserver();
   const listRef = useLatest(list);
 
+  const productGroupById = useMemo(() => {
+    const lookup = new Map<number, string | null>();
+    for (const product of products) {
+      lookup.set(product.id, product.product_group_name ?? "Ungrouped");
+    }
+    return lookup;
+  }, [products]);
+
   const loadProducts = useCallback(async () => {
     try {
       const data = await fetchGrocyProducts(instanceIndex);
@@ -190,7 +198,6 @@ export function useShoppingListController(
         instanceIndex,
         list: effectiveList,
         updates,
-        isOnline: shouldSendOnline,
         queueFn: async (listToQueue, updatesToQueue) =>
           updateItemsWithCache(listToQueue, updatesToQueue, false),
       });
@@ -648,7 +655,15 @@ export function useShoppingListController(
     }
 
     const grouped = new Map<string, ShoppingListItem[]>();
-    for (const item of list.items) {
+    const itemsWithGroups = list.items.map((item) => {
+      const productGroup =
+        item.product_group_name ??
+        productGroupById.get(item.product_id) ??
+        "Ungrouped";
+      return { ...item, product_group_name: productGroup };
+    });
+
+    for (const item of itemsWithGroups) {
       const key = locationKeyForItem(item);
       const items = grouped.get(key) ?? [];
       items.push(item);
@@ -693,7 +708,7 @@ export function useShoppingListController(
         someChecked: purchased > 0 && purchased < total,
       };
     });
-  }, [list, locationKeyForItem]);
+  }, [list, locationKeyForItem, productGroupById]);
 
   const purchasedCount =
     list?.items.filter(

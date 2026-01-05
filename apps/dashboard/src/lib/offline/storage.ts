@@ -1,7 +1,6 @@
 import type { ShoppingList } from "@/lib/grocy/shopping-list-types";
-
+import { shoppingListKey, shoppingSyncQueueKey } from "./cache-keys";
 import {
-  buildStorageKey,
   clearStoredPayload,
   readStoredPayload,
   writeStoredPayload,
@@ -25,11 +24,11 @@ export function clearCachedShoppingList(instanceIndex: string): void {
 }
 
 export function shoppingListCacheKey(instanceIndex: string): string {
-  return buildStorageKey(["shopping-list", "active", instanceIndex]);
+  return shoppingListKey(instanceIndex);
 }
 
 export function syncQueueKey(): string {
-  return buildStorageKey(["shopping-list", "sync-queue"]);
+  return shoppingSyncQueueKey();
 }
 
 export function readCache<T>(key: string): T | null {

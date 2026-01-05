@@ -1,11 +1,10 @@
 import { readSyncQueue, writeSyncQueue } from "./queue";
-import { syncPendingActions } from "./sync";
 import {
-  getOnlineStatus,
   notifyConnectivityStatus,
   notifySyncInfo,
   setOnlineStatus,
 } from "./status";
+import { syncPendingActions } from "./sync";
 
 let listenersAttached = false;
 

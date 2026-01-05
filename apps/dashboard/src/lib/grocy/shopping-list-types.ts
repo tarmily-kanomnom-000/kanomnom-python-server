@@ -10,6 +10,7 @@ export interface ShoppingListItem {
   id: string;
   product_id: number;
   product_name: string;
+  product_group_name?: string | null;
   shopping_location_id: number | null;
   shopping_location_name: string;
   status: ItemStatus;

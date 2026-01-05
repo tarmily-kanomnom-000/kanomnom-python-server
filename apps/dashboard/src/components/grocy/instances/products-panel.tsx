@@ -10,9 +10,7 @@ import {
 import { useSyncedQueryState } from "@/hooks/use-synced-query-state";
 import type { DashboardRole } from "@/lib/auth/types";
 import { GROCY_QUERY_PARAMS } from "@/lib/grocy/query-params";
-import type {
-  GrocyProductInventoryEntry,
-} from "@/lib/grocy/types";
+import type { GrocyProductInventoryEntry } from "@/lib/grocy/types";
 
 import {
   isDateRangeActive,
@@ -41,12 +39,12 @@ import {
 } from "./inventory-query-state";
 import {
   ModeButtons,
+  type ProductInteractionMode,
   PurchaseModeDefaults,
   parseProductModeParam,
   parsePurchaseDateParam,
   serializeProductModeParam,
   serializePurchaseDateParam,
-  type ProductInteractionMode,
 } from "./mode-controls";
 import { ProductActionDialog } from "./product-action-dialog";
 import type { ProductActionType } from "./product-actions";
@@ -62,8 +60,8 @@ import {
   STOCK_STATUS_LABEL_BY_CATEGORY,
 } from "./product-metrics";
 import { ProductsTable } from "./products-table";
-import { ShoppingListButton } from "./shopping-list-button";
 import { usePurchaseDefaultsPrefetch } from "./purchase-defaults";
+import { ShoppingListButton } from "./shopping-list-button";
 
 const PRODUCT_SEARCH_PARAM = GROCY_QUERY_PARAMS.inventorySearch;
 const PRODUCT_GROUPS_PARAM = GROCY_QUERY_PARAMS.inventoryGroups;
@@ -189,9 +187,6 @@ export function ProductsPanel({
     setProductInteractionMode("details");
     setActiveAction(null);
     setActiveProduct(null);
-    setPurchaseDefaultsByProductId({});
-    setPurchaseDefaultsError(null);
-    prefetchedDefaultsRef.current = new Set();
   }, [isAdmin, setProductInteractionMode]);
 
   useEffect(() => {
@@ -502,12 +497,12 @@ export function ProductsPanel({
               : ""}
             )
           </p>
-        {hasProductFilters ? (
-          <p className="text-xs text-neutral-500">
-            Filters and search applied to the inventory list.
-          </p>
-        ) : null}
-      </div>
+          {hasProductFilters ? (
+            <p className="text-xs text-neutral-500">
+              Filters and search applied to the inventory list.
+            </p>
+          ) : null}
+        </div>
         <ModeButtons
           isAdmin={isAdmin}
           productInteractionMode={productInteractionMode}

@@ -50,6 +50,7 @@ export default function ShoppingListPage() {
   const [itemSearch, setItemSearch] = useState("");
   const [statusFilters, setStatusFilters] = useState<ItemStatus[]>([]);
   const [locationFilters, setLocationFilters] = useState<string[]>([]);
+  const [productGroupFilters, setProductGroupFilters] = useState<string[]>([]);
   const [showUncheckedOnly, setShowUncheckedOnly] = useState(false);
   const [selectedProduct, setSelectedProduct] =
     useState<ProductSearchResult | null>(null);
@@ -164,6 +165,14 @@ export default function ShoppingListPage() {
     );
   };
 
+  const toggleProductGroup = (groupName: string) => {
+    setProductGroupFilters((current) =>
+      current.includes(groupName)
+        ? current.filter((value) => value !== groupName)
+        : [...current, groupName],
+    );
+  };
+
   const handleAddItem = async () => {
     const productId = parseInt(addItemProductId, 10);
     const quantity = parseFloat(addItemQuantity);
@@ -220,6 +229,18 @@ export default function ShoppingListPage() {
     [locationFilterValues],
   );
 
+  const productGroupFilterValues = useMemo(() => {
+    const groups = new Set<string>();
+    for (const section of sections) {
+      for (const item of section.items) {
+        groups.add(item.product_group_name ?? "Ungrouped");
+      }
+    }
+    return Array.from(groups)
+      .map((name) => ({ value: name, label: name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [sections]);
+
   const filteredSections = useMemo(() => {
     const normalizedSearch = itemSearch.trim().toLowerCase();
     const effectiveStatusFilters: ItemStatus[] = showUncheckedOnly
@@ -244,6 +265,14 @@ export default function ShoppingListPage() {
               item.shopping_location_id?.toString() ??
                 item.shopping_location_name ??
                 "UNKNOWN",
+            )
+          ) {
+            return false;
+          }
+          if (
+            productGroupFilters.length > 0 &&
+            !productGroupFilters.includes(
+              item.product_group_name ?? "Ungrouped",
             )
           ) {
             return false;
@@ -273,7 +302,14 @@ export default function ShoppingListPage() {
         };
       })
       .filter((section) => section.items.length > 0);
-  }, [itemSearch, locationFilters, sections, showUncheckedOnly, statusFilters]);
+  }, [
+    itemSearch,
+    locationFilters,
+    productGroupFilters,
+    sections,
+    showUncheckedOnly,
+    statusFilters,
+  ]);
 
   if (isLoading) {
     return <div className="p-6">Loading...</div>;
@@ -382,6 +418,7 @@ export default function ShoppingListPage() {
                 onClick={() => {
                   setStatusFilters([]);
                   setLocationFilters([]);
+                  setProductGroupFilters([]);
                   setShowUncheckedOnly(false);
                   setItemSearch("");
                 }}
@@ -443,6 +480,27 @@ export default function ShoppingListPage() {
                     toggleLocation(locationEntry.value);
                   },
                   onClear: () => setLocationFilters([]),
+                },
+                {
+                  id: "product_group",
+                  label: "Product group",
+                  type: "text",
+                  values: productGroupFilterValues.map((entry) => entry.label),
+                  selectedValues: productGroupFilterValues
+                    .filter((entry) =>
+                      productGroupFilters.includes(entry.value),
+                    )
+                    .map((entry) => entry.label),
+                  onToggle: (label) => {
+                    const groupEntry = productGroupFilterValues.find(
+                      (entry) => entry.label === label,
+                    );
+                    if (!groupEntry) {
+                      return;
+                    }
+                    toggleProductGroup(groupEntry.value);
+                  },
+                  onClear: () => setProductGroupFilters([]),
                 },
               ],
               buttonLabel: "Filters +",

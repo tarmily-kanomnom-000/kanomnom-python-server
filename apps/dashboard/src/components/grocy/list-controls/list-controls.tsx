@@ -3,12 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 
 import { FilterDrawer } from "./filter-drawer";
+import { hasDateSelection, hasNumericSelection } from "./filter-editors";
 import { SearchBar } from "./search-bar";
 import { SortMenu } from "./sort-menu";
-import {
-  hasDateSelection,
-  hasNumericSelection,
-} from "./filter-editors";
 import type {
   DateRange,
   ListControlsProps,
@@ -183,7 +180,7 @@ export function ListControls<Field extends string>({
               ? `Filters (${activeFiltersCount})`
               : (filters?.buttonLabel ?? "Filters +")}
           </button>
-          {isFilterOpen ? (
+          {isFilterOpen && filters ? (
             <FilterDrawer
               filters={filters}
               activeFieldId={activeFilterFieldId}
@@ -219,9 +216,7 @@ export function ListControls<Field extends string>({
               sortOptions={sortOptions}
               sortState={effectiveSortState}
               reachedMaxSortLevels={reachedMaxSortLevels}
-              onSortChange={(rules: SortRule<Field>[]) =>
-                onSortChange?.(rules)
-              }
+              onSortChange={(rules: SortRule<Field>[]) => onSortChange?.(rules)}
               onClose={() => setSortOpen(false)}
             />
           ) : null}

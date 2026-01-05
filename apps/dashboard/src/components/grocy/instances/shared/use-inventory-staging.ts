@@ -1,5 +1,5 @@
-import type { GrocyProductInventoryEntry } from "@/lib/grocy/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { GrocyProductInventoryEntry } from "@/lib/grocy/types";
 import {
   buildStorageKey,
   clearStoredPayload,
@@ -175,7 +175,8 @@ export function useInventoryStaging({
     }
     try {
       const updatedAt =
-        typeof payload.updatedAt === "number" && Number.isFinite(payload.updatedAt)
+        typeof payload.updatedAt === "number" &&
+        Number.isFinite(payload.updatedAt)
           ? payload.updatedAt
           : 0;
       if (!updatedAt || Date.now() - updatedAt > STAGING_TTL_MS) {
