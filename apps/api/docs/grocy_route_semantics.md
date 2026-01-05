@@ -42,7 +42,6 @@ Concise reference for the Grocy API routes and key helpers. Use this to understa
 - Inventory logic lives in `apps/api/src/core/grocy/inventory.py` (inventory views, corrections/adjustments, cache loading).
 - Purchase resolution/defaults live in `apps/api/src/core/grocy/purchases.py`.
 - Shared stock helpers (unit mapping, last-update mapping, price rounding, default best-before) live in `apps/api/src/core/grocy/stock_helpers.py`.
-- `stock.py` now re-exports the primary dataclasses/services to preserve imports; prefer the concrete modules above for new code.
 
 ## Shopping Lists (`.../shopping_list.py`)
 - See `apps/api/docs/shopping_list.md` for endpoints and `apps/api/docs/shopping_list_core.md` for manager/generator semantics (locking, merge rules, enrichment, deleted_product_ids).

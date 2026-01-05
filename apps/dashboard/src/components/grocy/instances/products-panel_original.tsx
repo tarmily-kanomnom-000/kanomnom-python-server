@@ -9,9 +9,11 @@ import {
 } from "@/components/grocy/list-controls";
 import { useSyncedQueryState } from "@/hooks/use-synced-query-state";
 import type { DashboardRole } from "@/lib/auth/types";
+import { fetchBulkPurchaseEntryDefaults } from "@/lib/grocy/client";
 import { GROCY_QUERY_PARAMS } from "@/lib/grocy/query-params";
 import type {
   GrocyProductInventoryEntry,
+  PurchaseEntryDefaults,
 } from "@/lib/grocy/types";
 
 import {
@@ -39,15 +41,6 @@ import {
   serializeSortStateParam,
   serializeStringArrayParam,
 } from "./inventory-query-state";
-import {
-  ModeButtons,
-  PurchaseModeDefaults,
-  parseProductModeParam,
-  parsePurchaseDateParam,
-  serializeProductModeParam,
-  serializePurchaseDateParam,
-  type ProductInteractionMode,
-} from "./mode-controls";
 import { ProductActionDialog } from "./product-action-dialog";
 import type { ProductActionType } from "./product-actions";
 import { ProductDetailsDialog } from "./product-details-dialog";
@@ -63,7 +56,6 @@ import {
 } from "./product-metrics";
 import { ProductsTable } from "./products-table";
 import { ShoppingListButton } from "./shopping-list-button";
-import { usePurchaseDefaultsPrefetch } from "./purchase-defaults";
 
 const PRODUCT_SEARCH_PARAM = GROCY_QUERY_PARAMS.inventorySearch;
 const PRODUCT_GROUPS_PARAM = GROCY_QUERY_PARAMS.inventoryGroups;
@@ -75,6 +67,48 @@ const PRODUCT_SORT_PARAM = GROCY_QUERY_PARAMS.inventorySort;
 const PRODUCT_MODE_PARAM = GROCY_QUERY_PARAMS.inventoryMode;
 const PRODUCT_PURCHASE_DATE_PARAM = GROCY_QUERY_PARAMS.inventoryPurchaseDate;
 
+const PURCHASE_DEFAULTS_BATCH_SIZE = 25;
+const PURCHASE_DEFAULT_PREFETCH_CONCURRENCY = 4;
+const PURCHASE_DEFAULT_PREFETCH_RETRY_BASE_DELAY_MS = 5_000;
+const PURCHASE_DEFAULT_PREFETCH_RETRY_MAX_DELAY_MS = 60_000;
+
+type ProductInteractionMode = "details" | "purchase" | "inventory";
+
+const parseProductModeParam = (
+  rawValue: string | null,
+): ProductInteractionMode => {
+  if (rawValue === "purchase" || rawValue === "inventory") {
+    return rawValue;
+  }
+  return "details";
+};
+
+const serializeProductModeParam = (
+  value: ProductInteractionMode,
+): string | null => {
+  return value === "details" ? null : value;
+};
+
+const parsePurchaseDateParam = (rawValue: string | null): string => {
+  if (rawValue?.trim().length) {
+    return rawValue;
+  }
+  return buildDateInputValue();
+};
+
+const serializePurchaseDateParam = (value: string): string | null => {
+  return value?.trim().length ? value : null;
+};
+
+const PRODUCT_MODE_OPTIONS: Array<{
+  value: ProductInteractionMode;
+  label: string;
+}> = [
+  { value: "details", label: "Normal" },
+  { value: "purchase", label: "Purchase" },
+  { value: "inventory", label: "Inventory" },
+];
+
 const parseSearchQueryParam = (rawValue: string | null): string =>
   rawValue ?? "";
 
@@ -82,6 +116,27 @@ const serializeSearchQueryParam = (value: string): string | null => {
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : null;
 };
+
+const buildPurchaseDefaultsCacheKey = (
+  productId: number,
+  shoppingLocationId: number | null,
+): string => `${productId}:${shoppingLocationId ?? "__none__"}`;
+
+const buildDateInputValue = (): string => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today.toISOString().slice(0, 10);
+};
+function chunkArray<T>(items: T[], size: number): T[][] {
+  if (size <= 0) {
+    return [items.slice()];
+  }
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
 
 type ProductsPanelProps = {
   isLoading: boolean;
@@ -152,13 +207,151 @@ export function ProductsPanel({
     serialize: serializeStringArrayParam,
     isEqual: areArraysEqual,
   });
+  const [purchaseDefaultsByProductId, setPurchaseDefaultsByProductId] =
+    useState<Record<number, PurchaseEntryDefaults>>({});
+  const [purchaseDefaultsError, setPurchaseDefaultsError] = useState<
+    string | null
+  >(null);
+  const prefetchedDefaultsRef = useRef<Set<string>>(new Set());
+  const prefetchRetryAttemptsRef = useRef(0);
+  const prefetchRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [prefetchRetrySignal, setPrefetchRetrySignal] = useState(0);
   const isAdmin = userRole === "admin";
-  const { defaultsByProductId, error: purchaseDefaultsError } =
-    usePurchaseDefaultsPrefetch({
-      isAdmin,
-      activeInstanceId,
-      products,
-    });
+
+  const instanceDefaultsResetKey = activeInstanceId ?? "__none__";
+
+  useEffect(() => {
+    void instanceDefaultsResetKey;
+    prefetchedDefaultsRef.current = new Set();
+    setPurchaseDefaultsByProductId({});
+    setPurchaseDefaultsError(null);
+    prefetchRetryAttemptsRef.current = 0;
+    if (prefetchRetryTimeoutRef.current) {
+      clearTimeout(prefetchRetryTimeoutRef.current);
+      prefetchRetryTimeoutRef.current = null;
+    }
+    setPrefetchRetrySignal((value) => value + 1);
+  }, [instanceDefaultsResetKey]);
+
+  useEffect(() => {
+    // Force effect reruns whenever the retry signal increments without depending on other state.
+    void prefetchRetrySignal;
+    if (!isAdmin) {
+      if (prefetchRetryTimeoutRef.current) {
+        clearTimeout(prefetchRetryTimeoutRef.current);
+        prefetchRetryTimeoutRef.current = null;
+      }
+      return;
+    }
+    if (!activeInstanceId) {
+      return;
+    }
+    const shoppingLocationId: number | null = null;
+    const missingProductIds = products
+      .map((product) => ({
+        id: product.id,
+        key: buildPurchaseDefaultsCacheKey(product.id, shoppingLocationId),
+      }))
+      .filter((entry) => !prefetchedDefaultsRef.current.has(entry.key))
+      .map((entry) => entry.id);
+    if (missingProductIds.length === 0) {
+      prefetchRetryAttemptsRef.current = 0;
+      setPurchaseDefaultsError(null);
+      if (prefetchRetryTimeoutRef.current) {
+        clearTimeout(prefetchRetryTimeoutRef.current);
+        prefetchRetryTimeoutRef.current = null;
+      }
+      return;
+    }
+    setPurchaseDefaultsError(null);
+    let cancelled = false;
+    const batches = chunkArray(missingProductIds, PURCHASE_DEFAULTS_BATCH_SIZE);
+
+    const runPrefetch = async () => {
+      const workerCount = Math.min(
+        PURCHASE_DEFAULT_PREFETCH_CONCURRENCY,
+        batches.length,
+      );
+      const runWorker = async (workerIndex: number) => {
+        for (
+          let batchIndex = workerIndex;
+          batchIndex < batches.length;
+          batchIndex += workerCount
+        ) {
+          const batch = batches[batchIndex];
+          const defaults = await fetchBulkPurchaseEntryDefaults(
+            activeInstanceId,
+            batch,
+            shoppingLocationId,
+          );
+          if (cancelled) {
+            return;
+          }
+          setPurchaseDefaultsByProductId((current) => {
+            const next = { ...current };
+            defaults.forEach((entry) => {
+              next[entry.productId] = entry;
+              prefetchedDefaultsRef.current.add(
+                buildPurchaseDefaultsCacheKey(
+                  entry.productId,
+                  entry.shoppingLocationId ?? null,
+                ),
+              );
+            });
+            return next;
+          });
+        }
+      };
+
+      await Promise.all(
+        Array.from({ length: workerCount }, (_, index) => runWorker(index)),
+      );
+    };
+
+    const loadDefaults = async () => {
+      try {
+        await runPrefetch();
+        if (cancelled) {
+          return;
+        }
+        prefetchRetryAttemptsRef.current = 0;
+        if (prefetchRetryTimeoutRef.current) {
+          clearTimeout(prefetchRetryTimeoutRef.current);
+          prefetchRetryTimeoutRef.current = null;
+        }
+        setPurchaseDefaultsError(null);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        console.warn("Failed to prefetch purchase entry defaults", error);
+        const attempt = prefetchRetryAttemptsRef.current + 1;
+        prefetchRetryAttemptsRef.current = attempt;
+        const delay = Math.min(
+          PURCHASE_DEFAULT_PREFETCH_RETRY_MAX_DELAY_MS,
+          PURCHASE_DEFAULT_PREFETCH_RETRY_BASE_DELAY_MS * attempt,
+        );
+        setPurchaseDefaultsError(
+          `Unable to preload purchase metadata. We'll retry automatically in ${Math.round(delay / 1000)} seconds.`,
+        );
+        if (prefetchRetryTimeoutRef.current) {
+          clearTimeout(prefetchRetryTimeoutRef.current);
+        }
+        prefetchRetryTimeoutRef.current = setTimeout(() => {
+          setPrefetchRetrySignal((value) => value + 1);
+        }, delay);
+      }
+    };
+
+    void loadDefaults();
+    return () => {
+      cancelled = true;
+      if (prefetchRetryTimeoutRef.current) {
+        clearTimeout(prefetchRetryTimeoutRef.current);
+        prefetchRetryTimeoutRef.current = null;
+      }
+    };
+  }, [activeInstanceId, isAdmin, products, prefetchRetrySignal]);
 
   const [activeProduct, setActiveProduct] =
     useState<GrocyProductInventoryEntry | null>(null);
@@ -457,6 +650,81 @@ export function ProductsPanel({
     setActiveProduct(product);
   };
 
+  const allowedModes = useMemo(
+    () =>
+      isAdmin
+        ? PRODUCT_MODE_OPTIONS
+        : PRODUCT_MODE_OPTIONS.filter((option) => option.value === "details"),
+    [isAdmin],
+  );
+
+  const renderModeButtons = () => (
+    <div className="flex flex-col items-center gap-2 lg:flex-1 lg:flex-row lg:items-center lg:justify-center">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+        Mode
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {allowedModes.map((option) => {
+          const isActive = option.value === productInteractionMode;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setProductInteractionMode(option.value)}
+              aria-pressed={isActive}
+              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                isActive
+                  ? "bg-neutral-900 text-white shadow"
+                  : "border border-neutral-300 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900"
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderPurchaseModeDefaults = () => {
+    if (!isAdmin || productInteractionMode !== "purchase") {
+      return null;
+    }
+    return (
+      <div className="rounded-3xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-4 text-sm text-neutral-700 shadow-inner">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              Default purchase date
+            </p>
+            <p className="text-xs text-neutral-500">
+              New purchase entries open with this date pre-filled so you can
+              batch receipts for a given day.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              type="date"
+              value={purchaseDateOverride ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setPurchaseDateOverride(value.trim().length ? value : "");
+              }}
+              className="rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setPurchaseDateOverride(buildDateInputValue())}
+              className="rounded-full border border-neutral-300 px-4 py-2 text-xs font-semibold text-neutral-700 transition hover:border-neutral-900 hover:text-neutral-900"
+            >
+              Use today
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (errorMessage) {
     return (
       <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -502,17 +770,13 @@ export function ProductsPanel({
               : ""}
             )
           </p>
-        {hasProductFilters ? (
-          <p className="text-xs text-neutral-500">
-            Filters and search applied to the inventory list.
-          </p>
-        ) : null}
-      </div>
-        <ModeButtons
-          isAdmin={isAdmin}
-          productInteractionMode={productInteractionMode}
-          onChange={setProductInteractionMode}
-        />
+          {hasProductFilters ? (
+            <p className="text-xs text-neutral-500">
+              Filters and search applied to the inventory list.
+            </p>
+          ) : null}
+        </div>
+        {renderModeButtons()}
         {onRefresh || activeInstanceId ? (
           <div className="flex gap-2 justify-start lg:justify-end">
             {activeInstanceId ? (
@@ -532,12 +796,7 @@ export function ProductsPanel({
         ) : null}
       </div>
 
-      <PurchaseModeDefaults
-        isAdmin={isAdmin}
-        productInteractionMode={productInteractionMode}
-        purchaseDateOverride={purchaseDateOverride}
-        setPurchaseDateOverride={setPurchaseDateOverride}
-      />
+      {renderPurchaseModeDefaults()}
 
       <ListControls
         searchLabel="Search products"
@@ -592,7 +851,7 @@ export function ProductsPanel({
           locationNamesById={locationNamesById}
           shoppingLocationNamesById={shoppingLocationNamesById}
           onProductUpdate={onProductUpdate}
-          prefetchedPurchaseDefaults={defaultsByProductId}
+          prefetchedPurchaseDefaults={purchaseDefaultsByProductId}
           defaultPurchasedDate={purchaseDateOverride}
           onSuccess={(message) => {
             handleActionSuccess(message);
