@@ -64,6 +64,8 @@ const PRODUCT_QUANTITY_PARAM = GROCY_QUERY_PARAMS.inventoryQuantityRange;
 const PRODUCT_STALENESS_PARAM = GROCY_QUERY_PARAMS.inventoryStalenessRange;
 const PRODUCT_UPDATED_PARAM = GROCY_QUERY_PARAMS.inventoryUpdatedRange;
 const PRODUCT_SORT_PARAM = GROCY_QUERY_PARAMS.inventorySort;
+const PRODUCT_MODE_PARAM = GROCY_QUERY_PARAMS.inventoryMode;
+const PRODUCT_PURCHASE_DATE_PARAM = GROCY_QUERY_PARAMS.inventoryPurchaseDate;
 
 const PURCHASE_DEFAULTS_BATCH_SIZE = 25;
 const PURCHASE_DEFAULT_PREFETCH_CONCURRENCY = 4;
@@ -71,6 +73,32 @@ const PURCHASE_DEFAULT_PREFETCH_RETRY_BASE_DELAY_MS = 5_000;
 const PURCHASE_DEFAULT_PREFETCH_RETRY_MAX_DELAY_MS = 60_000;
 
 type ProductInteractionMode = "details" | "purchase" | "inventory";
+
+const parseProductModeParam = (
+  rawValue: string | null,
+): ProductInteractionMode => {
+  if (rawValue === "purchase" || rawValue === "inventory") {
+    return rawValue;
+  }
+  return "details";
+};
+
+const serializeProductModeParam = (
+  value: ProductInteractionMode,
+): string | null => {
+  return value === "details" ? null : value;
+};
+
+const parsePurchaseDateParam = (rawValue: string | null): string => {
+  if (rawValue?.trim().length) {
+    return rawValue;
+  }
+  return buildDateInputValue();
+};
+
+const serializePurchaseDateParam = (value: string): string | null => {
+  return value?.trim().length ? value : null;
+};
 
 const PRODUCT_MODE_OPTIONS: Array<{
   value: ProductInteractionMode;
@@ -335,10 +363,17 @@ export function ProductsPanel({
   const notificationTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastInstanceId = useRef<string | null>(null);
   const [productInteractionMode, setProductInteractionMode] =
-    useState<ProductInteractionMode>("details");
-  const [purchaseDateOverride, setPurchaseDateOverride] = useState<
-    string | null
-  >(() => buildDateInputValue());
+    useSyncedQueryState<ProductInteractionMode>({
+      key: PRODUCT_MODE_PARAM,
+      parse: parseProductModeParam,
+      serialize: serializeProductModeParam,
+    });
+  const [purchaseDateOverride, setPurchaseDateOverride] =
+    useSyncedQueryState<string>({
+      key: PRODUCT_PURCHASE_DATE_PARAM,
+      parse: parsePurchaseDateParam,
+      serialize: serializePurchaseDateParam,
+    });
 
   useEffect(() => {
     if (isAdmin) {
@@ -350,7 +385,7 @@ export function ProductsPanel({
     setPurchaseDefaultsByProductId({});
     setPurchaseDefaultsError(null);
     prefetchedDefaultsRef.current = new Set();
-  }, [isAdmin]);
+  }, [isAdmin, setProductInteractionMode]);
 
   useEffect(() => {
     if (!activeInstanceId) {
@@ -673,7 +708,7 @@ export function ProductsPanel({
               value={purchaseDateOverride ?? ""}
               onChange={(event) => {
                 const value = event.target.value;
-                setPurchaseDateOverride(value ? value : null);
+                setPurchaseDateOverride(value.trim().length ? value : "");
               }}
               className="rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none"
             />

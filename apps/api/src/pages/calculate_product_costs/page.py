@@ -258,9 +258,7 @@ class ProductCostsCalculatorContent(ft.Container):
                 logger.warning("No ingredients found for %s", recipe_name)
                 return None
 
-            _, total_cost = self.cost_calculator.calculate_ingredient_costs(
-                ingredients, self.cost_calculator.material_cost_basis
-            )
+            _, total_cost = self.cost_calculator.calculate_ingredient_costs(ingredients, self.cost_calculator.material_cost_basis)
             return total_cost
         except Exception:  # noqa: BLE001 - surfaced via log
             logger.exception("Error calculating current cost for %s", recipe_name)
@@ -532,9 +530,7 @@ class ProductCostsCalculatorContent(ft.Container):
             return
 
         try:
-            new_breakdown = self.ui_builder.create_ingredient_breakdown(
-                recipe_name, ingredients, selected_date, cost_basis
-            )
+            new_breakdown = self.ui_builder.create_ingredient_breakdown(recipe_name, ingredients, selected_date, cost_basis)
 
             if not self.state.current_cost_data:
                 logger.warning("No cached cost data available for chart refresh")

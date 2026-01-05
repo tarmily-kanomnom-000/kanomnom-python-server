@@ -12,6 +12,14 @@ if [[ "${mode}" != "dev" && "${mode}" != "prod" ]]; then
   exit 64
 fi
 
+if [[ "${mode}" == "dev" ]]; then
+  export FASTAPI_ENV="${FASTAPI_ENV:-development}"
+  export TELEGRAM_BOT_ENABLED="${TELEGRAM_BOT_ENABLED:-0}"
+else
+  export FASTAPI_ENV="${FASTAPI_ENV:-production}"
+  export TELEGRAM_BOT_ENABLED="${TELEGRAM_BOT_ENABLED:-1}"
+fi
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 api_dir="${repo_root}/apps/api"
 dashboard_dir="${repo_root}/apps/dashboard"

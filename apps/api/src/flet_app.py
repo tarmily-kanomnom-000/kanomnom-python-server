@@ -39,17 +39,13 @@ def home_view():
                                     [
                                         ft.ListTile(
                                             leading=ft.Icon(ft.Icons.CALCULATE, size=40),
-                                            title=ft.Text(
-                                                "Raw Ingredients Calculator", size=18, weight=ft.FontWeight.BOLD
-                                            ),
+                                            title=ft.Text("Raw Ingredients Calculator", size=18, weight=ft.FontWeight.BOLD),
                                             subtitle=ft.Text("Calculate raw ingredients from product recipes"),
                                             on_click=lambda e: e.page.go("/calculate_ingredients"),
                                         ),
                                         ft.ListTile(
                                             leading=ft.Icon(ft.Icons.ATTACH_MONEY, size=40),
-                                            title=ft.Text(
-                                                "Product Cost Calculator", size=18, weight=ft.FontWeight.BOLD
-                                            ),
+                                            title=ft.Text("Product Cost Calculator", size=18, weight=ft.FontWeight.BOLD),
                                             subtitle=ft.Text("Review material costs by recipe"),
                                             on_click=lambda e: e.page.go("/calculate_product_costs"),
                                         ),
@@ -98,8 +94,8 @@ def main(page: ft.Page):
             height: 0 !important;
         }
         """
-    except:
-        pass
+    except Exception:
+        logger.exception("Failed to disable Flet debug/banner UI elements")
 
     def route_change(route):
         page.views.clear()

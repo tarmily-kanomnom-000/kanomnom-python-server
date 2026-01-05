@@ -1,0 +1,103 @@
+[
+    {
+        "name": "Costco - Cherry Hill",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Restaurant Depot - Roberts Ave",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Restaurant Depot - Pennsauken",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Wegmans - Cherry Hill",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Wegmans - King of Prussia",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Costco.com",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "The Restaurant Store - Online",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Sun Seng Supermarket",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Shoprite - Roxborough",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Ben Tanh Supermarket",
+        "description": null,
+        "row_created_timestamp": "2025-12-30 23:02:55",
+        "active": 1
+    },
+    {
+        "name": "ACME - Roxborough",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Hung Vuong - Cherry Hill",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Hung Vuong - Washington Ave",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Costco - King of Prussia",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Shoprite - Fox Street",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "The Restaurant Store - Plymouth Meeting",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "The Restaurant Store - Pennsauken",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Amazon",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "No 1 Asian Supermarket",
+        "description": null,
+        "active": 1
+    },
+    {
+        "name": "Hung Vuong - Mayfair",
+        "description": null,
+        "active": 1
+    }
+]

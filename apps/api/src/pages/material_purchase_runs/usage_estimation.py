@@ -110,9 +110,7 @@ class KalmanFilterConfig:
             max_em_iterations=max(0, _require_int("max_em_iterations")),
             convergence_tolerance=max(_EPS, _require_float("convergence_tolerance")),
             initial_process_variance=max(_require_float("initial_process_variance"), minimum_process_variance),
-            initial_measurement_variance=max(
-                _require_float("initial_measurement_variance"), minimum_measurement_variance
-            ),
+            initial_measurement_variance=max(_require_float("initial_measurement_variance"), minimum_measurement_variance),
             minimum_process_variance=minimum_process_variance,
             minimum_measurement_variance=minimum_measurement_variance,
             target_sample_size=max(1, _require_int("target_sample_size")),
@@ -428,9 +426,7 @@ class KalmanUsageEstimator(MaterialUsageEstimator):
         """Construct EM keyword arguments compatible with the runtime statsmodels version."""
 
         if not hasattr(filter_instance, "em"):
-            raise RuntimeError(
-                "statsmodels.KalmanFilter.em is unavailable; upgrade statsmodels to support EM variance fitting."
-            )
+            raise RuntimeError("statsmodels.KalmanFilter.em is unavailable; upgrade statsmodels to support EM variance fitting.")
 
         parameters = inspect.signature(filter_instance.em).parameters
         kwargs: dict[str, object] = {}

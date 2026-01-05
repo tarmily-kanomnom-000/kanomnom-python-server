@@ -4,13 +4,21 @@ from dataclasses import dataclass
 from typing import Protocol, Sequence
 
 from core.grocy.client import GrocyClient
-from core.grocy.models import ProductGroupDefinition, QuantityUnitDefinition
+from core.grocy.models import (
+    ProductGroupDefinition,
+    QuantityUnitDefinition,
+    ShoppingLocationDefinition,
+)
 from core.grocy.note_metadata import (
     ProductGroupDescriptionMetadata,
     QuantityUnitDescriptionMetadata,
     decode_structured_note,
 )
-from core.grocy.responses import GrocyProductGroup, GrocyQuantityUnit
+from core.grocy.responses import (
+    GrocyProductGroup,
+    GrocyQuantityUnit,
+    GrocyShoppingLocation,
+)
 from core.grocy.sync import CreatedEntity, EntitySyncer, EntitySyncSpecification
 
 
@@ -119,6 +127,58 @@ class ProductGroupService:
         )
 
 
+@dataclass
+class ShoppingLocationSyncResult:
+    """Result returned after reconciling shopping locations."""
+
+    identifier_by_normalized_name: dict[str, int]
+    created: list[CreatedEntity[ShoppingLocationDefinition]]
+
+
+class ShoppingLocationService:
+    """Service encapsulating shopping location reconciliation logic."""
+
+    def __init__(self, client: GrocyClient, syncer: EntitySyncer[ShoppingLocationDefinition]) -> None:
+        self.client = client
+        self.syncer = syncer
+
+    def ensure_shopping_locations(self, definitions: list[ShoppingLocationDefinition]) -> ShoppingLocationSyncResult:
+        """Ensure the universal shopping locations exist and return their Grocy ids keyed by name."""
+        existing_locations = self.client.list_shopping_locations()
+        existing_lookup = {_existing_shopping_location_key(location): location for location in existing_locations}
+        specification = EntitySyncSpecification(
+            manifest_items=definitions,
+            existing_items=existing_locations,
+            manifest_key=lambda definition: definition.normalized_name(),
+            existing_key=_existing_shopping_location_key,
+            payload_builder=lambda definition, new_id: definition.to_payload(new_id),
+            creator=self.client.create_shopping_location,
+        )
+        sync_result = self.syncer.synchronize(specification)
+        lookup = _normalize_lookup(definitions, sync_result.identifier_by_key, "Shopping location")
+        for definition in definitions:
+            existing = existing_lookup.get(definition.normalized_name())
+            if existing is None:
+                continue
+            identifier = lookup.get(definition.normalized_name())
+            if identifier is None:
+                continue
+            desired_description = _normalized_description(definition.description)
+            desired_active = bool(definition.active)
+            current_description = _normalized_description(existing.description)
+            current_active = bool(existing.active)
+            if desired_description == current_description and desired_active == current_active:
+                continue
+            payload = definition.to_payload(identifier)
+            payload["description"] = definition.description
+            payload["active"] = definition.active
+            self.client.update_shopping_location(identifier, payload)
+        return ShoppingLocationSyncResult(
+            identifier_by_normalized_name=lookup,
+            created=sync_result.created,
+        )
+
+
 def _existing_unit_key(item: GrocyQuantityUnit) -> str:
     """Normalize quantity unit names returned by Grocy."""
     return item.name.strip().lower()
@@ -126,6 +186,11 @@ def _existing_unit_key(item: GrocyQuantityUnit) -> str:
 
 def _existing_product_group_key(item: GrocyProductGroup) -> str:
     """Normalize product group names returned by Grocy."""
+    return item.name.strip().lower()
+
+
+def _existing_shopping_location_key(item: GrocyShoppingLocation) -> str:
+    """Normalize shopping location names returned by Grocy."""
     return item.name.strip().lower()
 
 

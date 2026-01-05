@@ -127,6 +127,16 @@ export type InventoryCorrectionRequestPayload = {
   } | null;
 };
 
+export type InventoryAdjustmentRequestPayload = {
+  deltaAmount: number;
+  bestBeforeDate: string | null;
+  locationId: number | null;
+  note: string | null;
+  metadata?: {
+    losses?: InventoryLossDetailPayload[] | null;
+  } | null;
+};
+
 export type PurchaseEntryRequestPayload = {
   amount: number;
   bestBeforeDate: string | null;

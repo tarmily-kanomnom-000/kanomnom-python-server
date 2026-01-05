@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Optional
 
 from telegram import Update
 from telegram.ext import Application, CallbackContext, CommandHandler
@@ -10,35 +11,35 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 
+
+def _is_truthy(value: str | None) -> bool:
+    return value is not None and value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 TELEGRAM_INQURY_GROUP_CHAT_ID = "-1002388242169"
+DEV_MODE: bool = os.getenv("FASTAPI_ENV", "").lower() in {"dev", "development"}
+BOT_ENABLED: bool = _is_truthy(os.getenv("TELEGRAM_BOT_ENABLED")) and not DEV_MODE
 
-# Load bot token securely
-# This token should be the one associated with @kanomnom_internal_bot
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-if not TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set!")
+telegram_app: Optional[Application] = None
 
-logging.info("Initializing Telegram bot...")
+if BOT_ENABLED:
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not token:
+        raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set!")
 
-# Create bot application
-telegram_app = Application.builder().token(TOKEN).build()
+    logging.info("Initializing Telegram bot...")
+    telegram_app = Application.builder().token(token).build()
 
 
-async def start(update: Update, context: CallbackContext):
-    logging.info(f"Received /start command from {update.effective_user.id}")
+async def start(update: Update, context: CallbackContext) -> None:
+    logging.info("Received /start command from %s", update.effective_user.id)
     await update.message.reply_text("Hello! I am the Ka-Nom Nom internal bot.")
 
 
-# Log ALL updates to check if bot is receiving messages
-async def handle_updates(update: Update, context: CallbackContext):
-    logging.info(f"Received an update: {update}")
+def register_handlers() -> None:
+    if telegram_app is None:
+        return
+    telegram_app.add_handler(CommandHandler("start", start))
 
 
-telegram_app.add_handler(CommandHandler("start", start))
-
-
-async def start(update: Update, context: CallbackContext):
-    await update.message.reply_text("Hello! I am the Ka-Nom Nom internal bot.")
-
-
-telegram_app.add_handler(CommandHandler("start", start))
+register_handlers()

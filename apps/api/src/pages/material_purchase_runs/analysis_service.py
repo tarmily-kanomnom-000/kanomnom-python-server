@@ -280,9 +280,7 @@ class MaterialPurchaseAnalyticsService:
         total_purchases = len(records_sorted)
         last_record = records_sorted[-1]
 
-        last_purchase_date = (
-            last_record.get("purchase_date") if isinstance(last_record.get("purchase_date"), datetime) else None
-        )
+        last_purchase_date = last_record.get("purchase_date") if isinstance(last_record.get("purchase_date"), datetime) else None
         unit_counts = Counter()
         for record in records_sorted:
             unit_value = record.get("unit")
@@ -333,9 +331,7 @@ class MaterialPurchaseAnalyticsService:
             and days_since_last_purchase is not None
         ):
             if days_since_last_purchase > 0:
-                usage_per_day = units_last_purchase / max(
-                    days_since_last_purchase, self._usage_config.minimum_interval_days
-                )
+                usage_per_day = units_last_purchase / max(days_since_last_purchase, self._usage_config.minimum_interval_days)
                 usage_confidence = max(usage_confidence, 0.3)
 
         units_remaining_estimate = None
@@ -343,12 +339,7 @@ class MaterialPurchaseAnalyticsService:
         estimated_runout_date = None
         remaining_supply_window: RemainingSupplyWindow | None = None
 
-        if (
-            not infrequent_material
-            and usage_per_day is not None
-            and usage_per_day > 0
-            and units_last_purchase is not None
-        ):
+        if not infrequent_material and usage_per_day is not None and usage_per_day > 0 and units_last_purchase is not None:
             if days_since_last_purchase is None:
                 days_since_last_purchase = 0.0
             units_consumed = usage_per_day * days_since_last_purchase
@@ -452,11 +443,7 @@ class MaterialPurchaseAnalyticsService:
             if merged:
                 last_record = merged[-1]
                 last_date = last_record.get("purchase_date")
-                if (
-                    isinstance(purchase_date, datetime)
-                    and isinstance(last_date, datetime)
-                    and purchase_date == last_date
-                ):
+                if isinstance(purchase_date, datetime) and isinstance(last_date, datetime) and purchase_date == last_date:
                     merged[-1] = self._combine_same_day_record(last_record, record)
                     continue
             merged.append(record.copy())

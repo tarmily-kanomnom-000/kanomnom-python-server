@@ -32,18 +32,14 @@ class SemanticIngredientMatcher:
         self.max_candidates = max_candidates
         self.match_cache = LRUCache(maxsize=1000)  # LRU Cache for ingredient -> material matches
 
-        logger.info(
-            f"Initialized semantic matcher (fuzzy_threshold={fuzzy_threshold}, max_candidates={max_candidates})"
-        )
+        logger.info(f"Initialized semantic matcher (fuzzy_threshold={fuzzy_threshold}, max_candidates={max_candidates})")
 
     def set_api_client(self, api_client: Callable):
         """Set or update the API client function."""
         self.api_client = api_client
         logger.info("Updated API client for semantic matcher")
 
-    def _filter_materials_by_fuzzy_score(
-        self, unmatched_ingredients: list[str], available_materials: list[str]
-    ) -> list[str]:
+    def _filter_materials_by_fuzzy_score(self, unmatched_ingredients: list[str], available_materials: list[str]) -> list[str]:
         """
         Filter available materials using fuzzy string matching to get best candidates.
 
@@ -73,9 +69,7 @@ class SemanticIngredientMatcher:
             for match, _, _ in matches:
                 candidate_materials.add(match)
 
-            logger.debug(
-                f"🔍 Fuzzy search for '{ingredient}': {len(matches)} candidates (scores >= {self.fuzzy_threshold})"
-            )
+            logger.debug(f"🔍 Fuzzy search for '{ingredient}': {len(matches)} candidates (scores >= {self.fuzzy_threshold})")
 
         candidates_list = list(candidate_materials)
         original_count = len(available_materials)
@@ -87,9 +81,7 @@ class SemanticIngredientMatcher:
 
         return candidates_list
 
-    def _create_matching_prompt(
-        self, unmatched_ingredients: list[str], available_materials: list[str]
-    ) -> list[dict[str, str]]:
+    def _create_matching_prompt(self, unmatched_ingredients: list[str], available_materials: list[str]) -> list[dict[str, str]]:
         """Create the prompt messages for matching unmatched ingredients to available materials."""
         ingredients_list = "\n".join(f"{i + 1}. {ingredient}" for i, ingredient in enumerate(unmatched_ingredients))
         materials_list = "\n".join(f"{i + 1}. {material}" for i, material in enumerate(available_materials))
@@ -140,9 +132,7 @@ Now match the ingredients:""",
             },
         ]
 
-    def find_ingredient_matches(
-        self, unmatched_ingredients: list[str], available_materials: list[str]
-    ) -> dict[str, str]:
+    def find_ingredient_matches(self, unmatched_ingredients: list[str], available_materials: list[str]) -> dict[str, str]:
         """
         Find matches between unmatched recipe ingredients and available materials.
         Uses fuzzy string matching to pre-filter materials before LLM call for efficiency.
@@ -163,9 +153,7 @@ Now match the ingredients:""",
         # Log LLM call details
         logger.info("🤖 Calling LLM for semantic matching")
         logger.info(f"   📝 Unmatched ingredients: {unmatched_ingredients}")
-        logger.info(
-            f"   📦 Candidate materials: {candidate_materials} options (filtered from {len(available_materials)})"
-        )
+        logger.info(f"   📦 Candidate materials: {candidate_materials} options (filtered from {len(available_materials)})")
 
         try:
             # Create the prompt messages with filtered candidates

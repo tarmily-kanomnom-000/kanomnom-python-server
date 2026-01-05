@@ -1,6 +1,6 @@
 {
-  "name": "Ka-Nom Nom Dashboard",
-  "short_name": "Ka-Nom Nom",
+  "name": "Ka-Nom Nom Manager",
+  "short_name": "Ka-Nom Nom Manager",
   "description": "Internal dashboard for managing Ka-Nom Nom data and workflows.",
   "start_url": "/",
   "scope": "/",

@@ -139,9 +139,7 @@ def _add_total_cost(dataframe: pl.DataFrame) -> pl.DataFrame:
 
     if "total_unit_cost" in dataframe.columns:
         candidate_exprs.append(
-            pl.when(pl.col("total_unit_cost") > 0)
-            .then(pl.col("total_unit_cost") * package_expr * quantity_expr)
-            .otherwise(None)
+            pl.when(pl.col("total_unit_cost") > 0).then(pl.col("total_unit_cost") * package_expr * quantity_expr).otherwise(None)
         )
 
     if "purchase_unit_price" in dataframe.columns:
@@ -153,9 +151,7 @@ def _add_total_cost(dataframe: pl.DataFrame) -> pl.DataFrame:
 
     if "purchase_price_per_item" in dataframe.columns:
         candidate_exprs.append(
-            pl.when(pl.col("purchase_price_per_item") > 0)
-            .then(pl.col("purchase_price_per_item") * quantity_expr)
-            .otherwise(None)
+            pl.when(pl.col("purchase_price_per_item") > 0).then(pl.col("purchase_price_per_item") * quantity_expr).otherwise(None)
         )
 
     if "purchase_price_per_item2" in dataframe.columns:
@@ -179,9 +175,7 @@ def _add_unit_cost(dataframe: pl.DataFrame) -> pl.DataFrame:
     unit_cost_candidates: list[pl.Expr] = []
 
     if "total_unit_cost" in dataframe.columns:
-        unit_cost_candidates.append(
-            pl.when(pl.col("total_unit_cost") > 0).then(pl.col("total_unit_cost")).otherwise(None)
-        )
+        unit_cost_candidates.append(pl.when(pl.col("total_unit_cost") > 0).then(pl.col("total_unit_cost")).otherwise(None))
 
     unit_cost_candidates.append(
         pl.when((pl.col("units_purchased") > 0) & pl.col("total_cost").is_not_null() & (pl.col("total_cost") > 0))

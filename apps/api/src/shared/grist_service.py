@@ -62,9 +62,7 @@ def _convert_epoch_seconds_to_datetime(dataframe: pl.DataFrame, column: str) -> 
         pl.when(pl.col(column).is_null())
         .then(None)
         .otherwise(
-            pl.col(column)
-            .cast(pl.Int64, strict=False)
-            .map_elements(_epoch_to_datetime, return_dtype=pl.Datetime(time_unit="us"))
+            pl.col(column).cast(pl.Int64, strict=False).map_elements(_epoch_to_datetime, return_dtype=pl.Datetime(time_unit="us"))
         )
         .alias(column)
     )
@@ -289,9 +287,7 @@ def get_grist_table() -> pl.DataFrame:
             purchase_date_col = "Purchase_Date"
 
         string_columns = tuple(
-            column
-            for column in (resolved.get("material_name"), resolved.get("unit"))
-            if column and column in dataframe.columns
+            column for column in (resolved.get("material_name"), resolved.get("unit")) if column and column in dataframe.columns
         )
         dataframe = sanitize_string_columns(dataframe, string_columns)
 
@@ -396,9 +392,7 @@ class DataFilterManager:
             end_filter = self.end_date
 
             if start_filter and end_filter:
-                filtered_df = df.filter(
-                    (pl.col(purchase_date_col) >= start_filter) & (pl.col(purchase_date_col) <= end_filter)
-                )
+                filtered_df = df.filter((pl.col(purchase_date_col) >= start_filter) & (pl.col(purchase_date_col) <= end_filter))
                 logger.info(
                     "Applied date filter: %s to %s",
                     start_filter.strftime("%Y-%m-%d"),
@@ -438,9 +432,7 @@ class DataFilterManager:
 
         except Exception as exc:  # noqa: BLE001
             logger.error("Error applying time filter: %s", exc)
-            self.filtered_grist_dataframe = (
-                self.grist_dataframe.clone() if self.grist_dataframe is not None else pl.DataFrame()
-            )
+            self.filtered_grist_dataframe = self.grist_dataframe.clone() if self.grist_dataframe is not None else pl.DataFrame()
 
     def update_date_range(self, start_date: datetime, end_date: datetime) -> None:
         """Update the date range and reapply filter."""

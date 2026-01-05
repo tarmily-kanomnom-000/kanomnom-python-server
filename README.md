@@ -7,7 +7,7 @@ This repository now hosts multiple runtimes under a single roof. Each runtime li
 docker compose -f docker-compose-dev.yaml down && docker compose -f docker-compose-dev.yaml build && docker compose -f docker-compose-dev.yaml up
 
 ## Prod
-docker compose -f docker-compose-prod.yaml down && chmod +x scripts/run-stack-prod.sh scripts/run-stack.sh && docker compose -f docker-compose-prod.yaml build --no-cache && docker compose -f docker-compose-prod.yaml up -d
+docker compose -f docker-compose-prod.yaml down && sudo chown -R $USER:$USER . && chmod +x scripts/run-stack-prod.sh scripts/run-stack.sh && docker compose -f docker-compose-prod.yaml build --no-cache && docker compose -f docker-compose-prod.yaml up -d
 
 ## Directory Layout
 

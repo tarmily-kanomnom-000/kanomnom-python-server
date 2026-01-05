@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import time
 from contextlib import contextmanager
 from datetime import datetime
-import logging
 from pathlib import Path
 from typing import Any, Iterator
 
-logger = logging.getLogger(__name__)
-
 from models.shopping_list import BulkItemUpdate, ShoppingList
 from models.shopping_list_remove import BulkRemoveRequest
+
+logger = logging.getLogger(__name__)
 
 
 class ShoppingListManager:
@@ -28,11 +29,23 @@ class ShoppingListManager:
 
     @contextmanager
     def _with_lock(self, instance_index: str) -> Iterator[None]:
-        """Acquire a simple filesystem lock per instance to avoid concurrent writes."""
+        """Acquire a simple filesystem lock per instance to avoid concurrent writes.
+
+        Retries briefly instead of immediately throwing when another worker holds the lock,
+        to avoid transient 500s during rapid offline replay bursts.
+        """
         lock_path = self.get_instance_dir(instance_index) / "active.lock"
         fd: int | None = None
+        # Small bounded retry to allow queued syncs to serialize
+        for attempt in range(5):
+            try:
+                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+                break
+            except FileExistsError:
+                if attempt == 4:
+                    raise
+                time.sleep(0.1)
         try:
-            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
             yield
         finally:
             if fd is not None:
@@ -118,9 +131,7 @@ class ShoppingListManager:
             # Prevent duplicate products in the list (regardless of status)
             existing_product_ids = {item["product_id"] for item in list_data.get("items", [])}
             if item_data["product_id"] in existing_product_ids:
-                raise ValueError(
-                    f"Product {item_data['product_id']} already exists in the active shopping list"
-                )
+                raise ValueError(f"Product {item_data['product_id']} already exists in the active shopping list")
 
             list_data["items"].append(item_data)
 
@@ -162,9 +173,7 @@ class ShoppingListManager:
                 raise ValueError(f"Item {item_id} not found in list")
 
             # Remove from items list
-            list_data["items"] = [
-                item for item in list_data["items"] if item["id"] != item_id
-            ]
+            list_data["items"] = [item for item in list_data["items"] if item["id"] != item_id]
 
             # Track deleted product_id to prevent it from coming back in merge
             if "deleted_product_ids" not in list_data:
@@ -209,64 +218,87 @@ class ShoppingListManager:
         """
         with self._with_lock(instance_index):
             list_data = self.load_active_list(instance_index)
-        now = datetime.utcnow().isoformat() + "Z"
+            now = datetime.utcnow().isoformat() + "Z"
 
-        # Create a mapping of item_id to updates for fast lookup
-        updates_map = {
-            (update["item_id"] if isinstance(update, dict) else update.item_id): (
-                update if isinstance(update, dict) else update.model_dump(exclude_none=True)
-            )
-            for update in updates
-        }
+            # Create a mapping of item_id to updates for fast lookup
+            updates_map = {
+                (update["item_id"] if isinstance(update, dict) else update.item_id): (
+                    update if isinstance(update, dict) else update.model_dump(exclude_none=True)
+                )
+                for update in updates
+            }
 
-        # Track which items were updated
-        updated_items = []
-        item_ids_found = set()
-        remaining_items: list[dict] = []
+            # Track which items were updated
+            updated_items = []
+            item_ids_found = set()
+            remaining_items: list[dict] = []
 
-        # Apply updates to all matching items
-        for item in list_data["items"]:
-            item_id = item["id"]
-            if item_id in updates_map:
-                update = updates_map[item_id]
-                item_ids_found.add(item_id)
+            # Apply updates to all matching items
+            for item in list_data["items"]:
+                item_id = item["id"]
+                if item_id in updates_map:
+                    update = updates_map[item_id]
+                    item_ids_found.add(item_id)
 
-                # Apply updates
-                if "status" in update and update["status"] is not None:
-                    item["status"] = update["status"]
-                if "quantity_purchased" in update and update["quantity_purchased"] is not None:
-                    item["quantity_purchased"] = update["quantity_purchased"]
-                if "notes" in update and update["notes"] is not None:
-                    item["notes"] = update["notes"]
-                if "checked_at" in update and update["checked_at"] is not None:
-                    item["checked_at"] = update["checked_at"]
+                    # Apply updates
+                    if "status" in update and update["status"] is not None:
+                        item["status"] = update["status"]
+                    if "quantity_purchased" in update and update["quantity_purchased"] is not None:
+                        item["quantity_purchased"] = update["quantity_purchased"]
+                    if "notes" in update and update["notes"] is not None:
+                        item["notes"] = update["notes"]
+                    if "checked_at" in update and update["checked_at"] is not None:
+                        item["checked_at"] = update["checked_at"]
+                    if "shopping_location_id" in update:
+                        item["shopping_location_id"] = update["shopping_location_id"]
+                    if "shopping_location_name" in update and update["shopping_location_name"] is not None:
+                        item["shopping_location_name"] = update["shopping_location_name"]
+                    elif "shopping_location_id" in update:
+                        item["shopping_location_name"] = (
+                            "UNKNOWN" if update["shopping_location_id"] is None else item.get("shopping_location_name", "UNKNOWN")
+                        )
 
-                # Update modified timestamp
-                item["modified_at"] = now
-                updated_items.append(item.copy())
-                remaining_items.append(item)
-            else:
-                remaining_items.append(item)
+                    # Update modified timestamp
+                    item["modified_at"] = now
+                    updated_items.append(item.copy())
+                    remaining_items.append(item)
+                else:
+                    remaining_items.append(item)
 
-        # Check if all requested items were found (including deletions)
-        missing_ids = set(updates_map.keys()) - item_ids_found
-        if missing_ids:
-            raise ValueError(f"Items not found: {', '.join(missing_ids)}")
+            # Check if all requested items were found (including deletions)
+            missing_ids = set(updates_map.keys()) - item_ids_found
+            if missing_ids:
+                raise ValueError(f"Items not found: {', '.join(missing_ids)}")
 
-        list_data["items"] = remaining_items
+            list_data["items"] = remaining_items
+            # Append new locations to location_order so future grouping remains consistent
+            location_order: list[str | int] = list_data.get("location_order", [])
+            existing_location_keys = {str(loc) for loc in location_order}
+            for updated in updated_items:
+                location_key = (
+                    str(updated["shopping_location_id"])
+                    if updated.get("shopping_location_id") is not None
+                    else updated.get("shopping_location_name", "UNKNOWN")
+                )
+                if location_key not in existing_location_keys:
+                    location_order.append(
+                        updated["shopping_location_id"]
+                        if updated.get("shopping_location_id") is not None
+                        else updated.get("shopping_location_name", "UNKNOWN")
+                    )
+                    existing_location_keys.add(location_key)
+            list_data["location_order"] = location_order
 
-        # Update list metadata
-        list_data["version"] = list_data.get("version", 1) + 1
-        list_data["last_modified_at"] = now
+            # Update list metadata
+            list_data["version"] = list_data.get("version", 1) + 1
+            list_data["last_modified_at"] = now
 
-        # Save updated list
-        self.save_active_list(instance_index, list_data)
+            # Save updated list
+            self.save_active_list(instance_index, list_data)
 
-        return updated_items
+            return updated_items
 
-    def bulk_remove_items(
-        self, instance_index: str, request: BulkRemoveRequest
-    ) -> list[dict]:
+    def bulk_remove_items(self, instance_index: str, request: BulkRemoveRequest) -> list[dict]:
         """Remove multiple items and track deleted product_ids"""
         with self._with_lock(instance_index):
             list_data = self.load_active_list(instance_index)
@@ -315,11 +347,7 @@ class ShoppingListManager:
         if "location_order" not in list_data:
             seen_locations: list[str | int] = []
             for item in list_data.get("items", []):
-                location_key = (
-                    "UNKNOWN"
-                    if item.get("shopping_location_id") is None
-                    else item["shopping_location_id"]
-                )
+                location_key = "UNKNOWN" if item.get("shopping_location_id") is None else item["shopping_location_id"]
                 if location_key not in seen_locations:
                     seen_locations.append(location_key)
             list_data["location_order"] = seen_locations

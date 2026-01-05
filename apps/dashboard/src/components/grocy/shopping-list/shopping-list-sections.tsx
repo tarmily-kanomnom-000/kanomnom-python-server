@@ -2,6 +2,12 @@ import type { ShoppingListSection } from "@/hooks/useShoppingListController";
 import type { ItemUpdate } from "@/lib/grocy/shopping-list-types";
 import { ShoppingListItemCard } from "./shopping-list-item-card";
 
+type LocationOption = {
+  value: string;
+  label: string;
+  name: string;
+};
+
 type Props = {
   sections: ShoppingListSection[];
   collapsedSections: Record<string, boolean>;
@@ -10,6 +16,7 @@ type Props = {
   onUncheckSection: (locationKey: string) => void;
   onUpdateItem: (itemId: string, updates: ItemUpdate) => Promise<void>;
   onDeleteItem: (itemId: string) => Promise<void>;
+  locationOptions: LocationOption[];
 };
 
 export function ShoppingListSections({
@@ -20,6 +27,7 @@ export function ShoppingListSections({
   onUncheckSection,
   onUpdateItem,
   onDeleteItem,
+  locationOptions,
 }: Props) {
   return (
     <div className="space-y-6">
@@ -92,6 +100,7 @@ export function ShoppingListSections({
                     item={item}
                     onUpdate={onUpdateItem}
                     onDelete={onDeleteItem}
+                    locationOptions={locationOptions}
                   />
                 ))}
               </div>

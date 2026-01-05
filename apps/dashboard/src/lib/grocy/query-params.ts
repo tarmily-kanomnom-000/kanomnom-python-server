@@ -7,6 +7,8 @@ export const GROCY_QUERY_PARAMS = {
   inventoryStalenessRange: "inventory_stale",
   inventoryUpdatedRange: "inventory_updated",
   inventorySort: "inventory_sort",
+  inventoryMode: "inventory_mode",
+  inventoryPurchaseDate: "inventory_purchase_date",
 } as const;
 
 export const INVENTORY_QUERY_PARAM_KEYS: string[] = [
@@ -17,4 +19,6 @@ export const INVENTORY_QUERY_PARAM_KEYS: string[] = [
   GROCY_QUERY_PARAMS.inventoryStalenessRange,
   GROCY_QUERY_PARAMS.inventoryUpdatedRange,
   GROCY_QUERY_PARAMS.inventorySort,
+  GROCY_QUERY_PARAMS.inventoryMode,
+  GROCY_QUERY_PARAMS.inventoryPurchaseDate,
 ];

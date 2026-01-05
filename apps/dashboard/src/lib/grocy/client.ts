@@ -11,6 +11,7 @@ import {
 import type {
   GrocyProductInventoryEntry,
   GrocyStockEntry,
+  InventoryAdjustmentRequestPayload,
   InventoryCorrectionRequestPayload,
   PurchaseEntryCalculation,
   PurchaseEntryDefaults,
@@ -114,6 +115,47 @@ export async function submitInventoryCorrection(
   try {
     const response = await axios.post(
       `/api/grocy/${instanceIndex}/products/${productId}/inventory`,
+      payload,
+      {
+        adapter: "fetch",
+        fetchOptions: { cache: "no-store" },
+      },
+    );
+    const entry = deserializeGrocyProductInventoryEntry(
+      response.data as GrocyProductInventoryEntryPayload,
+    );
+    invalidateGrocyProductsClientCache(instanceIndex);
+    upsertCachedProduct(instanceIndex, entry);
+    return entry;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const detail =
+        (
+          error.response?.data as
+            | { error?: string; detail?: string }
+            | undefined
+        )?.error ??
+        (
+          error.response?.data as
+            | { error?: string; detail?: string }
+            | undefined
+        )?.detail ??
+        error.response?.statusText ??
+        error.message;
+      throw new Error(detail);
+    }
+    throw error;
+  }
+}
+
+export async function submitInventoryAdjustment(
+  instanceIndex: string,
+  productId: number,
+  payload: InventoryAdjustmentRequestPayload,
+): Promise<GrocyProductInventoryEntry> {
+  try {
+    const response = await axios.post(
+      `/api/grocy/${instanceIndex}/products/${productId}/inventory/adjust`,
       payload,
       {
         adapter: "fetch",

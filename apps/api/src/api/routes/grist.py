@@ -31,9 +31,7 @@ async def grist_status(inquiries: Inquiries) -> dict:
     for inquiry in inquiries.root:
         email_value = escape_markdown_v2(inquiry.email.ascii_email) if getattr(inquiry, "email", None) else "N/A"
         phone_value = (
-            escape_markdown_v2(str(inquiry.phone_number.national_number))
-            if getattr(inquiry, "phone_number", None)
-            else "N/A"
+            escape_markdown_v2(str(inquiry.phone_number.national_number)) if getattr(inquiry, "phone_number", None) else "N/A"
         )
 
         email_line = f"📧 *Email:* {email_value}"
@@ -52,11 +50,7 @@ async def grist_status(inquiries: Inquiries) -> dict:
         customer_name = escape_markdown_v2(" ".join(customer_names)) if customer_names else "N/A"
         inquiry_type = escape_markdown_v2(inquiry.inquiry_type.value) if inquiry.inquiry_type else "N/A"
         inquiry_message = escape_markdown_v2(inquiry.inquiry or "N/A")
-        needed_by = (
-            escape_markdown_v2(inquiry.date_needed_by.strftime("%Y-%m-%d %H:%M:%S"))
-            if inquiry.date_needed_by
-            else "N/A"
-        )
+        needed_by = escape_markdown_v2(inquiry.date_needed_by.strftime("%Y-%m-%d %H:%M:%S")) if inquiry.date_needed_by else "N/A"
 
         message_text = (
             "📩 *New Inquiry Received*\n"

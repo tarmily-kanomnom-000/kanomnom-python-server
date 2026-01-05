@@ -234,6 +234,8 @@ When refactoring:
 - Refresh docstrings and comments.  
 - Fix tests and usage examples.  
 - Provide a short migration note if public APIs change.
+- Keep documentation current while implementing features—no doc deserts or doc dumps. Add concise, relevant updates in the owning runtime (API docs, dashboard README, manifests) instead of piling everything into a single file.
+- Maintain a Documentation Standards Markdown (`docs/DOCUMENTATION_STANDARDS.md`) that explains how we document, where updates belong, and the expected level of detail; create or refresh it whenever practices evolve and link to it from new docs.
 
 ---
 

@@ -3,11 +3,15 @@
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { ListControls } from "@/components/grocy/list-controls";
 import { OfflineIndicator } from "@/components/grocy/shopping-list/offline-indicator";
 import { ShoppingListSections } from "@/components/grocy/shopping-list/shopping-list-sections";
 import { SyncStatusBanner } from "@/components/grocy/shopping-list/sync-status-banner";
 import { useShoppingListController } from "@/hooks/useShoppingListController";
-import type { ProductSearchResult } from "@/lib/grocy/shopping-list-types";
+import type {
+  ItemStatus,
+  ProductSearchResult,
+} from "@/lib/grocy/shopping-list-types";
 
 export default function ShoppingListPage() {
   const params = useParams();
@@ -43,6 +47,10 @@ export default function ShoppingListPage() {
   const [addItemProductId, setAddItemProductId] = useState("");
   const [addItemQuantity, setAddItemQuantity] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [itemSearch, setItemSearch] = useState("");
+  const [statusFilters, setStatusFilters] = useState<ItemStatus[]>([]);
+  const [locationFilters, setLocationFilters] = useState<string[]>([]);
+  const [showUncheckedOnly, setShowUncheckedOnly] = useState(false);
   const [selectedProduct, setSelectedProduct] =
     useState<ProductSearchResult | null>(null);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
@@ -140,6 +148,22 @@ export default function ShoppingListPage() {
     setSearchQuery(product.name);
   };
 
+  const toggleStatus = (status: ItemStatus) => {
+    setStatusFilters((current) =>
+      current.includes(status)
+        ? current.filter((value) => value !== status)
+        : [...current, status],
+    );
+  };
+
+  const toggleLocation = (locationKey: string) => {
+    setLocationFilters((current) =>
+      current.includes(locationKey)
+        ? current.filter((value) => value !== locationKey)
+        : [...current, locationKey],
+    );
+  };
+
   const handleAddItem = async () => {
     const productId = parseInt(addItemProductId, 10);
     const quantity = parseFloat(addItemQuantity);
@@ -161,6 +185,95 @@ export default function ShoppingListPage() {
     setSearchQuery("");
     setSelectedProduct(null);
   };
+
+  const statusFilterValues: Array<{ value: ItemStatus; label: string }> = [
+    { value: "pending", label: "Pending" },
+    { value: "purchased", label: "Purchased" },
+    { value: "unavailable", label: "Unavailable" },
+  ];
+
+  const locationFilterValues = useMemo(() => {
+    const entries = new Map<string, string>();
+    sections.forEach((section) => {
+      entries.set(section.locationKey, section.locationName);
+    });
+    return Array.from(entries.entries())
+      .map(([key, name]) => {
+        const baseLabel = name || key;
+        return {
+          value: key,
+          label: baseLabel,
+          name: baseLabel,
+          display: baseLabel === key ? baseLabel : `${baseLabel} (${key})`,
+        };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [sections]);
+
+  const locationOptions = useMemo(
+    () =>
+      locationFilterValues.map((entry) => ({
+        value: entry.value,
+        label: entry.display,
+        name: entry.name,
+      })),
+    [locationFilterValues],
+  );
+
+  const filteredSections = useMemo(() => {
+    const normalizedSearch = itemSearch.trim().toLowerCase();
+    const effectiveStatusFilters: ItemStatus[] = showUncheckedOnly
+      ? ["pending"]
+      : statusFilters;
+
+    const matchesSearch = (value: string) =>
+      value.toLowerCase().includes(normalizedSearch);
+
+    return sections
+      .map((section) => {
+        const items = section.items.filter((item) => {
+          if (
+            effectiveStatusFilters.length > 0 &&
+            !effectiveStatusFilters.includes(item.status)
+          ) {
+            return false;
+          }
+          if (
+            locationFilters.length > 0 &&
+            !locationFilters.includes(
+              item.shopping_location_id?.toString() ??
+                item.shopping_location_name ??
+                "UNKNOWN",
+            )
+          ) {
+            return false;
+          }
+          if (!normalizedSearch) {
+            return true;
+          }
+          return (
+            matchesSearch(item.product_name) ||
+            (item.notes ? matchesSearch(item.notes) : false)
+          );
+        });
+
+        const purchased = items.filter(
+          (item) =>
+            item.status === "purchased" || item.status === "unavailable",
+        ).length;
+        const total = items.length;
+
+        return {
+          ...section,
+          items,
+          purchasedCount: purchased,
+          totalCount: total,
+          allChecked: purchased === total && total > 0,
+          someChecked: purchased > 0 && purchased < total,
+        };
+      })
+      .filter((section) => section.items.length > 0);
+  }, [itemSearch, locationFilters, sections, showUncheckedOnly, statusFilters]);
 
   if (isLoading) {
     return <div className="p-6">Loading...</div>;
@@ -243,6 +356,100 @@ export default function ShoppingListPage() {
           </>
         )}
       </div>
+
+      {list ? (
+        <div className="mb-6 space-y-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="text-sm font-medium text-gray-800">
+              Filter and search items
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setShowUncheckedOnly((prev) => !prev)}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                  showUncheckedOnly
+                    ? "border-green-500 bg-green-50 text-green-700"
+                    : "border-gray-300 text-gray-700 hover:border-gray-500"
+                }`}
+              >
+                {showUncheckedOnly
+                  ? "Showing unchecked only"
+                  : "Show unchecked"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusFilters([]);
+                  setLocationFilters([]);
+                  setShowUncheckedOnly(false);
+                  setItemSearch("");
+                }}
+                className="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 transition hover:border-gray-500"
+              >
+                Clear filters
+              </button>
+            </div>
+          </div>
+          <ListControls
+            searchLabel="Search shopping list items"
+            searchPlaceholder="Search items or notes…"
+            searchValue={itemSearch}
+            onSearchChange={setItemSearch}
+            filters={{
+              fields: [
+                {
+                  id: "status",
+                  label: "Status",
+                  type: "text",
+                  values: statusFilterValues.map((value) => value.label),
+                  selectedValues: statusFilterValues
+                    .filter((entry) =>
+                      showUncheckedOnly
+                        ? entry.value === "pending"
+                        : statusFilters.includes(entry.value),
+                    )
+                    .map((entry) => entry.label),
+                  onToggle: (label) => {
+                    const statusEntry = statusFilterValues.find(
+                      (entry) => entry.label === label,
+                    );
+                    if (!statusEntry) {
+                      return;
+                    }
+                    setShowUncheckedOnly(false);
+                    toggleStatus(statusEntry.value);
+                  },
+                  onClear: () => {
+                    setStatusFilters([]);
+                    setShowUncheckedOnly(false);
+                  },
+                },
+                {
+                  id: "location",
+                  label: "Location",
+                  type: "text",
+                  values: locationFilterValues.map((entry) => entry.display),
+                  selectedValues: locationFilterValues
+                    .filter((entry) => locationFilters.includes(entry.value))
+                    .map((entry) => entry.display),
+                  onToggle: (label) => {
+                    const locationEntry = locationFilterValues.find(
+                      (entry) => entry.display === label,
+                    );
+                    if (!locationEntry) {
+                      return;
+                    }
+                    toggleLocation(locationEntry.value);
+                  },
+                  onClear: () => setLocationFilters([]),
+                },
+              ],
+              buttonLabel: "Filters +",
+            }}
+          />
+        </div>
+      ) : null}
 
       {error && (
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700">
@@ -379,15 +586,16 @@ export default function ShoppingListPage() {
       )}
 
       {/* Items grouped by location */}
-      {list && list.items.length > 0 && (
+      {list && filteredSections.length > 0 && (
         <ShoppingListSections
-          sections={sections}
+          sections={filteredSections}
           collapsedSections={collapsedSections}
           onToggleSection={toggleSection}
           onCheckSection={bulkCheckSection}
           onUncheckSection={bulkUncheckSection}
           onUpdateItem={updateItem}
           onDeleteItem={(itemId) => removeItems([itemId])}
+          locationOptions={locationOptions}
         />
       )}
 

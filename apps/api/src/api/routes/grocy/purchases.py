@@ -83,12 +83,13 @@ def _resolve_package_batch(metadata: PurchaseEntryNoteMetadata | None) -> tuple[
     if metadata.package_quantity is None or metadata.package_size is None:
         return None
     quantity = metadata.package_quantity
-    if not float(quantity).is_integer():
-        raise ValueError("package_quantity must be a whole number to create discrete package entries.")
-    count = int(quantity)
-    if count < 1:
-        raise ValueError("package_quantity must be at least 1.")
-    return count, metadata.package_size
+    # Only split into discrete packages when the quantity is a whole number; otherwise treat as a single entry.
+    if float(quantity).is_integer():
+        count = int(quantity)
+        if count < 1:
+            raise ValueError("package_quantity must be at least 1.")
+        return count, metadata.package_size
+    return None
 
 
 def _serialize_stock_entries(entries: list[GrocyStockEntry]) -> list[GrocyStockEntryPayload]:
@@ -344,9 +345,7 @@ async def record_purchase_entry(
         new_entries = new_entries[-expected_entries:]
 
     purchase_epoch = _compose_purchase_timestamp(recorded_entries[0].purchased_date, instance_index)
-    shopping_location_name = await _resolve_shopping_location_name(
-        instance_index, recorded_entries[0].shopping_location_id
-    )
+    shopping_location_name = await _resolve_shopping_location_name(instance_index, recorded_entries[0].shopping_location_id)
     serialized_product = serialize_inventory_view(updated_product)
     grist_fields = _build_grist_record_fields(
         product=serialized_product,
@@ -524,9 +523,7 @@ def _instance_timezone(instance_index: str) -> ZoneInfo:
     return ZoneInfo("UTC")
 
 
-async def _ensure_shopping_location_id(
-    instance_index: str, purchase: PurchaseEntryRequest
-) -> int | None:
+async def _ensure_shopping_location_id(instance_index: str, purchase: PurchaseEntryRequest) -> int | None:
     if purchase.shopping_location_id is not None:
         return purchase.shopping_location_id
 

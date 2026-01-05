@@ -6,6 +6,7 @@ from core.grocy.models import (
     InstanceMetadata,
     ProductGroupDefinition,
     QuantityUnitDefinition,
+    ShoppingLocationDefinition,
     UniversalManifest,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     "InstanceMetadata",
     "ProductGroupDefinition",
     "QuantityUnitDefinition",
+    "ShoppingLocationDefinition",
     "UniversalManifest",
 ]

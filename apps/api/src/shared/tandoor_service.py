@@ -274,9 +274,7 @@ class TandoorService:
                 page_recipes = [self._parse_recipe(recipe_data) for recipe_data in data.get("results", [])]
                 recipes.extend(page_recipes)
 
-                logger.info(
-                    f"Fetched {len(page_recipes)} recipe stubs from page {page_num} (total so far: {len(recipes)})"
-                )
+                logger.info(f"Fetched {len(page_recipes)} recipe stubs from page {page_num} (total so far: {len(recipes)})")
 
                 # Use the next URL provided by Tandoor
                 url = next_url

@@ -17,10 +17,7 @@ def sanitize_string_columns(dataframe: pl.DataFrame, columns: tuple[str, ...] | 
 
         text = pl.col(column).cast(pl.Utf8, strict=False).str.strip_chars()
         dataframe = dataframe.with_columns(
-            pl.when(text.is_null() | text.str.to_lowercase().is_in(_EMPTY_LITERALS))
-            .then(None)
-            .otherwise(text)
-            .alias(column)
+            pl.when(text.is_null() | text.str.to_lowercase().is_in(_EMPTY_LITERALS)).then(None).otherwise(text).alias(column)
         )
 
     return dataframe

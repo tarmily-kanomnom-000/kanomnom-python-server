@@ -35,6 +35,7 @@ type PurchaseEntryFormProps = {
   onClose: () => void;
   onProductChange: (product: GrocyProductInventoryEntry) => void;
   onSuccess: (message: string) => void;
+  formId?: string;
 };
 
 export function PurchaseEntryForm({
@@ -47,6 +48,7 @@ export function PurchaseEntryForm({
   onClose,
   onProductChange,
   onSuccess,
+  formId = "purchase-entry-form",
 }: PurchaseEntryFormProps) {
   const normalizeCurrency = useCallback((value: string | null): string => {
     if (!value) {
@@ -576,6 +578,7 @@ export function PurchaseEntryForm({
 
   return (
     <form
+      id={formId}
       onSubmit={handleSubmit}
       className="mt-6 space-y-5 text-sm text-neutral-900"
     >
@@ -973,26 +976,6 @@ export function PurchaseEntryForm({
           {statusMessage.text}
         </p>
       ) : null}
-      <div className="flex justify-end gap-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-full border border-neutral-200 px-5 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-900 hover:text-neutral-900"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={!isFormValid}
-          className={`rounded-full px-5 py-2 text-sm font-semibold text-white transition ${
-            isFormValid
-              ? "bg-neutral-900 hover:bg-neutral-800"
-              : "bg-neutral-400"
-          }`}
-        >
-          {isSubmitting ? "Submitting…" : "Record purchase"}
-        </button>
-      </div>
     </form>
   );
 }

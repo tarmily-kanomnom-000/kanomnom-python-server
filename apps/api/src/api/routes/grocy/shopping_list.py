@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
-import logging
 
 from core.cache.grocy_shopping_locations_cache import get_grocy_shopping_locations_cache
 from core.grocy.price_analyzer import PriceAnalyzer
@@ -59,16 +59,12 @@ async def _get_price_analyzer(instance_index: str) -> PriceAnalyzer:
         raise HTTPException(status_code=500, detail=f"Failed to initialize price analyzer: {exc!s}") from exc
 
 
-async def _build_item_data(
-    instance_index: str, request: AddItemRequest, price_analyzer: PriceAnalyzer | None = None
-) -> dict:
+async def _build_item_data(instance_index: str, request: AddItemRequest, price_analyzer: PriceAnalyzer | None = None) -> dict:
     """Build a shopping list item payload with price/location enrichment."""
     grocy_manager = await run_in_threadpool(governor.manager_for, instance_index)
     inventory_service = grocy_manager._inventory
 
-    products_with_inv = await run_in_threadpool(
-        inventory_service.list_products_with_inventory, instance_index
-    )
+    products_with_inv = await run_in_threadpool(inventory_service.list_products_with_inventory, instance_index)
     product_view = None
     for p in products_with_inv:
         if p.product.id == request.product_id:
@@ -87,9 +83,7 @@ async def _build_item_data(
             current_stock += stock.amount
 
     shopping_locations_cache = get_grocy_shopping_locations_cache()
-    shopping_locations = await run_in_threadpool(
-        shopping_locations_cache.load_shopping_locations, instance_index
-    )
+    shopping_locations = await run_in_threadpool(shopping_locations_cache.load_shopping_locations, instance_index)
     location_names = {}
     if shopping_locations:
         location_names = {loc.id: loc.name for loc in shopping_locations}
@@ -100,9 +94,7 @@ async def _build_item_data(
         location_name = location_names.get(location_id, f"Location {location_id}")
 
     analyzer = price_analyzer or await _get_price_analyzer(instance_index)
-    last_price = await run_in_threadpool(
-        analyzer.get_last_purchase_price, request.product_id
-    )
+    last_price = await run_in_threadpool(analyzer.get_last_purchase_price, request.product_id)
 
     now = datetime.utcnow().isoformat() + "Z"
     return {
@@ -125,9 +117,7 @@ async def _build_item_data(
 
 
 @router.post("/{instance_index}/shopping-list/generate", response_model=ShoppingList)
-async def generate_shopping_list(
-    instance_index: str, request: GenerateListRequest
-) -> ShoppingList:
+async def generate_shopping_list(instance_index: str, request: GenerateListRequest) -> ShoppingList:
     """Generate shopping list with Phase 2 features (price, merge support)"""
     manager = _get_manager()
 
@@ -140,9 +130,7 @@ async def generate_shopping_list(
 
         existing_list = await run_in_threadpool(manager.load_active_list, instance_index)
         generator = await _get_generator(instance_index, with_price_analyzer=True)
-        merged_list = await run_in_threadpool(
-            generator.merge_with_existing, existing_list, instance_index
-        )
+        merged_list = await run_in_threadpool(generator.merge_with_existing, existing_list, instance_index)
         await run_in_threadpool(manager.save_active_list, instance_index, merged_list)
         return ShoppingList(**merged_list)
 
@@ -274,6 +262,8 @@ async def bulk_update_items(
                 "quantity_purchased": update.quantity_purchased,
                 "notes": update.notes,
                 "checked_at": update.checked_at,
+                "shopping_location_id": update.shopping_location_id,
+                "shopping_location_name": update.shopping_location_name,
             }
             for update in request.updates
         ]
@@ -313,7 +303,7 @@ async def bulk_add_items(
         analyzer = await _get_price_analyzer(instance_index)
         item_payloads = []
         for req in requests:
-          item_payloads.append(await _build_item_data(instance_index, req, analyzer))
+            item_payloads.append(await _build_item_data(instance_index, req, analyzer))
 
         added_items = []
         for payload in item_payloads:
@@ -344,9 +334,7 @@ async def bulk_remove_items(
     manager = _get_manager()
 
     try:
-        removed = await run_in_threadpool(
-            manager.bulk_remove_items, instance_index, request
-        )
+        removed = await run_in_threadpool(manager.bulk_remove_items, instance_index, request)
         logger.info(
             "shopping_list_bulk_remove",
             extra={"instance_index": instance_index, "count": len(removed)},

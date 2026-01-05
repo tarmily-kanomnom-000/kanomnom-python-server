@@ -40,9 +40,7 @@ class IngredientsCalculationService:
             return False
 
         try:
-            intermediate_servings, raw_ingredients = self._calculator.calculate_ingredients_and_servings(
-                selected_quantities
-            )
+            intermediate_servings, raw_ingredients = self._calculator.calculate_ingredients_and_servings(selected_quantities)
             self.state.intermediate_servings = intermediate_servings
             self.state.raw_ingredients = raw_ingredients
 
@@ -63,9 +61,7 @@ class IngredientsCalculationService:
         try:
             remaining_servings = self._calculate_remaining_servings()
             if remaining_servings:
-                self.state.raw_ingredients = self._calculator.calculate_raw_ingredients_from_remaining(
-                    remaining_servings
-                )
+                self.state.raw_ingredients = self._calculator.calculate_raw_ingredients_from_remaining(remaining_servings)
             else:
                 self.state.raw_ingredients = {}
 

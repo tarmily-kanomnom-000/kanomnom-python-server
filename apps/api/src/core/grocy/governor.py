@@ -8,7 +8,11 @@ from core.grocy.exceptions import ManifestNotFoundError
 from core.grocy.manager import GrocyManager
 from core.grocy.metadata import InstanceMetadataRepository
 from core.grocy.models import InstanceMetadata, UniversalManifest
-from core.grocy.services import ProductGroupSyncResult, QuantityUnitSyncResult
+from core.grocy.services import (
+    ProductGroupSyncResult,
+    QuantityUnitSyncResult,
+    ShoppingLocationSyncResult,
+)
 
 
 class GrocyGovernor:
@@ -57,6 +61,12 @@ class GrocyGovernor:
         manifest = self._load_universal_manifest()
         manager = self.manager_for(instance_index)
         return manager.ensure_product_groups(manifest)
+
+    def ensure_shopping_locations(self, instance_index: str) -> ShoppingLocationSyncResult:
+        """Ensure an instance has every shopping location defined in the universal manifest."""
+        manifest = self._load_universal_manifest()
+        manager = self.manager_for(instance_index)
+        return manager.ensure_shopping_locations(manifest)
 
     def _load_universal_manifest(self) -> UniversalManifest:
         universal_dir = self.manifest_root / "universal"

@@ -152,10 +152,7 @@ class WeatherIngestJob:
             upsert_window_metrics_rows(conn, location_window_rows)
 
             print(f"✅ Inserted/updated {len(location_hourly_rows)} rows into weather_hourly for {location.name}.")
-            print(
-                "✅ Inserted/updated "
-                f"{len(location_window_rows)} rows into weather_window_metrics for {location.name}."
-            )
+            print("✅ Inserted/updated " f"{len(location_window_rows)} rows into weather_window_metrics for {location.name}.")
 
         if conn:
             conn.close()

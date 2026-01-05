@@ -70,14 +70,20 @@ export function InstancesPicker({ instances, userRole }: InstancesPickerProps) {
 
   useEffect(() => {
     const queryInstanceId = searchParams.get(GROCY_QUERY_PARAMS.instance);
+    const browserInstanceId =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get(
+            GROCY_QUERY_PARAMS.instance,
+          )
+        : null;
     const resolvedSelection = resolveInstanceSelection(
-      queryInstanceId,
+      browserInstanceId ?? queryInstanceId,
       instances,
     );
     setSelectedInstanceId((current) =>
       current === resolvedSelection ? current : resolvedSelection,
     );
-    if (resolvedSelection !== queryInstanceId) {
+    if (!browserInstanceId && resolvedSelection) {
       updateQueryParams({ [GROCY_QUERY_PARAMS.instance]: resolvedSelection });
     }
   }, [instances, searchParams, updateQueryParams]);
@@ -199,9 +205,7 @@ function resolveInstanceSelection(
     const matched = instances.find(
       (instance) => instance.instance_index === queryValue,
     );
-    if (matched) {
-      return matched.instance_index;
-    }
+    return matched ? matched.instance_index : queryValue;
   }
   return instances[0]?.instance_index ?? null;
 }

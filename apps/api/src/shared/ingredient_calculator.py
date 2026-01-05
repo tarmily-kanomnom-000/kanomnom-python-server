@@ -67,9 +67,7 @@ class IngredientCalculator:
 
                 # Check if this ingredient is itself a recipe
                 if ingredient_name_lower in self.recipe_lookup:
-                    sub_ingredients = get_raw_ingredients_for_recipe(
-                        ingredient.name, ingredient_quantity_needed, visited.copy()
-                    )
+                    sub_ingredients = get_raw_ingredients_for_recipe(ingredient.name, ingredient_quantity_needed, visited.copy())
                     for sub_ingredient, (sub_quantity, sub_unit) in sub_ingredients.items():
                         if sub_ingredient in ingredient_breakdown:
                             existing_qty, existing_unit = ingredient_breakdown[sub_ingredient]
@@ -165,9 +163,7 @@ class IngredientCalculator:
         intermediate_servings = {}
         raw_ingredients = {}
 
-        def process_recipe(
-            recipe_name: str, needed_quantity: float, is_root_product: bool = False, visited: set = None
-        ):
+        def process_recipe(recipe_name: str, needed_quantity: float, is_root_product: bool = False, visited: set = None):
             if visited is None:
                 visited = set()
 
@@ -257,9 +253,7 @@ class IngredientCalculator:
     @cachedmethod(
         attrgetter("_calculation_cache"), key=lambda self, remaining_servings: tuple(sorted(remaining_servings.items()))
     )
-    def calculate_raw_ingredients_from_remaining(
-        self, remaining_servings: dict[str, float]
-    ) -> dict[str, tuple[float, str]]:
+    def calculate_raw_ingredients_from_remaining(self, remaining_servings: dict[str, float]) -> dict[str, tuple[float, str]]:
         """Calculate raw ingredients needed based on remaining intermediate servings."""
         raw_ingredients = {}
 

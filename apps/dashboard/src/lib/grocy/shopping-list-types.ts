@@ -53,6 +53,8 @@ export interface BulkItemUpdate {
   quantity_purchased?: number;
   notes?: string;
   checked_at?: string | null;
+  shopping_location_id?: number | null;
+  shopping_location_name?: string;
   /**
    * Client-side timestamp used for ordering/coalescing; ignored by server.
    */
@@ -68,6 +70,8 @@ export interface ItemUpdate {
   quantity_purchased?: number | null;
   notes?: string;
   checked_at?: string | null;
+  shopping_location_id?: number | null;
+  shopping_location_name?: string;
 }
 
 export interface ProductSearchResult {

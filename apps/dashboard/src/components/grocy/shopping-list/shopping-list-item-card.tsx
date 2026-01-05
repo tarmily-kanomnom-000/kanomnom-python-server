@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import type {
@@ -11,6 +12,11 @@ interface ShoppingListItemCardProps {
   item: ShoppingListItem;
   onUpdate: (itemId: string, updates: ItemUpdate) => Promise<void>;
   onDelete: (itemId: string) => Promise<void>;
+  locationOptions: Array<{
+    value: string;
+    label: string;
+    name: string;
+  }>;
 }
 
 type StockTone = "critical" | "warning" | "caution";
@@ -32,6 +38,7 @@ export function ShoppingListItemCard({
   item,
   onUpdate,
   onDelete,
+  locationOptions,
 }: ShoppingListItemCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -121,6 +128,24 @@ export function ShoppingListItemCard({
   const handleMarkUnavailable = async () => {
     const newStatus = isUnavailable ? "pending" : "unavailable";
     await onUpdate(item.id, { status: newStatus });
+  };
+
+  const handleLocationChange = async (
+    event: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
+    const selectedValue = event.target.value;
+    const numericId = Number.parseInt(selectedValue, 10);
+    const isNumeric = Number.isFinite(numericId);
+    const selectedOption = locationOptions.find(
+      (option) => option.value === selectedValue,
+    );
+    const nextName = selectedOption?.name ?? selectedValue ?? "UNKNOWN";
+    const shopping_location_id =
+      selectedValue === "UNKNOWN" ? null : isNumeric ? numericId : null;
+    await onUpdate(item.id, {
+      shopping_location_id,
+      shopping_location_name: nextName,
+    });
   };
 
   const handleDeleteClick = () => {
@@ -304,7 +329,7 @@ export function ShoppingListItemCard({
               </div>
 
               {/* Actions - larger touch targets on mobile */}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleMarkUnavailable}
                   className={`rounded px-4 py-2 text-sm font-medium md:px-3 md:py-1 md:text-xs ${
@@ -315,6 +340,31 @@ export function ShoppingListItemCard({
                 >
                   {isUnavailable ? "Mark Available" : "Mark Unavailable"}
                 </button>
+                <div className="flex items-center gap-2 rounded border border-gray-300 bg-white px-2 py-1">
+                  <label
+                    className="text-xs text-gray-600"
+                    htmlFor={`location-${item.id}`}
+                  >
+                    Move to:
+                  </label>
+                  <select
+                    id={`location-${item.id}`}
+                    value={
+                      item.shopping_location_id !== null &&
+                      item.shopping_location_id !== undefined
+                        ? item.shopping_location_id.toString()
+                        : item.shopping_location_name || "UNKNOWN"
+                    }
+                    onChange={handleLocationChange}
+                    className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-800"
+                  >
+                    {locationOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <button
                   onClick={handleDeleteClick}
                   className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 md:px-3 md:py-1 md:text-xs"

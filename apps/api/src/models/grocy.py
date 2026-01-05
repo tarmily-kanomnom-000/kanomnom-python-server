@@ -18,12 +18,19 @@ class CreatedProductGroup(BaseModel):
     identifier: int
 
 
+class CreatedShoppingLocation(BaseModel):
+    name: str
+    identifier: int
+
+
 class InitializeInstanceResponse(BaseModel):
     instance_index: str
     quantity_unit_identifiers: dict[str, int]
     created_units: list[CreatedQuantityUnit]
     product_group_identifiers: dict[str, int]
     created_product_groups: list[CreatedProductGroup]
+    shopping_location_identifiers: dict[str, int]
+    created_shopping_locations: list[CreatedShoppingLocation]
 
 
 class GrocyLocationPayload(BaseModel):
@@ -76,6 +83,14 @@ class InventoryCorrectionMetadataPayload(BaseModel):
 
 class InventoryCorrectionRequest(BaseModel):
     new_amount: float
+    best_before_date: date | None = None
+    location_id: int | None = None
+    note: str | None = None
+    metadata: InventoryCorrectionMetadataPayload | None = None
+
+
+class InventoryAdjustmentRequest(BaseModel):
+    delta_amount: float
     best_before_date: date | None = None
     location_id: int | None = None
     note: str | None = None
@@ -213,6 +228,7 @@ class GrocyProductsResponse(BaseModel):
 __all__ = [
     "CreatedQuantityUnit",
     "CreatedProductGroup",
+    "CreatedShoppingLocation",
     "InitializeInstanceResponse",
     "PurchaseEntryDefaultsResponse",
     "PurchaseEntryDefaultsBatchRequest",

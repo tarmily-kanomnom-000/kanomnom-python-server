@@ -215,9 +215,7 @@ class IngredientsCalculatorContent(ft.Container):
 
         return [
             ft.Text("📋 Required Raw Ingredients:", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.PRIMARY),
-            ft.Container(
-                content=ingredients_table, border=ft.border.all(1, ft.Colors.GREY), border_radius=5, padding=10
-            ),
+            ft.Container(content=ingredients_table, border=ft.border.all(1, ft.Colors.GREY), border_radius=5, padding=10),
             copy_section,
         ]
 
@@ -243,9 +241,7 @@ class IngredientsCalculatorContent(ft.Container):
 
         # Add action button and copy section
         intermediate_recipe_controls.append(self.ui_builder.create_recalculate_button(self.recalculate_with_existing))
-        servings_copy_section = self.ui_builder.create_servings_copy_section(
-            self.state.intermediate_servings, remaining_servings
-        )
+        servings_copy_section = self.ui_builder.create_servings_copy_section(self.state.intermediate_servings, remaining_servings)
 
         return [
             ft.Text("🔧 Intermediate Recipe Servings:", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.PRIMARY),

@@ -6,7 +6,7 @@ Concise reference for the Grocy API routes and key helpers. Use this to understa
 - `GET /grocy/instances` (`list_instances`) — Returns every discovered instance plus address/location/shopping-location rosters by pulling managers from the governor. Loads location lists synchronously inside a threadpool; no pagination or filtering today.
 
 ## Lifecycle (`.../lifecycle.py`)
-- `POST /grocy/{instance_index}/initialize` (`initialize_instance`) — Seeds product groups and quantity units from the universal manifest via the governor. 404 if metadata missing; 500 if manifest missing. Response includes identifiers and a list of created units/groups.
+- `POST /grocy/{instance_index}/initialize` (`initialize_instance`) — Seeds shopping locations, product groups, and quantity units from the universal manifest via the governor. 404 if metadata missing; 500 if manifest missing. Response includes identifiers and created shopping locations/groups/units.
 
 ## Products (`.../products.py` + `helpers.serialize_inventory_view`)
 - `GET /grocy/{instance_index}/products` (`list_products`) — Returns inventory-enriched products. Honors `force_refresh` truthy values {1,true,t,yes,y,on} to invalidate caches for that instance before listing. 404 on missing metadata.

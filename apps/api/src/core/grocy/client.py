@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_REQUEST_TIMEOUT_SECONDS = 15.0
 _RETRYABLE_STATUS_CODES = (502, 503, 504)
-_ALLOWED_METHODS = frozenset({"GET", "POST"})
+_ALLOWED_METHODS = frozenset({"GET", "POST", "PUT"})
 
 
 class GrocyClient:
@@ -95,6 +95,10 @@ class GrocyClient:
         """Create a shopping location via Grocy's API."""
         return self._request("POST", "/api/objects/shopping_locations", payload)
 
+    def update_shopping_location(self, location_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        """Update a shopping location via Grocy's API."""
+        return self._request("PUT", f"/api/objects/shopping_locations/{location_id}", payload)
+
     def list_product_groups(self) -> list[GrocyProductGroup]:
         """Fetch product group definitions from Grocy."""
         payload = self._request("GET", "/api/objects/product_groups", None)
@@ -108,15 +112,11 @@ class GrocyClient:
         """Update a product group via Grocy's API."""
         return self._request("PUT", f"/api/objects/product_groups/{group_id}", payload)
 
-    def correct_product_inventory(
-        self, product_id: int, payload: dict[str, Any]
-    ) -> dict[str, Any] | list[dict[str, Any]]:
+    def correct_product_inventory(self, product_id: int, payload: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
         """Apply an inventory correction for the provided product."""
         return self._request("POST", f"/api/stock/products/{product_id}/inventory", payload)
 
-    def add_product_purchase_entry(
-        self, product_id: int, payload: dict[str, Any]
-    ) -> dict[str, Any] | list[dict[str, Any]]:
+    def add_product_purchase_entry(self, product_id: int, payload: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
         """Record a purchase entry for the provided product."""
         return self._request("POST", f"/api/stock/products/{product_id}/add", payload)
 

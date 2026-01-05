@@ -19,8 +19,9 @@ Source: `apps/api/src/api/routes/grocy/shopping_list.py`
 - **Request:** array of `{ "product_id": <int>, "quantity": <float> }` (duplicates rejected).
 - **Notes:** Uses the same enrichment pipeline as single add (location name, stock totals, min stock, unit, last purchase price); rejects duplicate `product_id` already on the list.
 - **Responses:** `201` with array of items; `404` if no active list; `404` if any product_id not found.
-- `PATCH /grocy/{instance_index}/shopping-list/items/bulk` — bulk update items (status/notes/quantity).
-- **Request:** `{ "updates": [ { "item_id": "uuid", "status": "pending|purchased|unavailable", "quantity_purchased": <float|null>, "notes": <string|null>, "checked_at": <iso|null> } ] }`
+- `PATCH /grocy/{instance_index}/shopping-list/items/bulk` — bulk update items (status/notes/quantity/location).
+- **Request:** `{ "updates": [ { "item_id": "uuid", "status": "pending|purchased|unavailable", "quantity_purchased": <float|null>, "notes": <string|null>, "checked_at": <iso|null>, "shopping_location_id": <int|null>, "shopping_location_name": <string|null> } ] }`
+- **Notes:** `shopping_location_id` / `shopping_location_name` may be supplied together to reassign an item. Passing `shopping_location_id: null` will set the name to `UNKNOWN`. Any newly referenced location key is appended to `location_order` to keep grouping stable.
 - **Responses:** `200` with updated items; `404` if list missing or any item_id missing; `400` invalid payload.
 - `DELETE /grocy/{instance_index}/shopping-list/active/items/{item_id}` — remove a single item (tracks deleted product to prevent re-adding on merge).
 - **Responses:** `204`; `404` if list missing or item not found.

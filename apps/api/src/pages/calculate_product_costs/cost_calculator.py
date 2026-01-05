@@ -36,9 +36,7 @@ class MaterialCostCalculator:
         self._semantic_matching_enabled = False
         self._schema = MaterialPurchaseSchema.default()
 
-    def calculate_material_cost_basis(
-        self, filtered_grist_dataframe: pl.DataFrame | None
-    ) -> dict[str, dict[str, float]]:
+    def calculate_material_cost_basis(self, filtered_grist_dataframe: pl.DataFrame | None) -> dict[str, dict[str, float]]:
         """
         Calculate cost basis per unit for each material from filtered Grist data.
         Groups by material and unit, then calculates weighted average cost per unit.
@@ -54,9 +52,7 @@ class MaterialCostCalculator:
         self.material_cost_basis = cost_basis
         return cost_basis
 
-    def _try_unit_conversion(
-        self, material_name: str, target_unit: str, material_costs: dict[str, float]
-    ) -> Optional[float]:
+    def _try_unit_conversion(self, material_name: str, target_unit: str, material_costs: dict[str, float]) -> Optional[float]:
         """
         Try to convert between units using special conversions first, then density.
 
@@ -200,11 +196,7 @@ class MaterialCostCalculator:
 
     def _validate_time_series_prerequisites(self) -> Optional[list]:
         """Validate that prerequisites for time series calculation are met."""
-        if (
-            self.data_manager is None
-            or self.data_manager.grist_dataframe is None
-            or self.data_manager.grist_dataframe.is_empty()
-        ):
+        if self.data_manager is None or self.data_manager.grist_dataframe is None or self.data_manager.grist_dataframe.is_empty():
             logger.warning("No Grist data available for time series calculation")
             return []
         return None
@@ -260,9 +252,7 @@ class MaterialCostCalculator:
 
         window_start = time_point - relativedelta(months=trailing_months)
 
-        window_data = dataframe.filter(
-            (pl.col(purchase_date_col) >= window_start) & (pl.col(purchase_date_col) <= time_point)
-        )
+        window_data = dataframe.filter((pl.col(purchase_date_col) >= window_start) & (pl.col(purchase_date_col) <= time_point))
 
         if window_data.is_empty():
             logger.debug("No data for window ending %s", time_point)
@@ -312,9 +302,7 @@ class MaterialCostCalculator:
                 pl.col("total_cost").fill_null(0.0).alias("total_cost"),
             ]
         ).filter(
-            (pl.col("material").str.len_chars() > 0)
-            & (pl.col("unit").str.len_chars() > 0)
-            & (pl.col("units_purchased") > 0)
+            (pl.col("material").str.len_chars() > 0) & (pl.col("unit").str.len_chars() > 0) & (pl.col("units_purchased") > 0)
         )
 
         logger.debug(
@@ -375,9 +363,7 @@ class MaterialCostCalculator:
             return {}
 
         window_start = selected_date - relativedelta(months=trailing_months)
-        window_data = df.filter(
-            (pl.col(purchase_date_col) >= window_start) & (pl.col(purchase_date_col) <= selected_date)
-        )
+        window_data = df.filter((pl.col(purchase_date_col) >= window_start) & (pl.col(purchase_date_col) <= selected_date))
 
         if window_data.is_empty():
             logger.warning("No data available for time point %s", selected_date)

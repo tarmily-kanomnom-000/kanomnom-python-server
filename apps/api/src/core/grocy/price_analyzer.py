@@ -24,17 +24,14 @@ class PriceAnalyzer:
             # Get all stock log entries and filter for this product's purchases
             all_stock_entries = self.grocy_client.list_stock_log()
             stock_entries = [
-                entry for entry in all_stock_entries
-                if entry.product_id == product_id and entry.transaction_type == "purchase"
+                entry for entry in all_stock_entries if entry.product_id == product_id and entry.transaction_type == "purchase"
             ]
 
             if not stock_entries:
                 return None
 
             # Sort by purchased_date (most recent first)
-            stock_entries.sort(
-                key=lambda x: x.purchased_date or "", reverse=True
-            )
+            stock_entries.sort(key=lambda x: x.purchased_date or "", reverse=True)
 
             latest = stock_entries[0]
 

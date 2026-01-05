@@ -85,6 +85,17 @@ class InventoryCorrection:
 
 
 @dataclass(frozen=True)
+class InventoryAdjustment:
+    """Represents a delta-based inventory adjustment."""
+
+    delta_amount: float
+    best_before_date: date | None
+    location_id: int | None
+    note: str | None
+    metadata: InventoryCorrectionNoteMetadata | None = None
+
+
+@dataclass(frozen=True)
 class PurchaseEntryDraft:
     """Raw purchase entry payload provided by callers."""
 
@@ -265,6 +276,37 @@ class ProductInventoryService:
             location_id=location_id,
             shopping_location_id=shopping_location_id,
             note=note_payload,
+        )
+
+    def resolve_inventory_adjustment(
+        self,
+        instance_index: str,
+        product_id: int,
+        adjustment: InventoryAdjustment,
+    ) -> InventoryCorrection:
+        """Convert a delta adjustment into an inventory correction with safeguards."""
+        product = self._get_product(instance_index, product_id)
+        best_before_date = adjustment.best_before_date
+        if best_before_date is None:
+            best_before_date = _default_best_before_date(product)
+        location_id = adjustment.location_id if adjustment.location_id is not None else product.location_id
+        current_stock = self._current_stock_amount(product_id)
+        if product.enable_tare_weight_handling and product.tare_weight > 0:
+            tare_weight = product.tare_weight
+            net_new_stock = current_stock + adjustment.delta_amount
+            if net_new_stock < 0:
+                raise ValueError("Adjustment would reduce stock below zero.")
+            new_amount = net_new_stock + tare_weight
+        else:
+            new_amount = current_stock + adjustment.delta_amount
+            if new_amount < 0:
+                raise ValueError("Adjustment would reduce stock below zero.")
+        return InventoryCorrection(
+            new_amount=new_amount,
+            best_before_date=best_before_date,
+            location_id=location_id,
+            note=adjustment.note,
+            metadata=adjustment.metadata,
         )
 
     def build_purchase_defaults(

@@ -54,14 +54,14 @@ export function ProductActionDialog({
       : "max-w-md";
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4"
+      className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8"
       role="dialog"
       aria-modal="true"
     >
       <div
-        className={`w-full ${dialogWidthClass} rounded-3xl bg-white p-6 shadow-2xl`}
+        className={`w-full ${dialogWidthClass} max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl`}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-neutral-500">
               Grocy action
@@ -71,14 +71,43 @@ export function ProductActionDialog({
             </h3>
             <p className="text-sm text-neutral-500">{currentProduct.name}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-neutral-200 p-2 text-neutral-500 transition hover:border-neutral-900 hover:text-neutral-900"
-            aria-label="Close action dialog"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            {showInventoryForm ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-900 hover:text-neutral-900"
+                >
+                  Close (staging kept)
+                </button>
+                <button
+                  type="submit"
+                  form="inventory-correction-form"
+                  className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-800"
+                >
+                  Submit
+                </button>
+              </>
+            ) : showPurchaseForm ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover-border-neutral-900 hover:text-neutral-900"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  form="purchase-entry-form"
+                  className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-800"
+                >
+                  Submit
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
         {showInventoryForm ? (
           <InventoryCorrectionForm
@@ -86,6 +115,7 @@ export function ProductActionDialog({
             instanceIndex={instanceIndex}
             locationNamesById={locationNamesById}
             lossReasonOptions={LOSS_REASON_OPTIONS}
+            formId="inventory-correction-form"
             onClose={onClose}
             onProductChange={(updatedProduct) => {
               setCurrentProduct(updatedProduct);

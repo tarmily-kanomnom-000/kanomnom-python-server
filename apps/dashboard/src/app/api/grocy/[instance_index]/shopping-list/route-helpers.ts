@@ -21,6 +21,20 @@ function resolveApiBaseUrl(): string {
   return apiBaseUrl;
 }
 
+function buildGrocyApiUrl(
+  apiBaseUrl: string,
+  instanceIndex: string,
+  path: string,
+): URL {
+  const normalizedBase = apiBaseUrl.endsWith("/")
+    ? apiBaseUrl
+    : `${apiBaseUrl}/`;
+  const resolvedPath = path
+    .replace("{instance}", instanceIndex)
+    .replace(/^\//, "");
+  return new URL(resolvedPath, normalizedBase);
+}
+
 export async function resolveInstanceAndRole(context: BaseContext): Promise<
   | {
       instanceIndex: string;
@@ -60,7 +74,7 @@ export async function proxyGrocyRequest(options: {
   const { instanceIndex, roleHeaders, path, method, payload, okStatuses } =
     options;
   const apiBaseUrl = resolveApiBaseUrl();
-  const url = new URL(path.replace("{instance}", instanceIndex), apiBaseUrl);
+  const url = buildGrocyApiUrl(apiBaseUrl, instanceIndex, path);
 
   if (options.validate) {
     const validationError = options.validate(payload);

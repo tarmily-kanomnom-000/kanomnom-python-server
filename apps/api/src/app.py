@@ -1,9 +1,11 @@
 import asyncio
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import AsyncIterator
 
 import uvicorn
 from cachetools import TTLCache
@@ -11,9 +13,10 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from flet.fastapi import app as flet_fastapi
+from telegram.ext import Application
 
 from api.routes import grist, grocy
-from bot import TELEGRAM_INQURY_GROUP_CHAT_ID, telegram_app
+from bot import BOT_ENABLED, TELEGRAM_INQURY_GROUP_CHAT_ID, telegram_app
 from core.cache.cache_service import get_cache_service
 from core.cache.grist_cache_refresher import (
     GristCacheRefresher,
@@ -43,13 +46,31 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
+DEV_MODE: bool = os.getenv("FASTAPI_ENV", "").lower() in {"dev", "development"}
+
+
+def _require_telegram_app() -> Application:
+    if telegram_app is None:
+        raise RuntimeError("Telegram bot is enabled but failed to initialize.")
+    return telegram_app
+
 
 # Start and Stop the Telegram Bot
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Handles startup and shutdown tasks."""
-    logging.info("Starting Telegram bot inside FastAPI lifespan...")
-    await telegram_app.initialize()
+    bot_started = False
+    bot_task: asyncio.Task[None] | None = None
+
+    if not BOT_ENABLED or DEV_MODE:
+        logging.info("FASTAPI_ENV indicates dev; skipping Telegram bot startup.")
+    else:
+        logging.info("Starting Telegram bot inside FastAPI lifespan...")
+        bot_app = _require_telegram_app()
+        await bot_app.initialize()
+        bot_task = asyncio.create_task(bot_app.updater.start_polling())
+        await bot_app.start()
+        bot_started = True
 
     cache_service = get_cache_service()
     grist_cache_refresher = GristCacheRefresher(
@@ -72,9 +93,6 @@ async def lifespan(app: FastAPI):
     weather_stop_event: asyncio.Event | None = None
     weather_task: asyncio.Task | None = None
 
-    bot_task = asyncio.create_task(telegram_app.updater.start_polling())
-    await telegram_app.start()
-
     weather_stop_event = asyncio.Event()
     weather_task = asyncio.create_task(_weather_ingest_loop(weather_stop_event))
 
@@ -90,10 +108,13 @@ async def lifespan(app: FastAPI):
                 logging.info("Weather ingest scheduler cancelled during shutdown.")
         await tandoor_cache_refresher.stop()
         await grist_cache_refresher.stop()
-        await telegram_app.updater.stop()
-        await telegram_app.stop()
-        bot_task.cancel()
-        logging.info("Telegram bot stopped.")
+        if bot_started:
+            bot_app = _require_telegram_app()
+            await bot_app.updater.stop()
+            await bot_app.stop()
+            if bot_task:
+                bot_task.cancel()
+            logging.info("Telegram bot stopped.")
 
 
 app = FastAPI(
@@ -144,7 +165,7 @@ async def _weather_ingest_loop(stop_event: asyncio.Event) -> None:
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Handles validation errors, ensures one Telegram alert per request, and dumps request info to file."""
 
     exc_str = f"{exc}".replace("\n", " ").replace("   ", " ")
@@ -173,7 +194,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         logging.exception("Failed to dump request data")
 
     # Send alert via Telegram if not already done
-    if request.url.path.startswith("/grist") and request_id not in validation_error_cache:
+    if BOT_ENABLED and request.url.path.startswith("/grist") and request_id not in validation_error_cache:
         validation_error_cache[request_id] = True
 
         error_message = (
@@ -182,7 +203,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             f"📅 *Time:* {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}"
         )
 
-        await telegram_app.bot.send_message(
+        bot_app = _require_telegram_app()
+        await bot_app.bot.send_message(
             chat_id=TELEGRAM_INQURY_GROUP_CHAT_ID,
             text=error_message,
             parse_mode="Markdown",
@@ -198,7 +220,7 @@ app.mount("/flet", flet_app)
 
 
 @app.get("/calculate_ingredients")
-async def redirect_to_flet():
+async def redirect_to_flet() -> RedirectResponse:
     """Redirect to Flet app"""
     return RedirectResponse(url="/calculate_raw_ingredients")
 
@@ -208,13 +230,13 @@ app.include_router(grocy.router)
 
 
 @app.get("/")
-async def root():
+async def root() -> dict[str, str]:
     logging.info("Received request on /")
     return {"message": "Welcome to FastAPI service"}
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, str]:
     logging.info("Health check request received")
     return {"status": "healthy"}
 

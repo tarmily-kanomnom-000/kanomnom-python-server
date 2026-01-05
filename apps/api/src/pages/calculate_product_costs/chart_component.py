@@ -50,9 +50,7 @@ class CostChartComponent:
             border_radius=5,
         )
 
-    def create_cost_chart(
-        self, product_name: str, cost_data: list[tuple[datetime, float]], on_chart_click=None
-    ) -> ft.Container:
+    def create_cost_chart(self, product_name: str, cost_data: list[tuple[datetime, float]], on_chart_click=None) -> ft.Container:
         """
         Create a line chart showing cost over time.
 

@@ -94,9 +94,7 @@ class MaterialPurchaseRunsUIBuilder:
         if not schedule_list:
             return self._panel(
                 title="Cadence Supply Schedule",
-                controls=[
-                    ft.Text("No materials require ordering within the configured horizon.", color=ft.Colors.GREEN)
-                ],
+                controls=[ft.Text("No materials require ordering within the configured horizon.", color=ft.Colors.GREEN)],
             )
 
         tiles: list[ft.Control] = []
@@ -227,9 +225,7 @@ class MaterialPurchaseRunsUIBuilder:
         rows: list[ft.DataRow] = []
         for assignment in sorted(warning_list, key=lambda item: item.projection.material.lower()):
             projection = assignment.projection
-            run_label, run_date = schedule_lookup.get(
-                id(assignment), (f"Run @ {assignment.run_offset_days:.0f}d", None)
-            )
+            run_label, run_date = schedule_lookup.get(id(assignment), (f"Run @ {assignment.run_offset_days:.0f}d", None))
             reason = self._format_assignment_warning(assignment, interval_days)
             purchase_text = self._format_quantity(assignment.recommended_purchase_units, projection.unit)
             cost_text = self._format_currency(assignment.recommended_purchase_cost)

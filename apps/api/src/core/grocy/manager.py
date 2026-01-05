@@ -13,6 +13,7 @@ from core.grocy.client import GrocyClient
 from core.grocy.models import (
     ProductGroupDefinition,
     QuantityUnitDefinition,
+    ShoppingLocationDefinition,
     UniversalManifest,
 )
 from core.grocy.responses import GrocyLocation, GrocyShoppingLocation
@@ -21,8 +22,11 @@ from core.grocy.services import (
     ProductGroupSyncResult,
     QuantityUnitService,
     QuantityUnitSyncResult,
+    ShoppingLocationService,
+    ShoppingLocationSyncResult,
 )
 from core.grocy.stock import (
+    InventoryAdjustment,
     InventoryCorrection,
     ProductInventoryService,
     ProductInventoryView,
@@ -46,8 +50,10 @@ class GrocyManager:
         self.client = client
         self._quantity_unit_syncer: EntitySyncer[QuantityUnitDefinition] = EntitySyncer()
         self._product_group_syncer: EntitySyncer[ProductGroupDefinition] = EntitySyncer()
+        self._shopping_location_syncer: EntitySyncer[ShoppingLocationDefinition] = EntitySyncer()
         self.quantity_units = QuantityUnitService(self.client, self._quantity_unit_syncer)
         self.product_groups = ProductGroupService(self.client, self._product_group_syncer)
+        self.shopping_locations = ShoppingLocationService(self.client, self._shopping_location_syncer)
         self._inventory = ProductInventoryService(
             self.client,
             get_grocy_product_cache(),
@@ -66,6 +72,12 @@ class GrocyManager:
     def ensure_product_groups(self, manifest: UniversalManifest) -> ProductGroupSyncResult:
         """Ensure the provided manifest product groups exist in Grocy."""
         return self.product_groups.ensure_product_groups(manifest.product_groups)
+
+    def ensure_shopping_locations(self, manifest: UniversalManifest) -> ShoppingLocationSyncResult:
+        """Ensure the provided manifest shopping locations exist in Grocy."""
+        result = self.shopping_locations.ensure_shopping_locations(manifest.shopping_locations)
+        self._shopping_locations_cache.clear_cache(self.instance_index)
+        return result
 
     def list_product_inventory(self) -> list[ProductInventoryView]:
         """Return products merged with stock availability metadata."""
@@ -96,6 +108,15 @@ class GrocyManager:
         self._refresh_inventory_caches()
         return resolved, response
 
+    def adjust_product_inventory(
+        self, product_id: int, adjustment: InventoryAdjustment
+    ) -> tuple[InventoryCorrection, dict[str, Any] | list[dict[str, Any]] | None]:
+        """Apply a delta-based inventory adjustment to a Grocy product."""
+        resolved = self._inventory.resolve_inventory_adjustment(self.instance_index, product_id, adjustment)
+        response = self.client.correct_product_inventory(product_id, resolved.to_payload())
+        self._refresh_inventory_caches()
+        return resolved, response
+
     def record_purchase_entry(
         self, product_id: int, entry: PurchaseEntryDraft
     ) -> tuple[PurchaseEntry, dict[str, Any] | list[dict[str, Any]] | None]:
@@ -115,9 +136,7 @@ class GrocyManager:
         """Return purchase metadata defaults for multiple products."""
         defaults: list[PurchaseEntryDefaults] = []
         for product_id in product_ids:
-            defaults.append(
-                self._inventory.build_purchase_defaults(self.instance_index, product_id, shopping_location_id)
-            )
+            defaults.append(self._inventory.build_purchase_defaults(self.instance_index, product_id, shopping_location_id))
         return defaults
 
     def list_shopping_locations(self) -> list[GrocyShoppingLocation]:

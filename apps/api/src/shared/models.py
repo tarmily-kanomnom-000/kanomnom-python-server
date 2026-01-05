@@ -75,9 +75,7 @@ class Recipe:
                                 f"Ingredient '{food_name}' has conflicting units in recipe '{self.name}': existing {ingredient_map[key].unit.value}, new {unit_enum.value}. Using the non-zero entry."
                             )
                             # Keep the new entry since we already filtered out zero amounts
-                            ingredient_map[key] = Ingredient(
-                                id=food_id, name=food_name, quantity=amount, unit=unit_enum
-                            )
+                            ingredient_map[key] = Ingredient(id=food_id, name=food_name, quantity=amount, unit=unit_enum)
                     else:
                         ingredient_map[key] = Ingredient(id=food_id, name=food_name, quantity=amount, unit=unit_enum)
                 except Exception as e:
@@ -87,9 +85,7 @@ class Recipe:
         self.ingredients = ingredient_map
 
         if self.produced_amount is None:
-            gram_total = sum(
-                ingredient.quantity for ingredient in ingredient_map.values() if ingredient.unit == Unit.GRAM
-            )
+            gram_total = sum(ingredient.quantity for ingredient in ingredient_map.values() if ingredient.unit == Unit.GRAM)
             if gram_total > 0:
                 self.produced_amount = gram_total
                 self.produced_unit = Unit.GRAM
