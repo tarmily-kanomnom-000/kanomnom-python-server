@@ -59,32 +59,20 @@ export function mergeIntoSnapshot(
       );
       break;
     case "add_item":
-      if (payload.list?.items) {
-        const itemToAdd =
-          "item" in incoming.payload ? incoming.payload.item : null;
-        if (
-          itemToAdd &&
-          typeof itemToAdd === "object" &&
-          "id" in itemToAdd &&
-          "product_id" in itemToAdd
-        ) {
-          payload.list.items = [
-            ...payload.list.items,
-            itemToAdd as ShoppingListItem,
-          ];
-        }
-      }
+      // Without enriched item payloads, rely on replaying server-side add.
       break;
     case "remove_item":
       if (payload.list?.items) {
-        const itemId =
-          "item_id" in incoming.payload ? incoming.payload.item_id : null;
-        if (!itemId) {
-          break;
+        const ids =
+          "item_ids" in incoming.payload &&
+          Array.isArray(incoming.payload.item_ids)
+            ? incoming.payload.item_ids
+            : [];
+        if (ids.length > 0) {
+          payload.list.items = payload.list.items.filter(
+            (item: ShoppingListItem) => !ids.includes(item.id),
+          );
         }
-        payload.list.items = payload.list.items.filter(
-          (item: ShoppingListItem) => item.id !== itemId,
-        );
       }
       break;
     default:

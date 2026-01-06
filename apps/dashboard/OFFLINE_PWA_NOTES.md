@@ -10,3 +10,9 @@ The dev server (`npm run dev` / `npm run dev:pwa`) is not reliable for true offl
 4) Go offline/airplane mode and use “View Shopping List”; it should use cached pages instead of failing.
 
 Use `npm run dev:pwa` only for desktop dev convenience; it will still break offline once the network is fully cut.***
+
+## Shopping List Sync Notes (batching)
+
+- Offline actions (add/remove/update) are queued and **batched per instance** before hitting the API; single deletes use the bulk remove endpoint with one id.
+- Sync runs when connectivity returns; cache refresh happens once per instance after batching completes.
+- Watch `useSyncStatus` in UI for queue size and last error; it reflects the batched sync state.

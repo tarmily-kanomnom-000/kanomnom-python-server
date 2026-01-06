@@ -115,7 +115,7 @@ export function useOfflineShoppingList(instanceIndex: string) {
       quantity: number,
       optimisticItem: ShoppingListItem | null = null,
     ): Promise<ShoppingList | null> => {
-      const payload = { product_id: productId, quantity };
+      const payload = { items: [{ product_id: productId, quantity }] };
 
       if (isOffline()) {
         // Queue for later sync
@@ -139,11 +139,11 @@ export function useOfflineShoppingList(instanceIndex: string) {
       }
 
       const response = await fetch(
-        `/api/grocy/${instanceIndex}/shopping-list/items`,
+        `/api/grocy/${instanceIndex}/shopping-list/items/bulk`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(payload.items),
         },
       );
 

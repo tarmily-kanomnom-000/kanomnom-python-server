@@ -3,6 +3,7 @@ import { useConnectivityStatus } from "@/hooks/useConnectivityStatus";
 import { useLatest } from "@/hooks/useLatest";
 import { fetchGrocyProducts } from "@/lib/grocy/client";
 import { bulkAddShoppingListItems } from "@/lib/grocy/shopping-list-client";
+import { buildOptimisticItem } from "@/lib/grocy/shopping-list-optimistic";
 import { dispatchShoppingListUpdates } from "@/lib/grocy/shopping-list-sync";
 import type {
   BulkItemUpdate,
@@ -553,36 +554,7 @@ export function useShoppingListController(
       const current = list ?? listRef.current;
       const product = products.find((p) => p.id === productId) ?? null;
       const optimisticItem: ShoppingListItem | null =
-        current && product
-          ? {
-              id:
-                typeof crypto !== "undefined" && crypto.randomUUID
-                  ? crypto.randomUUID()
-                  : `${Date.now()}-${productId}`,
-              product_id: product.id,
-              product_name: product.name,
-              shopping_location_id: product.shopping_location_id ?? null,
-              shopping_location_name:
-                product.location_name ??
-                (product.shopping_location_id !== undefined &&
-                product.shopping_location_id !== null
-                  ? `Location ${product.shopping_location_id}`
-                  : "UNKNOWN"),
-              status: "pending",
-              quantity_suggested: quantity,
-              quantity_purchased: null,
-              quantity_unit: product.stock_quantity_unit_name || "unit",
-              current_stock: product.stocks.reduce(
-                (total, entry) => total + entry.amount,
-                0,
-              ),
-              min_stock: product.min_stock_amount,
-              last_price: null,
-              notes: "",
-              checked_at: null,
-              modified_at: new Date().toISOString(),
-            }
-          : null;
+        current && product ? buildOptimisticItem(product, quantity) : null;
 
       try {
         const updated = await addItemWithCache(

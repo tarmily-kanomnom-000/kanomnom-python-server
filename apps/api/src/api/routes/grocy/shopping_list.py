@@ -55,60 +55,70 @@ async def _get_price_analyzer(instance_index: str) -> PriceAnalyzer:
     return build_price_analyzer(instance_index)
 
 
-async def _build_item_data(instance_index: str, request: AddItemRequest, price_analyzer: PriceAnalyzer | None = None) -> dict:
-    """Build a shopping list item payload with price/location enrichment."""
+async def _build_items_data(instance_index: str, requests: list[AddItemRequest]) -> list[dict]:
+    """Build shopping list item payloads with shared enrichment for batch adds."""
+    if not requests:
+        raise HTTPException(status_code=400, detail="No items provided")
+
     grocy_manager = await get_manager(instance_index)
     inventory_service = grocy_manager._inventory
 
     products_with_inv = await run_in_threadpool(inventory_service.list_products_with_inventory, instance_index)
-    product_view = None
-    for p in products_with_inv:
-        if p.product.id == request.product_id:
-            product_view = p
-            break
+    product_map = {p.product.id: p for p in products_with_inv}
 
-    if not product_view:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Product {request.product_id} not found in Grocy",
-        )
+    requested_product_ids = [req.product_id for req in requests]
+    if len(set(requested_product_ids)) != len(requested_product_ids):
+        raise HTTPException(status_code=400, detail="Duplicate product_ids in add request")
 
-    current_stock = 0.0
-    if product_view.stocks:
-        for stock in product_view.stocks:
-            current_stock += stock.amount
+    missing_products = [pid for pid in requested_product_ids if pid not in product_map]
+    if missing_products:
+        missing_str = ", ".join(str(pid) for pid in sorted(missing_products))
+        raise HTTPException(status_code=404, detail=f"Products not found in Grocy: {missing_str}")
 
     shopping_locations = await load_shopping_locations(instance_index)
     location_names = {}
     if shopping_locations:
         location_names = {loc.id: loc.name for loc in shopping_locations}
 
-    location_id = product_view.product.shopping_location_id
-    location_name = "UNKNOWN"
-    if location_id is not None:
-        location_name = location_names.get(location_id, f"Location {location_id}")
-
-    analyzer = price_analyzer or await _get_price_analyzer(instance_index)
-    last_price = await run_in_threadpool(analyzer.get_last_purchase_price, request.product_id)
+    analyzer = await _get_price_analyzer(instance_index)
 
     now = datetime.utcnow().isoformat() + "Z"
-    return {
-        "id": str(uuid.uuid4()),
-        "product_id": request.product_id,
-        "product_name": product_view.product.name,
-        "shopping_location_id": location_id,
-        "shopping_location_name": location_name,
-        "status": "pending",
-        "quantity_suggested": request.quantity,
-        "quantity_purchased": None,
-        "quantity_unit": product_view.stock_unit_name or "unit",
-        "current_stock": current_stock,
-        "min_stock": product_view.product.min_stock_amount,
-        "last_price": last_price,
-        "notes": "",
-        "checked_at": None,
-        "modified_at": now,
-    }
+    items: list[dict] = []
+    for req in requests:
+        product_view = product_map[req.product_id]
+        current_stock = 0.0
+        if product_view.stocks:
+            for stock in product_view.stocks:
+                current_stock += stock.amount
+
+        location_id = product_view.product.shopping_location_id
+        location_name = "UNKNOWN"
+        if location_id is not None:
+            location_name = location_names.get(location_id, f"Location {location_id}")
+
+        last_price = await run_in_threadpool(analyzer.get_last_purchase_price, req.product_id)
+
+        items.append(
+            {
+                "id": str(uuid.uuid4()),
+                "product_id": req.product_id,
+                "product_name": product_view.product.name,
+                "shopping_location_id": location_id,
+                "shopping_location_name": location_name,
+                "status": "pending",
+                "quantity_suggested": req.quantity,
+                "quantity_purchased": None,
+                "quantity_unit": product_view.stock_unit_name or "unit",
+                "current_stock": current_stock,
+                "min_stock": product_view.product.min_stock_amount,
+                "last_price": last_price,
+                "notes": "",
+                "checked_at": None,
+                "modified_at": now,
+            }
+        )
+
+    return items
 
 
 @router.post("/{instance_index}/shopping-list/generate", response_model=ShoppingList)
@@ -180,41 +190,17 @@ async def add_item(
     manager = _get_manager()
 
     try:
-        analyzer = await _get_price_analyzer(instance_index)
-        item_data = await _build_item_data(instance_index, request, analyzer)
-        added_item = await run_in_threadpool(manager.add_item, instance_index, item_data)
-        return ShoppingListItem(**added_item)
-    except FileNotFoundError as exc:
-        raise HTTPException(
-            status_code=404,
-            detail="No active shopping list exists",
-        ) from exc
-
-
-@router.delete(
-    "/{instance_index}/shopping-list/active/items/{item_id}",
-    status_code=204,
-    response_model=None,
-)
-async def remove_item(
-    instance_index: str,
-    item_id: str,
-):
-    """Remove an item from the active shopping list"""
-    manager = _get_manager()
-
-    try:
-        await run_in_threadpool(manager.remove_item, instance_index, item_id)
+        items_data = await _build_items_data(instance_index, [request])
+        added_items = await run_in_threadpool(manager.add_items_bulk, instance_index, items_data)
+        return ShoppingListItem(**added_items[0])
     except FileNotFoundError as exc:
         raise HTTPException(
             status_code=404,
             detail="No active shopping list exists",
         ) from exc
     except ValueError as exc:
-        raise HTTPException(
-            status_code=404,
-            detail=str(exc),
-        ) from exc
+        status_code = 409 if "already exist" in str(exc) else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 
 def _serialize_updates(updates: list[BulkItemUpdate]) -> list[dict]:
@@ -274,10 +260,8 @@ async def bulk_update_items(
             detail="No active shopping list exists",
         ) from exc
     except ValueError as exc:
-        raise HTTPException(
-            status_code=404,
-            detail=str(exc),
-        ) from exc
+        status_code = 404 if "Items not found" in str(exc) else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 
 @router.post(
@@ -293,26 +277,23 @@ async def bulk_add_items(
     manager = _get_manager()
 
     try:
-        analyzer = await _get_price_analyzer(instance_index)
-        item_payloads = []
-        for req in requests:
-            item_payloads.append(await _build_item_data(instance_index, req, analyzer))
-
-        added_items = []
-        for payload in item_payloads:
-            added_item = await run_in_threadpool(manager.add_item, instance_index, payload)
-            added_items.append(ShoppingListItem(**added_item))
+        item_payloads = await _build_items_data(instance_index, requests)
+        added_items = await run_in_threadpool(manager.add_items_bulk, instance_index, item_payloads)
+        shopping_list_items = [ShoppingListItem(**item) for item in added_items]
 
         logger.info(
             "shopping_list_bulk_add",
-            extra={"instance_index": instance_index, "count": len(added_items)},
+            extra={"instance_index": instance_index, "count": len(shopping_list_items)},
         )
-        return added_items
+        return shopping_list_items
     except FileNotFoundError as exc:
         raise HTTPException(
             status_code=404,
             detail="No active shopping list exists",
         ) from exc
+    except ValueError as exc:
+        status_code = 409 if "already exist" in str(exc) else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 
 @router.post(
@@ -339,4 +320,5 @@ async def bulk_remove_items(
             detail="No active shopping list exists",
         ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        status_code = 404 if "Items not found" in str(exc) else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc

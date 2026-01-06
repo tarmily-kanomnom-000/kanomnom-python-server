@@ -26,7 +26,10 @@ async function handleRequest(
   return proxyGrocyRequest({
     instanceIndex,
     roleHeaders,
-    path: "/grocy/{instance}/shopping-list/items/bulk",
+    path:
+      method === "POST"
+        ? "/grocy/{instance}/shopping-list/active/items/bulk"
+        : "/grocy/{instance}/shopping-list/items/bulk",
     method,
     payload,
     okStatuses: method === "POST" ? [201] : undefined,

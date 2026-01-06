@@ -1,7 +1,4 @@
-import type {
-  ShoppingList,
-  ShoppingListItem,
-} from "@/lib/grocy/shopping-list-types";
+import type { ShoppingList } from "@/lib/grocy/shopping-list-types";
 import type { PendingAction, SnapshotPayload } from "@/lib/offline/types";
 
 export function applyOptimisticUpdate(
@@ -12,18 +9,7 @@ export function applyOptimisticUpdate(
 
   switch (action.action) {
     case "add_item":
-      if (
-        "item" in action.payload &&
-        action.payload.item &&
-        typeof action.payload.item === "object" &&
-        "id" in action.payload.item &&
-        "product_id" in action.payload.item
-      ) {
-        updatedList.items = [
-          ...updatedList.items,
-          action.payload.item as ShoppingListItem,
-        ];
-      }
+      // Add actions rely on optimistic lists being persisted by callers.
       break;
 
     case "remove_item": {

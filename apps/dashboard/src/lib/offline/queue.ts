@@ -37,6 +37,15 @@ export function clearSyncQueue(): void {
 export function addToSyncQueue(
   action: Omit<PendingAction, "id" | "timestamp">,
 ): void {
+  if (
+    action.action === "add_item" &&
+    (!("items" in action.payload) ||
+      !Array.isArray((action.payload as any).items) ||
+      (action.payload as any).items.length === 0)
+  ) {
+    console.warn("Dropping add_item with no items", { action });
+    return;
+  }
   if (action.action === "update_item" || action.action === "replay_snapshot") {
     const updates =
       "updates" in action.payload && Array.isArray(action.payload.updates)

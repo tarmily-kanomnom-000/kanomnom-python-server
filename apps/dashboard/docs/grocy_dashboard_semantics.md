@@ -12,7 +12,7 @@ Concise reference for dashboard-side Grocy flows: API proxies, data helpers, off
   - `POST /api/grocy/{instance}/shopping-list/active/items` — Single add; 400 on invalid JSON; expects 201 upstream.
   - `PATCH|POST /api/grocy/{instance}/shopping-list/items/bulk` — Bulk update/add; validates payload shape (array for POST, `.updates` array for PATCH); logs success/failure labels; allows 201 for bulk add.
   - `POST /api/grocy/{instance}/shopping-list/items/remove` — Validates non-empty `item_ids` array; logs `shopping_list_bulk_remove`.
-  - `PATCH|DELETE /api/grocy/{instance}/shopping-list/active/items/{item_id}` — Validates `item_id`; DELETE accepts 204. All proxies use `proxyGrocyRequest`, preserving upstream status and detail text when available.
+  - `PATCH /api/grocy/{instance}/shopping-list/active/items/{item_id}` — Validates `item_id` for legacy single-item updates. All proxies use `proxyGrocyRequest`, preserving upstream status and detail text when available.
 - Shared helpers: `resolveInstanceAndRole` enforces admin for shopping-list mutations and builds role headers; `resolveApiBaseUrl` requires `KANOMNOM_API_BASE_URL`; `proxyGrocyRequest` centralizes fetch, status allowlist, JSON validation, and error logging.
 
 ## Server Data Access (`src/lib/grocy/server.ts`)

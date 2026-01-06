@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PriceSnapshot(BaseModel):
@@ -43,7 +43,7 @@ class ShoppingList(BaseModel):
     last_modified_at: str
     items: list[ShoppingListItem]
     location_order: list[str | int]
-    deleted_product_ids: list[int] = []  # Track manually deleted products to exclude from merge
+    deleted_product_ids: list[int] = Field(default_factory=list)  # Track manually deleted products to exclude from merge
 
 
 class AddItemRequest(BaseModel):
@@ -74,7 +74,7 @@ class BulkItemUpdate(BaseModel):
 class BulkUpdateRequest(BaseModel):
     """Request to update multiple items at once"""
 
-    updates: list[BulkItemUpdate]
+    updates: list[BulkItemUpdate] = Field(min_length=1)
 
 
 __all__ = [

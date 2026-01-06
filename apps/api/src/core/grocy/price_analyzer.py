@@ -12,8 +12,22 @@ class PriceAnalyzer:
 
     def __init__(self, grocy_client: GrocyClient):
         self.grocy_client = grocy_client
+        self._stock_log_cache: list | None = None
+        self._shopping_locations_cache: list | None = None
 
-    def get_last_purchase_price(self, product_id: int) -> dict | None:
+    def _get_stock_log(self) -> list:
+        """Fetch stock log once per analyzer instance."""
+        if self._stock_log_cache is None:
+            self._stock_log_cache = self.grocy_client.list_stock_log()
+        return self._stock_log_cache
+
+    def _get_shopping_locations(self) -> list:
+        """Fetch shopping locations once per analyzer instance."""
+        if self._shopping_locations_cache is None:
+            self._shopping_locations_cache = self.grocy_client.list_shopping_locations()
+        return self._shopping_locations_cache
+
+    def get_last_purchase_price(self, product_id: int, *, use_cache: bool = True) -> dict | None:
         """
         Get the most recent purchase price for a product.
 
@@ -22,7 +36,7 @@ class PriceAnalyzer:
         """
         try:
             # Get all stock log entries and filter for this product's purchases
-            all_stock_entries = self.grocy_client.list_stock_log()
+            all_stock_entries = self._get_stock_log() if use_cache else self.grocy_client.list_stock_log()
             stock_entries = [
                 entry for entry in all_stock_entries if entry.product_id == product_id and entry.transaction_type == "purchase"
             ]
@@ -43,7 +57,7 @@ class PriceAnalyzer:
             # Get shopping location name
             location_name = "Unknown"
             if latest.shopping_location_id:
-                shopping_locations = self.grocy_client.list_shopping_locations()
+                shopping_locations = self._get_shopping_locations() if use_cache else self.grocy_client.list_shopping_locations()
                 for location in shopping_locations:
                     if location.id == latest.shopping_location_id:
                         location_name = location.name

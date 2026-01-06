@@ -79,6 +79,80 @@ export async function fetchShoppingListWithCache(
   }
 }
 
+function batchPendingActions(actions: PendingAction[]): PendingAction[] {
+  const result: PendingAction[] = [];
+  for (const action of actions) {
+    const last = result[result.length - 1];
+    const canMerge =
+      last &&
+      last.instanceIndex === action.instanceIndex &&
+      last.action === action.action &&
+      ["add_item", "remove_item", "update_item"].includes(action.action);
+    if (!canMerge) {
+      result.push(action);
+      continue;
+    }
+
+    const mergedFailureCount =
+      action.failureCount ?? last.failureCount ?? undefined;
+
+    if (action.action === "add_item" && last.action === "add_item") {
+      const previous =
+        "items" in last.payload && Array.isArray(last.payload.items)
+          ? last.payload.items
+          : [];
+      const incoming =
+        "items" in action.payload && Array.isArray(action.payload.items)
+          ? action.payload.items
+          : [];
+      result[result.length - 1] = {
+        ...last,
+        payload: { items: [...previous, ...incoming] },
+        timestamp: Math.max(last.timestamp, action.timestamp),
+        failureCount: mergedFailureCount,
+      };
+      continue;
+    }
+
+    if (action.action === "remove_item" && last.action === "remove_item") {
+      const previous =
+        "item_ids" in last.payload && Array.isArray(last.payload.item_ids)
+          ? last.payload.item_ids
+          : [];
+      const incoming =
+        "item_ids" in action.payload && Array.isArray(action.payload.item_ids)
+          ? action.payload.item_ids
+          : [];
+      const merged = Array.from(new Set([...previous, ...incoming]));
+      result[result.length - 1] = {
+        ...last,
+        payload: { item_ids: merged },
+        timestamp: Math.max(last.timestamp, action.timestamp),
+        failureCount: mergedFailureCount,
+      };
+      continue;
+    }
+
+    if (action.action === "update_item" && last.action === "update_item") {
+      const mergedUpdates = mergePendingUpdates(
+        Array.isArray(last.payload.updates) ? last.payload.updates : [],
+        Array.isArray(action.payload.updates) ? action.payload.updates : [],
+        action.timestamp,
+      );
+      result[result.length - 1] = {
+        ...last,
+        payload: { updates: mergedUpdates },
+        timestamp: action.timestamp,
+        failureCount: mergedFailureCount,
+      };
+      continue;
+    }
+
+    result.push(action);
+  }
+  return result;
+}
+
 export async function syncPendingActions(): Promise<void> {
   if (!getOnlineStatus()) {
     return;
@@ -127,35 +201,12 @@ export async function syncPendingActions(): Promise<void> {
     return;
   }
 
-  const batched: PendingAction[] = [];
-  for (const action of refreshedQueue) {
-    if (action.action !== "update_item") {
-      batched.push(action);
-      continue;
-    }
-    const last = batched[batched.length - 1];
-    const canMergeWithLast =
-      last &&
-      last.action === "update_item" &&
-      last.instanceIndex === action.instanceIndex;
-    if (!canMergeWithLast) {
-      batched.push(action);
-      continue;
-    }
-    const mergedUpdates = mergePendingUpdates(
-      Array.isArray(last.payload.updates) ? last.payload.updates : [],
-      Array.isArray(action.payload.updates) ? action.payload.updates : [],
-      action.timestamp,
-    );
-    batched[batched.length - 1] = {
-      ...last,
-      payload: { updates: mergedUpdates },
-      timestamp: action.timestamp,
-    };
-  }
+  const batched = batchPendingActions(refreshedQueue);
 
   console.log(`Syncing ${batched.length} pending shopping list actions...`);
   notifySyncInfo(batched.length);
+
+  const refreshAfter = new Set<string>();
 
   for (const action of batched) {
     try {
@@ -163,6 +214,15 @@ export async function syncPendingActions(): Promise<void> {
       removeFromSyncQueue(action.id);
       console.log(`Synced action: ${action.action}`, action);
       markSyncSuccess(readSyncQueue().length);
+      if (
+        action.action === "add_item" ||
+        action.action === "remove_item" ||
+        action.action === "update_item" ||
+        action.action === "generate_list" ||
+        action.action === "replay_snapshot"
+      ) {
+        refreshAfter.add(action.instanceIndex);
+      }
     } catch (error) {
       const status = statusFromError(error);
       const isPermanent = isPermanentFailure(status);
@@ -189,6 +249,10 @@ export async function syncPendingActions(): Promise<void> {
       writeSyncQueue(remaining);
       notifySyncInfo(remaining.length, "requeued_failed_action");
     }
+  }
+
+  for (const instanceIndex of refreshAfter) {
+    await refreshActiveListCache(instanceIndex);
   }
 }
 
@@ -223,28 +287,36 @@ async function executePendingAction(action: PendingAction): Promise<void> {
       }
       return;
     }
-    case "add_item":
-      await fetch(`/api/grocy/${instanceIndex}/shopping-list/items`, {
+    case "add_item": {
+      const items =
+        "items" in payload && Array.isArray(payload.items) ? payload.items : [];
+      if (items.length === 0) {
+        return;
+      }
+      await fetch(`/api/grocy/${instanceIndex}/shopping-list/items/bulk`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(items),
       });
       break;
+    }
 
-    case "remove_item":
+    case "remove_item": {
+      const itemIds =
+        "item_ids" in payload && Array.isArray(payload.item_ids)
+          ? payload.item_ids
+          : [];
       await fetch(`/api/grocy/${instanceIndex}/shopping-list/items/remove`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          item_ids:
-            "item_ids" in payload && Array.isArray(payload.item_ids)
-              ? payload.item_ids
-              : [],
+          item_ids: itemIds,
         }),
       });
       break;
+    }
 
     case "update_item":
       await fetch(`/api/grocy/${instanceIndex}/shopping-list/items/bulk`, {
@@ -257,7 +329,6 @@ async function executePendingAction(action: PendingAction): Promise<void> {
               : [],
         }),
       });
-      await refreshActiveListCache(instanceIndex);
       break;
 
     case "complete_list":
@@ -283,7 +354,6 @@ async function executePendingAction(action: PendingAction): Promise<void> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      await refreshActiveListCache(instanceIndex);
       break;
   }
 }

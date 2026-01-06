@@ -125,21 +125,29 @@ class ShoppingListManager:
 
     def add_item(self, instance_index: str, item_data: dict) -> dict:
         """Add a new item to the active list"""
+        added_items = self.add_items_bulk(instance_index, [item_data])
+        return added_items[0]
+
+    def add_items_bulk(self, instance_index: str, items: list[dict]) -> list[dict]:
+        """Add multiple items to the active list with a single lock/write."""
+        if not items:
+            raise ValueError("No items provided for bulk add")
+
+        incoming_product_ids = [item["product_id"] for item in items]
+        if len(set(incoming_product_ids)) != len(incoming_product_ids):
+            raise ValueError("Duplicate product_ids in bulk add request")
+
         with self._with_lock(instance_index):
             list_data = self.load_active_list(instance_index)
 
-            # Prevent duplicate products in the list (regardless of status)
             existing_product_ids = {item["product_id"] for item in list_data.get("items", [])}
-            if item_data["product_id"] in existing_product_ids:
-                raise ValueError(f"Product {item_data['product_id']} already exists in the active shopping list")
+            duplicates = existing_product_ids.intersection(incoming_product_ids)
+            if duplicates:
+                duplicate_list = ", ".join(str(pid) for pid in sorted(duplicates))
+                raise ValueError(f"Products already exist in the active shopping list: {duplicate_list}")
 
-            list_data["items"].append(item_data)
-
-            location_id = item_data["shopping_location_id"]
-            location_key = "UNKNOWN" if location_id is None else location_id
-
-            if location_key not in list_data["location_order"]:
-                list_data["location_order"].append(location_key)
+            list_data["items"].extend(items)
+            list_data["location_order"] = self._refresh_location_order(list_data["items"], list_data.get("location_order", []))
 
             list_data["version"] = list_data.get("version", 1) + 1
             list_data["last_modified_at"] = datetime.utcnow().isoformat() + "Z"
@@ -147,55 +155,14 @@ class ShoppingListManager:
             self.save_active_list(instance_index, list_data)
 
             logger.info(
-                "shopping_list_add_item",
+                "shopping_list_bulk_add",
                 extra={
                     "instance_index": instance_index,
-                    "product_id": item_data.get("product_id"),
-                    "item_id": item_data.get("id"),
+                    "count": len(items),
                 },
             )
 
-            return item_data
-
-    def remove_item(self, instance_index: str, item_id: str) -> None:
-        """Remove an item from the active list and track deletion"""
-        with self._with_lock(instance_index):
-            list_data = self.load_active_list(instance_index)
-
-            # Find the item to get its product_id before removing
-            removed_item = None
-            for item in list_data["items"]:
-                if item["id"] == item_id:
-                    removed_item = item
-                    break
-
-            if not removed_item:
-                raise ValueError(f"Item {item_id} not found in list")
-
-            # Remove from items list
-            list_data["items"] = [item for item in list_data["items"] if item["id"] != item_id]
-
-            # Track deleted product_id to prevent it from coming back in merge
-            if "deleted_product_ids" not in list_data:
-                list_data["deleted_product_ids"] = []
-
-            product_id = removed_item["product_id"]
-            if product_id not in list_data["deleted_product_ids"]:
-                list_data["deleted_product_ids"].append(product_id)
-
-            list_data["version"] = list_data.get("version", 1) + 1
-            list_data["last_modified_at"] = datetime.utcnow().isoformat() + "Z"
-
-            self.save_active_list(instance_index, list_data)
-
-            logger.info(
-                "shopping_list_remove_item",
-                extra={
-                    "instance_index": instance_index,
-                    "product_id": product_id,
-                    "item_id": item_id,
-                },
-            )
+            return items
 
     def bulk_update_items(
         self,
@@ -216,17 +183,20 @@ class ShoppingListManager:
         Returns:
             List of updated items
         """
+        if not updates:
+            raise ValueError("No updates provided")
+
         with self._with_lock(instance_index):
             list_data = self.load_active_list(instance_index)
             now = datetime.utcnow().isoformat() + "Z"
 
             # Create a mapping of item_id to updates for fast lookup
-            updates_map = {
-                (update["item_id"] if isinstance(update, dict) else update.item_id): (
-                    update if isinstance(update, dict) else update.model_dump(exclude_none=True)
-                )
-                for update in updates
-            }
+            updates_map = {}
+            for update in updates:
+                key = update["item_id"] if isinstance(update, dict) else update.item_id
+                if key in updates_map:
+                    raise ValueError(f"Duplicate item_id in updates: {key}")
+                updates_map[key] = update if isinstance(update, dict) else update.model_dump(exclude_none=True)
 
             # Track which items were updated
             updated_items = []
@@ -271,23 +241,7 @@ class ShoppingListManager:
                 raise ValueError(f"Items not found: {', '.join(missing_ids)}")
 
             list_data["items"] = remaining_items
-            # Append new locations to location_order so future grouping remains consistent
-            location_order: list[str | int] = list_data.get("location_order", [])
-            existing_location_keys = {str(loc) for loc in location_order}
-            for updated in updated_items:
-                location_key = (
-                    str(updated["shopping_location_id"])
-                    if updated.get("shopping_location_id") is not None
-                    else updated.get("shopping_location_name", "UNKNOWN")
-                )
-                if location_key not in existing_location_keys:
-                    location_order.append(
-                        updated["shopping_location_id"]
-                        if updated.get("shopping_location_id") is not None
-                        else updated.get("shopping_location_name", "UNKNOWN")
-                    )
-                    existing_location_keys.add(location_key)
-            list_data["location_order"] = location_order
+            list_data["location_order"] = self._refresh_location_order(list_data["items"], list_data.get("location_order", []))
 
             # Update list metadata
             list_data["version"] = list_data.get("version", 1) + 1
@@ -300,6 +254,9 @@ class ShoppingListManager:
 
     def bulk_remove_items(self, instance_index: str, request: BulkRemoveRequest) -> list[dict]:
         """Remove multiple items and track deleted product_ids"""
+        if not request.item_ids:
+            raise ValueError("No item_ids provided for removal")
+
         with self._with_lock(instance_index):
             list_data = self.load_active_list(instance_index)
             item_ids = set(request.item_ids)
@@ -321,6 +278,7 @@ class ShoppingListManager:
 
             list_data["items"] = remaining
             list_data["deleted_product_ids"] = deleted_product_ids
+            list_data["location_order"] = self._refresh_location_order(remaining, list_data.get("location_order", []))
             list_data["version"] = list_data.get("version", 1) + 1
             list_data["last_modified_at"] = datetime.utcnow().isoformat() + "Z"
 
@@ -375,3 +333,31 @@ class ShoppingListManager:
                 updated_fields["last_price"] = True
 
         return updated_fields or False
+
+    @staticmethod
+    def _location_key(item: dict[str, Any]) -> str | int:
+        """Return normalized location key for an item."""
+        location_id = item.get("shopping_location_id")
+        return "UNKNOWN" if location_id is None else location_id
+
+    def _refresh_location_order(self, items: list[dict[str, Any]], existing_order: list[str | int]) -> list[str | int]:
+        """Rebuild location_order preserving existing ordering where possible."""
+        seen_keys: list[str | int] = []
+        seen_key_strs: set[str] = set()
+
+        for item in items:
+            key = self._location_key(item)
+            key_str = str(key)
+            if key_str not in seen_key_strs:
+                seen_keys.append(key)
+                seen_key_strs.add(key_str)
+
+        ordered = [loc for loc in existing_order if str(loc) in seen_key_strs]
+        ordered_keys = {str(loc) for loc in ordered}
+        for key in seen_keys:
+            key_str = str(key)
+            if key_str not in ordered_keys:
+                ordered.append(key)
+                ordered_keys.add(key_str)
+
+        return ordered

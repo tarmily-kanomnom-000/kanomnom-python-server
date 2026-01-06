@@ -9,7 +9,9 @@ export type StoredPayload<T> = {
   data: T;
 };
 
-export type AddItemPayload = { product_id: number; quantity: number };
+export type AddItemPayload = {
+  items: { product_id: number; quantity: number }[];
+};
 export type RemoveItemPayload = { item_ids: string[] };
 export type UpdateItemPayload = { updates: BulkItemUpdate[] };
 export type SnapshotPayload = { list: ShoppingList; updates: BulkItemUpdate[] };
