@@ -65,7 +65,6 @@ export function InventoryCorrectionForm({
     addPackageEntry,
     removeStagedEntry,
     clearStagedEntries,
-    resetStaging,
     hasTareWeight,
     tareWeight,
   } = useInventoryStaging({ product, instanceIndex });
@@ -124,8 +123,7 @@ export function InventoryCorrectionForm({
     setStatusMessage(null);
     setStageModalOpen(false);
     setStageEntryType(null);
-    resetStaging();
-  }, [product, resetStaging]);
+  }, [product]);
 
   const resetBestBeforeToDefault = () => {
     setBestBeforeDate(defaultBestBefore);

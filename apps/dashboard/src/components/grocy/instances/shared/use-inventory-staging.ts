@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GrocyProductInventoryEntry } from "@/lib/grocy/types";
 import {
   buildStorageKey,
@@ -38,6 +38,12 @@ type StagingState = {
   stagedInterpretation: StagedInterpretation;
   deltaDirection: DeltaDirection;
 };
+
+const buildDefaultState = (): StagingState => ({
+  stagedEntries: [],
+  stagedInterpretation: "absolute",
+  deltaDirection: "add",
+});
 
 const sanitizeStagedEntries = (
   rawEntries: unknown,
@@ -154,16 +160,19 @@ export function useInventoryStaging({
       ? buildStorageKey(["inventory-staging", instanceIndex, `${product.id}`])
       : null;
 
-  const [state, setState] = useState<StagingState>({
-    stagedEntries: [],
-    stagedInterpretation: "absolute",
-    deltaDirection: "add",
+  const [state, setState] = useState<StagingState>(buildDefaultState);
+  const hydrationStateRef = useRef<{ key: string | null; hydrated: boolean }>({
+    key: null,
+    hydrated: false,
   });
 
   useEffect(() => {
     if (!stagingKey) {
+      hydrationStateRef.current = { key: null, hydrated: false };
+      setState(buildDefaultState());
       return;
     }
+    hydrationStateRef.current = { key: stagingKey, hydrated: false };
     const payload = readStoredPayload<{
       entries?: unknown;
       updatedAt?: number;
@@ -171,6 +180,8 @@ export function useInventoryStaging({
       direction?: DeltaDirection;
     }>(stagingKey);
     if (!payload) {
+      setState(buildDefaultState());
+      hydrationStateRef.current = { key: stagingKey, hydrated: true };
       return;
     }
     try {
@@ -181,6 +192,8 @@ export function useInventoryStaging({
           : 0;
       if (!updatedAt || Date.now() - updatedAt > STAGING_TTL_MS) {
         clearStoredPayload(stagingKey);
+        setState(buildDefaultState());
+        hydrationStateRef.current = { key: stagingKey, hydrated: true };
         return;
       }
       const interpretation: StagedInterpretation =
@@ -194,6 +207,8 @@ export function useInventoryStaging({
       );
       if (!hydrated.length) {
         clearStoredPayload(stagingKey);
+        setState(buildDefaultState());
+        hydrationStateRef.current = { key: stagingKey, hydrated: true };
         return;
       }
       setState({
@@ -201,17 +216,26 @@ export function useInventoryStaging({
         stagedInterpretation: interpretation,
         deltaDirection: direction,
       });
+      hydrationStateRef.current = { key: stagingKey, hydrated: true };
     } catch (error) {
       console.warn("Failed to hydrate inventory staging state; clearing", {
         stagingKey,
         error,
       });
       clearStoredPayload(stagingKey);
+      setState(buildDefaultState());
+      hydrationStateRef.current = { key: stagingKey, hydrated: true };
     }
   }, [stagingKey, hasTareWeight]);
 
   useEffect(() => {
     if (!stagingKey) {
+      return;
+    }
+    if (
+      hydrationStateRef.current.key !== stagingKey ||
+      !hydrationStateRef.current.hydrated
+    ) {
       return;
     }
     if (state.stagedEntries.length === 0) {
@@ -343,14 +367,21 @@ export function useInventoryStaging({
       ...current,
       stagedEntries: [],
     }));
-  }, []);
+    if (!stagingKey) {
+      return;
+    }
+    try {
+      clearStoredPayload(stagingKey);
+    } catch (error) {
+      console.warn("Failed to clear inventory staging state", {
+        stagingKey,
+        error,
+      });
+    }
+  }, [stagingKey]);
 
   const resetStaging = useCallback(() => {
-    setState({
-      stagedEntries: [],
-      stagedInterpretation: "absolute",
-      deltaDirection: "add",
-    });
+    setState(buildDefaultState());
   }, []);
 
   return {
