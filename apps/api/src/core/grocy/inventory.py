@@ -10,7 +10,12 @@ from core.cache.grocy_quantity_units_cache import GrocyQuantityUnitsCacheManager
 from core.cache.grocy_stock_cache import GrocyStockCacheManager
 from core.cache.grocy_stock_log_cache import GrocyStockLogCacheManager
 from core.grocy.client import GrocyClient
-from core.grocy.note_metadata import InventoryCorrectionNoteMetadata
+from core.grocy.note_metadata import (
+    InventoryCorrectionNoteMetadata,
+    ProductDescriptionMetadata,
+    encode_structured_note,
+    normalize_product_description_metadata,
+)
 from core.grocy.responses import (
     GrocyProduct,
     GrocyProductGroup,
@@ -110,6 +115,15 @@ class InventoryAdjustment:
     metadata: InventoryCorrectionNoteMetadata | None = None
 
 
+@dataclass(frozen=True)
+class ProductDescriptionMetadataUpdate:
+    """Structured description metadata update for a product."""
+
+    product_id: int
+    description: str | None
+    metadata: ProductDescriptionMetadata
+
+
 class ProductInventoryService:
     """Enriches Grocy product payloads with inventory metadata."""
 
@@ -179,6 +193,29 @@ class ProductInventoryService:
             self._settings.cold_start_timestamp,
             last_update_by_id.get(product_id),
         )
+
+    def update_product_description_metadata(
+        self,
+        instance_index: str,
+        updates: list[ProductDescriptionMetadataUpdate],
+    ) -> list[ProductInventoryView]:
+        """Apply structured description metadata updates to multiple products."""
+        if not updates:
+            raise ValueError("product_description updates must include at least one entry.")
+        context = self._build_inventory_context(instance_index)
+        refreshed: list[ProductInventoryView] = []
+        for update in updates:
+            product = self._get_product(instance_index, update.product_id)
+            sanitized = normalize_product_description_metadata(update.metadata, context.unit_name_lookup)
+            updated_description = encode_structured_note(update.description or "", sanitized)
+            if updated_description is None:
+                raise ValueError("Product description updates must include a description or unit conversions.")
+            self.client.update_product(product.id, {"description": updated_description})
+        self.product_cache.clear_cache(instance_index)
+        self._product_lookup.pop(instance_index, None)
+        for update in updates:
+            refreshed.append(self.get_product_inventory(instance_index, update.product_id))
+        return refreshed
 
     def resolve_inventory_correction(
         self,

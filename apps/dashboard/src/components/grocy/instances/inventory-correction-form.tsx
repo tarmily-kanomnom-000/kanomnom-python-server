@@ -63,6 +63,7 @@ export function InventoryCorrectionForm({
     addTareEntry,
     addManualEntry,
     addPackageEntry,
+    addConversionEntry,
     removeStagedEntry,
     clearStagedEntries,
     hasTareWeight,
@@ -86,7 +87,7 @@ export function InventoryCorrectionForm({
   const [losses, setLosses] = useState<LossEntry[]>([]);
   const [isStageModalOpen, setStageModalOpen] = useState(false);
   const [stageEntryType, setStageEntryType] = useState<
-    "tare" | "package" | "manual" | null
+    "tare" | "package" | "manual" | "conversion" | null
   >(null);
   const [statusMessage, setStatusMessage] = useState<{
     type: "success" | "error";
@@ -105,6 +106,11 @@ export function InventoryCorrectionForm({
   const locationOptions = useMemo(
     () => buildSearchableOptions(locationNamesById),
     [locationNamesById],
+  );
+
+  const unitConversions = useMemo(
+    () => product.description_metadata?.unit_conversions ?? [],
+    [product.description_metadata],
   );
 
   useEffect(() => {
@@ -412,6 +418,8 @@ export function InventoryCorrectionForm({
         onAddManual={addManualEntry}
         onAddTare={addTareEntry}
         onAddPackage={addPackageEntry}
+        onAddConversion={addConversionEntry}
+        unitConversions={unitConversions}
       />
     </form>
   );

@@ -11,9 +11,11 @@ import {
 } from "@/lib/grocy/transformers";
 import type {
   GrocyProductInventoryEntry,
+  GrocyQuantityUnit,
   GrocyStockEntry,
   InventoryAdjustmentRequestPayload,
   InventoryCorrectionRequestPayload,
+  ProductDescriptionMetadataBatchRequestPayload,
   PurchaseEntryCalculation,
   PurchaseEntryDefaults,
   PurchaseEntryRequestPayload,
@@ -66,6 +68,25 @@ export async function fetchGrocyProduct(
     },
     offlineFallback: cachedProduct ? () => cachedProduct : null,
   });
+}
+
+type GrocyQuantityUnitsResponsePayload = {
+  instance_index: string;
+  quantity_units: GrocyQuantityUnit[];
+};
+
+export async function fetchGrocyQuantityUnits(
+  instanceIndex: string,
+): Promise<GrocyQuantityUnit[]> {
+  const response = await axios.get(
+    `/api/grocy/${instanceIndex}/quantity-units`,
+    {
+      adapter: "fetch",
+      fetchOptions: { cache: "no-store" },
+    },
+  );
+  const payload = response.data as GrocyQuantityUnitsResponsePayload;
+  return payload.quantity_units ?? [];
 }
 
 export async function fetchGrocyProducts(
@@ -179,6 +200,31 @@ export async function submitPurchaseEntry(
       invalidateGrocyProductsClientCache(instanceIndex);
       const updatedProduct = await fetchGrocyProduct(instanceIndex, productId);
       return { product: updatedProduct, newEntries };
+    },
+  });
+}
+
+export async function submitProductDescriptionMetadata(
+  instanceIndex: string,
+  payload: ProductDescriptionMetadataBatchRequestPayload,
+): Promise<GrocyProductInventoryEntry[]> {
+  return runGrocyMutation<GrocyProductInventoryEntry[]>({
+    request: async () => {
+      const response = await axios.post(
+        `/api/grocy/${instanceIndex}/products/description-metadata`,
+        payload,
+        {
+          adapter: "fetch",
+          fetchOptions: { cache: "no-store" },
+        },
+      );
+      const responsePayload = response.data as GrocyProductsResponsePayload;
+      const products = deserializeGrocyProducts(responsePayload);
+      invalidateGrocyProductsClientCache(instanceIndex);
+      products.forEach((product) => {
+        upsertCachedProduct(instanceIndex, product);
+      });
+      return products;
     },
   });
 }

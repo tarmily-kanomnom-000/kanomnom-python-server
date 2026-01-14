@@ -73,6 +73,7 @@ Current metadata kinds:
 
 - `purchase_entry` — captures `shipping_cost`, `tax_rate`, and `brand` details for that buy.
 - `inventory_correction` — records a `losses` array so every adjustment can capture multiple structured reasons plus short optional notes. Valid reasons today are `spoilage`, `breakage`, `overportion`, `theft`, `quality_reject`, `process_error`, and `other`, and duplicates are ignored to keep the payload concise.
+- `product_description` — stores product-level `unit_conversions` so dashboards can convert between quantity units while keeping the human-facing description intact.
 
 These metadata payloads are defined twice on purpose: FastAPI models live in `apps/api/src/models/grocy.py`, while the dashboard consumes mirrored TypeScript shapes in `apps/dashboard/src/lib/grocy/types.ts`. Whenever you add a field (or a new metadata kind), update both layers in the same change and refresh this document so server and client stay aligned.
 

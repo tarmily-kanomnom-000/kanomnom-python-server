@@ -11,10 +11,14 @@ Concise reference for the Grocy API routes and key helpers. Use this to understa
 ## Products (`.../products.py` + `helpers.serialize_inventory_view`)
 - `GET /grocy/{instance_index}/products` (`list_products`) — Returns inventory-enriched products. Honors `force_refresh` truthy values {1,true,t,yes,y,on} to invalidate caches for that instance before listing. 404 on missing metadata.
 - `GET /grocy/{instance_index}/products/{product_id}` (`get_product`) — Fetches a single product with fresh stock rows; 404 on missing metadata or product_id.
+- `POST /grocy/{instance_index}/products/description-metadata` (`update_product_description_metadata`) — Applies structured unit conversions to multiple products and sets the human-readable description inside the note envelope. 400 on invalid conversions; 404 on missing metadata.
 - `serialize_inventory_view` — Normalizes structured notes on products/stocks (decodes envelopes, drops empty metadata), validates unit conversions, and maps Grocy unit names across purchase/stock/consume/price contexts for consistent API responses.
 
 ## Inventory Corrections (`.../inventory.py`)
 - `POST /grocy/{instance_index}/products/{product_id}/inventory` (`correct_product_inventory`) — Validates note text and optional loss-metadata; applies `InventoryCorrection` via `execute_product_mutation`. Returns refreshed inventory view. 400 on validation errors; 404 on missing metadata/product.
+
+## Quantity Units (`.../quantity_units.py`)
+- `GET /grocy/{instance_index}/quantity-units` (`list_quantity_units`) — Returns cached Grocy quantity units for the instance. 404 on missing metadata.
 
 ## Purchases (`.../purchases.py`)
 - `GET /grocy/{instance_index}/products/{product_id}/purchase/defaults` — Returns purchase metadata defaults for a product, optionally scoped to `shopping_location_id`. 404 on missing metadata/product.

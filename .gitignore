@@ -1,4 +1,4 @@
-.env
+.env*
 *.pyc
 apps/api/request_dumps/*
 *cache*

@@ -13,6 +13,7 @@ from core.grocy.client import GrocyClient
 from core.grocy.inventory import (
     InventoryAdjustment,
     InventoryCorrection,
+    ProductDescriptionMetadataUpdate,
     ProductInventoryService,
     ProductInventoryView,
     StockUpdateSettings,
@@ -28,7 +29,7 @@ from core.grocy.purchases import (
     PurchaseEntryDefaults,
     PurchaseEntryDraft,
 )
-from core.grocy.responses import GrocyLocation, GrocyShoppingLocation
+from core.grocy.responses import GrocyLocation, GrocyQuantityUnit, GrocyShoppingLocation
 from core.grocy.services import (
     ProductGroupService,
     ProductGroupSyncResult,
@@ -66,6 +67,7 @@ class GrocyManager:
         )
         self._locations_cache = get_grocy_locations_cache()
         self._shopping_locations_cache = get_grocy_shopping_locations_cache()
+        self._quantity_units_cache = get_grocy_quantity_units_cache()
 
     def ensure_quantity_units(self, manifest: UniversalManifest) -> QuantityUnitSyncResult:
         """Ensure the provided manifest quantity units exist in Grocy."""
@@ -92,6 +94,13 @@ class GrocyManager:
     def get_product_inventory(self, product_id: int) -> ProductInventoryView:
         """Return a single product with refreshed stock entries."""
         return self._inventory.get_product_inventory(self.instance_index, product_id)
+
+    def update_product_description_metadata(
+        self,
+        updates: list[ProductDescriptionMetadataUpdate],
+    ) -> list[ProductInventoryView]:
+        """Update structured description metadata for multiple products."""
+        return self._inventory.update_product_description_metadata(self.instance_index, updates)
 
     def list_locations(self) -> list[GrocyLocation]:
         """Return cached Grocy locations for this instance."""
@@ -147,6 +156,14 @@ class GrocyManager:
             self._shopping_locations_cache.load_shopping_locations,
             self.client.list_shopping_locations,
             self._shopping_locations_cache.save_shopping_locations,
+        )
+
+    def list_quantity_units(self) -> list[GrocyQuantityUnit]:
+        """Return cached Grocy quantity units for this instance."""
+        return self._load_or_fetch(
+            self._quantity_units_cache.load_units,
+            self.client.list_quantity_units,
+            self._quantity_units_cache.save_units,
         )
 
     def ensure_shopping_location(self, name: str) -> GrocyShoppingLocation:

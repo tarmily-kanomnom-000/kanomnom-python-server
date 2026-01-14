@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import type { GrocyProductInventoryEntry } from "@/lib/grocy/types";
-
+import { DescriptionWithLinks } from "./description-with-links";
 import {
   formatLastUpdated,
   formatQuantityWithUnit,
@@ -13,7 +13,6 @@ import {
 import { ACTION_MENU_OPTIONS, type ProductActionType } from "./product-actions";
 import {
   formatMinimumStock,
-  normalizeDescription,
   ProductStockStatus,
   resolveDaysSinceUpdate,
   resolveProductStockStatus,
@@ -251,9 +250,10 @@ function ProductQuickPreview({
         {resolveProductGroup(product)}
       </p>
       {product.description ? (
-        <p className="mt-2 line-clamp-2 text-[11px] text-neutral-600">
-          {normalizeDescription(product.description)}
-        </p>
+        <DescriptionWithLinks
+          description={product.description}
+          className="mt-2 line-clamp-2 whitespace-pre-line text-[11px] text-neutral-600"
+        />
       ) : null}
       <dl className="mt-3 space-y-2">
         <div className="flex items-center justify-between">

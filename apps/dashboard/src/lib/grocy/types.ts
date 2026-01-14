@@ -66,10 +66,21 @@ export type GrocyStockEntry = {
   } | null;
 };
 
+export type GrocyQuantityUnit = {
+  id: number;
+  name: string;
+  description: string | null;
+  name_plural: string | null;
+  plural_forms: string | null;
+  active: boolean;
+  is_discrete: boolean | null;
+};
+
 export type ProductUnitConversionDefinition = {
   from_unit: string;
   to_unit: string;
   factor: number;
+  tare?: number;
 };
 
 export type ProductDescriptionMetadata = {
@@ -77,6 +88,18 @@ export type ProductDescriptionMetadata = {
   unit_conversions?: ProductUnitConversionDefinition[];
   [key: string]: unknown;
 } | null;
+
+export type ProductDescriptionMetadataUpdatePayload = {
+  product_id: number;
+  description: string | null;
+  description_metadata: {
+    unit_conversions: ProductUnitConversionDefinition[];
+  };
+};
+
+export type ProductDescriptionMetadataBatchRequestPayload = {
+  updates: ProductDescriptionMetadataUpdatePayload[];
+};
 
 export type GrocyProductInventoryEntry = {
   id: number;

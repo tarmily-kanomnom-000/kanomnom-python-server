@@ -285,18 +285,23 @@ class ProductUnitConversion:
     from_unit: str
     to_unit: str
     factor: float
+    tare: float | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "from_unit", _normalize_required_text(self.from_unit, "from_unit"))
         object.__setattr__(self, "to_unit", _normalize_required_text(self.to_unit, "to_unit"))
         object.__setattr__(self, "factor", _normalize_required_positive_number(self.factor, "factor"))
+        object.__setattr__(self, "tare", _normalize_optional_number(self.tare, "tare"))
 
     def to_attrs(self) -> dict[str, Any]:
-        return {
+        payload = {
             "from_unit": self.from_unit,
             "to_unit": self.to_unit,
             "factor": self.factor,
         }
+        if self.tare is not None:
+            payload["tare"] = self.tare
+        return payload
 
     @classmethod
     def from_attrs(cls, attrs: Mapping[str, Any]) -> "ProductUnitConversion":
@@ -306,6 +311,7 @@ class ProductUnitConversion:
             from_unit=_normalize_required_text(attrs.get("from_unit"), "from_unit"),
             to_unit=_normalize_required_text(attrs.get("to_unit"), "to_unit"),
             factor=_normalize_required_positive_number(attrs.get("factor"), "factor"),
+            tare=_normalize_optional_number(attrs.get("tare"), "tare"),
         )
 
 
@@ -356,6 +362,95 @@ class ProductDescriptionMetadata(BaseNoteMetadata):
 
 
 _register_metadata(ProductDescriptionMetadata.kind, ProductDescriptionMetadata)
+
+
+def normalize_product_description_metadata(
+    metadata: ProductDescriptionMetadata,
+    unit_name_lookup: Mapping[str, str],
+) -> ProductDescriptionMetadata:
+    if not metadata.unit_conversions:
+        return metadata
+    if not unit_name_lookup:
+        raise ValueError("Unable to validate unit conversions because Grocy quantity units are unavailable.")
+    seen_pairs: set[tuple[str, str]] = set()
+    sanitized: list[ProductUnitConversion] = []
+    for conversion in metadata.unit_conversions:
+        from_key = _normalize_unit_name(conversion.from_unit)
+        to_key = _normalize_unit_name(conversion.to_unit)
+        if not from_key or not to_key:
+            raise ValueError("Unit conversions must include from_unit and to_unit names.")
+        if from_key not in unit_name_lookup:
+            raise ValueError(f"Unknown Grocy quantity unit '{conversion.from_unit}'.")
+        if to_key not in unit_name_lookup:
+            raise ValueError(f"Unknown Grocy quantity unit '{conversion.to_unit}'.")
+        pair_key = tuple(sorted((from_key, to_key)))
+        if pair_key in seen_pairs:
+            continue
+        seen_pairs.add(pair_key)
+        sanitized.append(
+            ProductUnitConversion(
+                from_unit=unit_name_lookup[from_key],
+                to_unit=unit_name_lookup[to_key],
+                factor=conversion.factor,
+                tare=conversion.tare,
+            )
+        )
+    return ProductDescriptionMetadata(unit_conversions=tuple(sanitized))
+
+
+def resolve_unit_conversion_factors(
+    conversions: Sequence[ProductUnitConversion],
+    requests: Sequence[tuple[str, str]],
+) -> dict[tuple[str, str], float | None]:
+    normalized_requests = [(_normalize_unit_name(req[0]), _normalize_unit_name(req[1])) for req in requests]
+    if not normalized_requests:
+        return {}
+    graph: dict[str, list[tuple[str, float]]] = {}
+    for conversion in conversions:
+        from_key = _normalize_unit_name(conversion.from_unit)
+        to_key = _normalize_unit_name(conversion.to_unit)
+        if not from_key or not to_key:
+            continue
+        if conversion.factor <= 0:
+            continue
+        graph.setdefault(from_key, []).append((to_key, conversion.factor))
+        graph.setdefault(to_key, []).append((from_key, 1 / conversion.factor))
+    results: dict[tuple[str, str], float | None] = {}
+    for raw_request, (from_key, to_key) in zip(requests, normalized_requests, strict=True):
+        if not from_key or not to_key:
+            results[raw_request] = None
+            continue
+        if from_key == to_key:
+            results[raw_request] = 1.0
+            continue
+        results[raw_request] = _resolve_conversion_factor(graph, from_key, to_key)
+    return results
+
+
+def _normalize_unit_name(value: str | None) -> str:
+    if value is None:
+        return ""
+    return value.strip().lower()
+
+
+def _resolve_conversion_factor(
+    graph: Mapping[str, Sequence[tuple[str, float]]],
+    source: str,
+    target: str,
+) -> float | None:
+    queue: list[tuple[str, float]] = [(source, 1.0)]
+    visited: set[str] = {source}
+    while queue:
+        current, factor = queue.pop(0)
+        for neighbor, edge_factor in graph.get(current, ()):
+            if neighbor in visited:
+                continue
+            next_factor = factor * edge_factor
+            if neighbor == target:
+                return next_factor
+            visited.add(neighbor)
+            queue.append((neighbor, next_factor))
+    return None
 
 
 @dataclass(frozen=True)

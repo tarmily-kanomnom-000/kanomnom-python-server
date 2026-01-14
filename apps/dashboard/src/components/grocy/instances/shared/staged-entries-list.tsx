@@ -60,7 +60,9 @@ export function StagedEntriesList({
                       ? "Weighed container"
                       : entry.kind === "package"
                         ? "Package entry"
-                        : "Measured entry"}
+                        : entry.kind === "conversion"
+                          ? "Converted entry"
+                          : "Measured entry"}
                   </p>
                   <p className="text-xs text-neutral-600">
                     {entry.kind === "tare"
@@ -71,7 +73,13 @@ export function StagedEntriesList({
                         }`
                       : entry.kind === "package"
                         ? `${entry.quantity.toLocaleString()} × ${formatAmountWithUnit(entry.packageSize, quantityUnit)} = ${formatAmountWithUnit(entry.submissionAmount, quantityUnit)}`
-                        : `Amount: ${formatAmountWithUnit(entry.submissionAmount, quantityUnit)}`}
+                        : entry.kind === "conversion"
+                          ? `Gross ${entry.grossAmount.toLocaleString()} ${entry.fromUnit}${
+                              entry.tareApplied && entry.tareAmount !== null
+                                ? ` • Net ${entry.netAmount.toLocaleString()} ${entry.fromUnit}`
+                                : ""
+                            } → ${formatAmountWithUnit(entry.submissionAmount, quantityUnit)}`
+                          : `Amount: ${formatAmountWithUnit(entry.submissionAmount, quantityUnit)}`}
                   </p>
                 </div>
                 <button

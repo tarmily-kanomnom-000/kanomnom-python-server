@@ -26,6 +26,18 @@ export type InventoryStagedEntry =
       id: string;
       kind: "manual";
       submissionAmount: number;
+    }
+  | {
+      id: string;
+      kind: "conversion";
+      submissionAmount: number;
+      grossAmount: number;
+      netAmount: number;
+      fromUnit: string;
+      toUnit: string;
+      factor: number;
+      tareApplied: boolean;
+      tareAmount: number | null;
     };
 
 export type StagedInterpretation = "absolute" | "delta";
@@ -116,6 +128,39 @@ const sanitizeStagedEntries = (
           };
         }
       }
+      if (kind === "conversion") {
+        const grossAmount = record.grossAmount;
+        const netAmount = record.netAmount;
+        const submissionAmount = record.submissionAmount;
+        const fromUnit = record.fromUnit;
+        const toUnit = record.toUnit;
+        const factor = record.factor;
+        const tareApplied = record.tareApplied;
+        const tareAmount = record.tareAmount;
+        if (
+          isFiniteNumber(grossAmount) &&
+          isFiniteNumber(netAmount) &&
+          isFiniteNumber(submissionAmount) &&
+          typeof fromUnit === "string" &&
+          typeof toUnit === "string" &&
+          isFiniteNumber(factor) &&
+          typeof tareApplied === "boolean" &&
+          (tareAmount === null || isFiniteNumber(tareAmount))
+        ) {
+          return {
+            id: idValue,
+            kind: "conversion",
+            grossAmount,
+            netAmount,
+            submissionAmount,
+            fromUnit,
+            toUnit,
+            factor,
+            tareApplied,
+            tareAmount: tareAmount === null ? null : tareAmount,
+          };
+        }
+      }
       return null;
     })
     .filter((entry): entry is InventoryStagedEntry => entry !== null);
@@ -141,11 +186,23 @@ type UseInventoryStagingResult = {
   addTareEntry: (grossAmount: number) => void;
   addManualEntry: (amount: number) => void;
   addPackageEntry: (quantity: number, packageSize: number) => void;
+  addConversionEntry: (entry: ConversionEntryInput) => void;
   removeStagedEntry: (id: string) => void;
   clearStagedEntries: () => void;
   resetStaging: () => void;
   hasTareWeight: boolean;
   tareWeight: number;
+};
+
+type ConversionEntryInput = {
+  grossAmount: number;
+  netAmount: number;
+  submissionAmount: number;
+  fromUnit: string;
+  toUnit: string;
+  factor: number;
+  tareApplied: boolean;
+  tareAmount: number | null;
 };
 
 export function useInventoryStaging({
@@ -267,15 +324,20 @@ export function useInventoryStaging({
   );
 
   const stagedNetPreview = useMemo(() => {
-    if (
-      !hasTareWeight ||
-      !state.stagedEntries.some((entry) => entry.kind === "tare")
-    ) {
+    const hasTareEntries = state.stagedEntries.some(
+      (entry) =>
+        entry.kind === "tare" ||
+        (entry.kind === "conversion" && entry.tareApplied),
+    );
+    if (!hasTareWeight && !hasTareEntries) {
       return null;
     }
     return Math.max(
       state.stagedEntries.reduce((total, entry) => {
         if (entry.kind === "tare") {
+          return total + entry.netAmount;
+        }
+        if (entry.kind === "conversion" && entry.tareApplied) {
           return total + entry.netAmount;
         }
         return total + entry.submissionAmount;
@@ -355,6 +417,31 @@ export function useInventoryStaging({
     [],
   );
 
+  const addConversionEntry = useCallback((entry: ConversionEntryInput) => {
+    const id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `conversion-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setState((current) => ({
+      ...current,
+      stagedEntries: [
+        ...current.stagedEntries,
+        {
+          id,
+          kind: "conversion",
+          submissionAmount: entry.submissionAmount,
+          grossAmount: entry.grossAmount,
+          netAmount: entry.netAmount,
+          fromUnit: entry.fromUnit,
+          toUnit: entry.toUnit,
+          factor: entry.factor,
+          tareApplied: entry.tareApplied,
+          tareAmount: entry.tareAmount,
+        },
+      ],
+    }));
+  }, []);
+
   const removeStagedEntry = useCallback((id: string) => {
     setState((current) => ({
       ...current,
@@ -401,6 +488,7 @@ export function useInventoryStaging({
     addTareEntry,
     addManualEntry,
     addPackageEntry,
+    addConversionEntry,
     removeStagedEntry,
     clearStagedEntries,
     resetStaging,

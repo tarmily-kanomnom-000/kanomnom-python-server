@@ -50,6 +50,21 @@ class GrocyShoppingLocationPayload(BaseModel):
     active: bool
 
 
+class GrocyQuantityUnitPayload(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+    name_plural: str | None = None
+    plural_forms: str | None = None
+    active: bool
+    is_discrete: bool | None = None
+
+
+class GrocyQuantityUnitsResponse(BaseModel):
+    instance_index: str
+    quantity_units: list[GrocyQuantityUnitPayload]
+
+
 class InstanceAddressPayload(BaseModel):
     line1: str
     line2: str | None = None
@@ -150,10 +165,21 @@ class ProductUnitConversionPayload(BaseModel):
     from_unit: str
     to_unit: str
     factor: float
+    tare: float | None = None
 
 
 class ProductDescriptionMetadataPayload(BaseModel):
     unit_conversions: list[ProductUnitConversionPayload] = Field(default_factory=list)
+
+
+class ProductDescriptionMetadataUpdatePayload(BaseModel):
+    product_id: int
+    description: str | None = None
+    description_metadata: ProductDescriptionMetadataPayload
+
+
+class ProductDescriptionMetadataBatchRequest(BaseModel):
+    updates: list[ProductDescriptionMetadataUpdatePayload] = Field(min_length=1)
 
 
 class GrocyStockEntryPayload(BaseModel):
@@ -230,6 +256,8 @@ __all__ = [
     "CreatedProductGroup",
     "CreatedShoppingLocation",
     "InitializeInstanceResponse",
+    "GrocyQuantityUnitPayload",
+    "GrocyQuantityUnitsResponse",
     "PurchaseEntryDefaultsResponse",
     "PurchaseEntryDefaultsBatchRequest",
     "PurchaseEntryDefaultsBatchResponse",
@@ -237,6 +265,8 @@ __all__ = [
     "PurchaseEntryCalculationResponse",
     "ProductUnitConversionPayload",
     "ProductDescriptionMetadataPayload",
+    "ProductDescriptionMetadataUpdatePayload",
+    "ProductDescriptionMetadataBatchRequest",
     "InstanceAddressPayload",
     "GrocyLocationPayload",
     "GrocyShoppingLocationPayload",

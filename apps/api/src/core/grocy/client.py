@@ -112,6 +112,10 @@ class GrocyClient:
         """Update a product group via Grocy's API."""
         return self._request("PUT", f"/api/objects/product_groups/{group_id}", payload)
 
+    def update_product(self, product_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        """Update a product via Grocy's API."""
+        return self._request("PUT", f"/api/objects/products/{product_id}", payload)
+
     def correct_product_inventory(self, product_id: int, payload: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
         """Apply an inventory correction for the provided product."""
         return self._request("POST", f"/api/stock/products/{product_id}/inventory", payload)

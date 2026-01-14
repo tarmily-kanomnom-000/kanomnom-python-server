@@ -576,6 +576,9 @@ export function ProductsPanel({
           onClose={() => setActiveProduct(null)}
           locationNamesById={locationNamesById}
           shoppingLocationNamesById={shoppingLocationNamesById}
+          instanceIndex={activeInstanceId}
+          isAdmin={isAdmin}
+          onProductUpdate={onProductUpdate}
         />
       ) : null}
       {activeAction ? (
