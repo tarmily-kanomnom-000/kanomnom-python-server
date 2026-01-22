@@ -14,9 +14,9 @@
         "active": 1
     },
     {
-        "name": "gallon",
+        "name": "gal",
         "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
-        "name_plural": "gallons",
+        "name_plural": "gal",
         "plural_forms": null,
         "active": 1
     },
@@ -66,6 +66,48 @@
         "name": "box",
         "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":true}}",
         "name_plural": "boxes",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "name": "qt",
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
+        "name_plural": "qt",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "name": "pt",
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
+        "name_plural": "pt",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "name": "tbsp",
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
+        "name_plural": "tbsp",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "name": "tsp",
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
+        "name_plural": "tsp",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "name": "cup",
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
+        "name_plural": "cups",
+        "plural_forms": null,
+        "active": 1
+    },
+    {
+        "name": "fl oz",
+        "description": "kanomnom::{\"v\":1,\"note\":\"\",\"attrs\":{\"kind\":\"quantity_unit\",\"is_discrete\":false}}",
+        "name_plural": "fl oz",
         "plural_forms": null,
         "active": 1
     }

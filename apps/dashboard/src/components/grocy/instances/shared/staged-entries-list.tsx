@@ -21,6 +21,30 @@ const formatAmountWithUnit = (value: number, unit: string | null): string => {
   return unit ? `${amountLabel} ${unit}` : amountLabel;
 };
 
+const formatConversionEntry = (
+  entry: Extract<InventoryStagedEntry, { kind: "conversion" | "measurement" }>,
+  defaultUnit: string | null,
+): string => {
+  const grossLabel = `${entry.grossAmount.toLocaleString()} ${entry.fromUnit}`;
+  if (entry.kind === "measurement") {
+    const convertedLabel = formatAmountWithUnit(entry.netAmount, entry.toUnit);
+    const tareNote =
+      entry.tareApplied && entry.tareAmount !== null
+        ? ` (tare ${entry.tareAmount.toLocaleString()} ${entry.fromUnit})`
+        : "";
+    return `Gross ${grossLabel}${tareNote} → ${convertedLabel}`;
+  }
+  const convertedLabel = formatAmountWithUnit(
+    entry.submissionAmount,
+    entry.toUnit,
+  );
+  const netLabel = formatAmountWithUnit(entry.netAmount, entry.fromUnit);
+  if (entry.tareApplied) {
+    return `Gross ${grossLabel} • Net ${netLabel} → ${convertedLabel}`;
+  }
+  return `Gross ${grossLabel} → ${convertedLabel}`;
+};
+
 export function StagedEntriesList({
   entries,
   hasTareWeight,
@@ -60,9 +84,7 @@ export function StagedEntriesList({
                       ? "Weighed container"
                       : entry.kind === "package"
                         ? "Package entry"
-                        : entry.kind === "conversion"
-                          ? "Converted entry"
-                          : "Measured entry"}
+                        : "Measured entry"}
                   </p>
                   <p className="text-xs text-neutral-600">
                     {entry.kind === "tare"
@@ -73,12 +95,9 @@ export function StagedEntriesList({
                         }`
                       : entry.kind === "package"
                         ? `${entry.quantity.toLocaleString()} × ${formatAmountWithUnit(entry.packageSize, quantityUnit)} = ${formatAmountWithUnit(entry.submissionAmount, quantityUnit)}`
-                        : entry.kind === "conversion"
-                          ? `Gross ${entry.grossAmount.toLocaleString()} ${entry.fromUnit}${
-                              entry.tareApplied && entry.tareAmount !== null
-                                ? ` • Net ${entry.netAmount.toLocaleString()} ${entry.fromUnit}`
-                                : ""
-                            } → ${formatAmountWithUnit(entry.submissionAmount, quantityUnit)}`
+                        : entry.kind === "conversion" ||
+                            entry.kind === "measurement"
+                          ? formatConversionEntry(entry, quantityUnit)
                           : `Amount: ${formatAmountWithUnit(entry.submissionAmount, quantityUnit)}`}
                   </p>
                 </div>
@@ -110,7 +129,7 @@ export function StagedEntriesList({
         </div>
         {stagedNetPreview !== null ? (
           <p className="text-[11px] text-neutral-500">
-            Net after tare for weighed entries:{" "}
+            Net after tare:{" "}
             {formatAmountWithUnit(stagedNetPreview, quantityUnit)}.
           </p>
         ) : null}

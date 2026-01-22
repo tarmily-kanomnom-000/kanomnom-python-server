@@ -19,9 +19,8 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://kanomnom0000:6971",
-    "http://kanomnom0000",
     "kanomnom0000",
+    "192.168.50.192",
     "http://dev-dashboard.kanomnom.com",
     "https://dev-dashboard.kanomnom.com",
     "http://dev-dashboard.kanomnom.com:3000",

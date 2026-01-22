@@ -1,0 +1,122 @@
+[
+    {
+        "from_qu_name": "mL",
+        "to_qu_name": "L",
+        "factor": 0.001,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "L",
+        "to_qu_name": "mL",
+        "factor": 1000,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "L",
+        "to_qu_name": "gal",
+        "factor": 0.264172,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "gal",
+        "to_qu_name": "L",
+        "factor": 3.785412534257983,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "kg",
+        "to_qu_name": "g",
+        "factor": 1000,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "g",
+        "to_qu_name": "kg",
+        "factor": 0.001,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "kg",
+        "to_qu_name": "lb",
+        "factor": 2.20462,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "lb",
+        "to_qu_name": "kg",
+        "factor": 0.45359290943563974,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "gal",
+        "to_qu_name": "qt",
+        "factor": 4,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "qt",
+        "to_qu_name": "gal",
+        "factor": 0.25,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "pt",
+        "to_qu_name": "qt",
+        "factor": 0.5,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "qt",
+        "to_qu_name": "pt",
+        "factor": 2,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "tbsp",
+        "to_qu_name": "tsp",
+        "factor": 3,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "tsp",
+        "to_qu_name": "tbsp",
+        "factor": 0.3333333333333333,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "cup",
+        "to_qu_name": "pt",
+        "factor": 0.5,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "pt",
+        "to_qu_name": "cup",
+        "factor": 2,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "fl oz",
+        "to_qu_name": "cup",
+        "factor": 0.125,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "cup",
+        "to_qu_name": "fl oz",
+        "factor": 8,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "fl oz",
+        "to_qu_name": "tbsp",
+        "factor": 2,
+        "product_id": null
+    },
+    {
+        "from_qu_name": "tbsp",
+        "to_qu_name": "fl oz",
+        "factor": 0.5,
+        "product_id": null
+    }
+]

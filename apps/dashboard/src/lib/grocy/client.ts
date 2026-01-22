@@ -2,20 +2,25 @@ import axios from "axios";
 
 import { runGrocyMutation } from "@/lib/grocy/mutation-runner";
 import {
+  deserializeGrocyInstanceSummaries,
   deserializeGrocyProductInventoryEntry,
   deserializeGrocyProducts,
   deserializeGrocyStockEntry,
   type GrocyProductInventoryEntryPayload,
   type GrocyProductsResponsePayload,
   type GrocyStockEntryPayload,
+  type ListInstancesResponsePayload,
 } from "@/lib/grocy/transformers";
 import type {
+  GrocyInstanceSummary,
   GrocyProductInventoryEntry,
   GrocyQuantityUnit,
+  GrocyQuantityUnitConversion,
   GrocyStockEntry,
   InventoryAdjustmentRequestPayload,
   InventoryCorrectionRequestPayload,
   ProductDescriptionMetadataBatchRequestPayload,
+  ProductUnitConversionDefinition,
   PurchaseEntryCalculation,
   PurchaseEntryDefaults,
   PurchaseEntryRequestPayload,
@@ -28,6 +33,9 @@ import {
 } from "@/lib/offline/grocy-cache";
 
 const productCache = new Map<string, Promise<GrocyProductInventoryEntry[]>>();
+const quantityUnitConversionsCache: {
+  promise: Promise<ProductUnitConversionDefinition[]> | null;
+} = { promise: null };
 
 export function invalidateGrocyProductsClientCache(
   instanceIndex: string,
@@ -43,6 +51,18 @@ export type PurchaseSubmissionResult = {
   product: GrocyProductInventoryEntry;
   newEntries: GrocyStockEntry[];
 };
+
+export async function fetchGrocyInstances({
+  forceRefresh = false,
+}: FetchOptions = {}): Promise<GrocyInstanceSummary[]> {
+  const path = `/api/grocy/instances${forceRefresh ? "?forceRefresh=1" : ""}`;
+  const response = await axios.get(path, {
+    adapter: "fetch",
+    fetchOptions: { cache: "no-store" },
+  });
+  const payload = response.data as ListInstancesResponsePayload;
+  return deserializeGrocyInstanceSummaries(payload);
+}
 
 export async function fetchGrocyProduct(
   instanceIndex: string,
@@ -75,6 +95,10 @@ type GrocyQuantityUnitsResponsePayload = {
   quantity_units: GrocyQuantityUnit[];
 };
 
+type GrocyQuantityUnitConversionsResponsePayload = {
+  conversions: GrocyQuantityUnitConversion[];
+};
+
 export async function fetchGrocyQuantityUnits(
   instanceIndex: string,
 ): Promise<GrocyQuantityUnit[]> {
@@ -87,6 +111,34 @@ export async function fetchGrocyQuantityUnits(
   );
   const payload = response.data as GrocyQuantityUnitsResponsePayload;
   return payload.quantity_units ?? [];
+}
+
+export async function fetchGrocyQuantityUnitConversions(): Promise<
+  ProductUnitConversionDefinition[]
+> {
+  if (quantityUnitConversionsCache.promise) {
+    return quantityUnitConversionsCache.promise;
+  }
+  const request = axios
+    .get("/api/grocy/quantity-unit-conversions", {
+      adapter: "fetch",
+      fetchOptions: { cache: "no-store" },
+    })
+    .then((response) => {
+      const payload =
+        response.data as GrocyQuantityUnitConversionsResponsePayload;
+      return (payload.conversions ?? []).map((conversion) => ({
+        from_unit: conversion.from_unit_name,
+        to_unit: conversion.to_unit_name,
+        factor: conversion.factor,
+        source: "universal" as const,
+      }));
+    })
+    .finally(() => {
+      quantityUnitConversionsCache.promise = null;
+    });
+  quantityUnitConversionsCache.promise = request;
+  return request;
 }
 
 export async function fetchGrocyProducts(

@@ -19,6 +19,7 @@ Concise reference for the Grocy API routes and key helpers. Use this to understa
 
 ## Quantity Units (`.../quantity_units.py`)
 - `GET /grocy/{instance_index}/quantity-units` (`list_quantity_units`) — Returns cached Grocy quantity units for the instance. 404 on missing metadata.
+- `GET /grocy/quantity-unit-conversions` (`list_quantity_unit_conversions`) — Expands universal quantity unit conversions into a fully connected conversion map keyed by unit names (skipping product-specific conversions). 500 if the conversion manifest or universal manifest is missing; 400 on invalid manifest entries.
 
 ## Purchases (`.../purchases.py`)
 - `GET /grocy/{instance_index}/products/{product_id}/purchase/defaults` — Returns purchase metadata defaults for a product, optionally scoped to `shopping_location_id`. 404 on missing metadata/product.
@@ -36,6 +37,9 @@ Concise reference for the Grocy API routes and key helpers. Use this to understa
   - Purchases (tare-enabled): send `current_net + purchased_net + tare`. Grocy subtracts tare once and the net stock ends up correct, even with multiple package drafts.
   - Inventory absolute corrections (tare-enabled): must send `target_net + tare`. If you send net, Grocy subtracts tare and undercounts by `tare_weight`.
   - Inventory delta adjustments (tare-enabled): send `current_net + delta + tare` as the gross new total.
+- How to compute net for staged measurements:
+  - Any per-entry tare (product tare, custom tare, or unit-conversion tare) is used only to calculate each entry’s **net** amount.
+  - The final payload must still add the **product tare** once to the summed net total before sending to Grocy.
 - Why purchase drafts don’t snowball: each draft pulls `current_net` from Grocy, adds the new purchased amount plus tare, and Grocy subtracts tare once. Net stock advances by the purchased amount per draft (no double-adding prior purchases).
 - Pitfalls to avoid:
   - Never submit a net absolute correction for a tare product; always add tare before calling Grocy.

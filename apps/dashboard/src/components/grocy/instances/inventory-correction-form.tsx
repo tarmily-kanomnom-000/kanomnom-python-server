@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMeasuredElementHeight } from "@/hooks/use-measured-element-height";
 import {
+  fetchGrocyQuantityUnitConversions,
   submitInventoryAdjustment,
   submitInventoryCorrection,
 } from "@/lib/grocy/client";
@@ -10,6 +11,7 @@ import type {
   GrocyProductInventoryEntry,
   InventoryAdjustmentRequestPayload,
   InventoryCorrectionRequestPayload,
+  ProductUnitConversionDefinition,
 } from "@/lib/grocy/types";
 import {
   buildSearchableOptions,
@@ -60,10 +62,8 @@ export function InventoryCorrectionForm({
     isAmountValid,
     setStagedInterpretation,
     setDeltaDirection,
-    addTareEntry,
-    addManualEntry,
     addPackageEntry,
-    addConversionEntry,
+    addMeasurementEntry,
     removeStagedEntry,
     clearStagedEntries,
     hasTareWeight,
@@ -87,12 +87,15 @@ export function InventoryCorrectionForm({
   const [losses, setLosses] = useState<LossEntry[]>([]);
   const [isStageModalOpen, setStageModalOpen] = useState(false);
   const [stageEntryType, setStageEntryType] = useState<
-    "tare" | "package" | "manual" | "conversion" | null
+    "measurement" | "package" | null
   >(null);
   const [statusMessage, setStatusMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [universalUnitConversions, setUniversalUnitConversions] = useState<
+    ProductUnitConversionDefinition[]
+  >([]);
   const [isSubmitting, setSubmitting] = useState(false);
   const [leftColumnRef, leftColumnHeight] =
     useMeasuredElementHeight<HTMLDivElement>();
@@ -109,8 +112,16 @@ export function InventoryCorrectionForm({
   );
 
   const unitConversions = useMemo(
-    () => product.description_metadata?.unit_conversions ?? [],
-    [product.description_metadata],
+    () => [
+      ...(product.description_metadata?.unit_conversions ?? []).map(
+        (conversion) => ({
+          ...conversion,
+          source: "product" as const,
+        }),
+      ),
+      ...universalUnitConversions,
+    ],
+    [product.description_metadata, universalUnitConversions],
   );
 
   useEffect(() => {
@@ -130,6 +141,26 @@ export function InventoryCorrectionForm({
     setStageModalOpen(false);
     setStageEntryType(null);
   }, [product]);
+
+  useEffect(() => {
+    let isActive = true;
+    fetchGrocyQuantityUnitConversions()
+      .then((conversions) => {
+        if (!isActive) {
+          return;
+        }
+        setUniversalUnitConversions(conversions);
+      })
+      .catch(() => {
+        if (!isActive) {
+          return;
+        }
+        setUniversalUnitConversions([]);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   const resetBestBeforeToDefault = () => {
     setBestBeforeDate(defaultBestBefore);
@@ -169,13 +200,7 @@ export function InventoryCorrectionForm({
     !isSubmitting;
 
   const openStageModal = (): void => {
-    const nextDefault =
-      stagedInterpretation === "delta"
-        ? "manual"
-        : hasTareWeight
-          ? "tare"
-          : "manual";
-    setStageEntryType(nextDefault);
+    setStageEntryType("measurement");
     setStageModalOpen(true);
   };
 
@@ -414,11 +439,8 @@ export function InventoryCorrectionForm({
         hasTareWeight={hasTareWeight}
         tareWeight={tareWeight}
         quantityUnit={quantityUnit}
-        stagedInterpretation={stagedInterpretation}
-        onAddManual={addManualEntry}
-        onAddTare={addTareEntry}
         onAddPackage={addPackageEntry}
-        onAddConversion={addConversionEntry}
+        onAddMeasurement={addMeasurementEntry}
         unitConversions={unitConversions}
       />
     </form>

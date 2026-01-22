@@ -1,9 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ProductUnitConversionDefinition } from "@/lib/grocy/types";
 import { resolveUnitConversionFactor } from "@/lib/grocy/unit-conversions";
-import type { StagedInterpretation } from "./use-inventory-staging";
 
-type StageEntryType = "tare" | "package" | "manual" | "conversion" | null;
+type StageEntryType = "measurement" | "package" | null;
 
 type Props = {
   isOpen: boolean;
@@ -11,17 +16,14 @@ type Props = {
   tareWeight: number;
   quantityUnit: string | null;
   unitConversions: ProductUnitConversionDefinition[];
-  stagedInterpretation: StagedInterpretation;
   stageEntryType: StageEntryType;
   onStageEntryTypeChange: (next: StageEntryType) => void;
   onClose: () => void;
-  onAddTare: (grossAmount: number) => void;
-  onAddManual: (amount: number) => void;
   onAddPackage: (quantity: number, packageSize: number) => void;
-  onAddConversion: (entry: ConversionEntryInput) => void;
+  onAddMeasurement: (entry: MeasurementEntryInput) => void;
 };
 
-type ConversionEntryInput = {
+type MeasurementEntryInput = {
   grossAmount: number;
   netAmount: number;
   submissionAmount: number;
@@ -38,76 +40,43 @@ export function InventoryStageModal({
   tareWeight,
   quantityUnit,
   unitConversions,
-  stagedInterpretation,
   stageEntryType,
   onStageEntryTypeChange,
   onClose,
-  onAddTare,
-  onAddManual,
   onAddPackage,
-  onAddConversion,
+  onAddMeasurement,
 }: Props) {
-  const stagedWeighedInputRef = useRef<HTMLInputElement | null>(null);
+  const measurementAmountInputRef = useRef<HTMLInputElement | null>(null);
+  const measurementUnitInputRef = useRef<HTMLInputElement | null>(null);
   const packageCountInputRef = useRef<HTMLInputElement | null>(null);
-  const manualAmountInputRef = useRef<HTMLInputElement | null>(null);
-  const conversionAmountInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [weighedAmount, setWeighedAmount] = useState("");
   const [packageCount, setPackageCount] = useState("");
   const [packageSize, setPackageSize] = useState("");
-  const [manualAmount, setManualAmount] = useState("");
-  const [conversionAmount, setConversionAmount] = useState("");
-  const [conversionUnit, setConversionUnit] = useState("");
+  const [measurementAmount, setMeasurementAmount] = useState("");
+  const [measurementUnit, setMeasurementUnit] = useState("");
+  const [isUnitDropdownOpen, setUnitDropdownOpen] = useState(false);
+  const [isUnitFiltering, setUnitFiltering] = useState(false);
+  const [applyTareWeight, setApplyTareWeight] = useState(true);
   const [convertedAmount, setConvertedAmount] = useState("");
-  const [useTareAdjustment, setUseTareAdjustment] = useState(true);
   const [isConvertedManual, setIsConvertedManual] = useState(false);
+  const [tareAmount, setTareAmount] = useState("");
+  const [isTareManual, setIsTareManual] = useState(false);
+  const [isTareToggleManual, setIsTareToggleManual] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
       return;
     }
-    if (stageEntryType === "tare") {
-      stagedWeighedInputRef.current?.focus();
+    if (stageEntryType === "measurement") {
+      measurementAmountInputRef.current?.focus();
     } else if (stageEntryType === "package") {
       packageCountInputRef.current?.focus();
-    } else if (stageEntryType === "manual") {
-      manualAmountInputRef.current?.focus();
-    } else if (stageEntryType === "conversion") {
-      conversionAmountInputRef.current?.focus();
     }
   }, [isOpen, stageEntryType]);
 
-  useEffect(() => {
-    if (
-      hasTareWeight &&
-      stagedInterpretation === "absolute" &&
-      stageEntryType === "manual"
-    ) {
-      onStageEntryTypeChange("tare");
-    }
-  }, [
-    hasTareWeight,
-    stagedInterpretation,
-    stageEntryType,
-    onStageEntryTypeChange,
-  ]);
-
-  const parsedWeighedAmount = Number(weighedAmount);
+  const parsedMeasurementAmount = Number(measurementAmount);
   const parsedPackageCount = Number(packageCount);
   const parsedPackageSize = Number(packageSize);
-  const parsedManualAmount = Number(manualAmount);
-  const parsedConversionAmount = Number(conversionAmount);
-  const parsedConvertedAmount = Number(convertedAmount);
-
-  const isWeighedAmountValid =
-    weighedAmount.trim().length > 0 &&
-    Number.isFinite(parsedWeighedAmount) &&
-    parsedWeighedAmount >= 0;
-  const isWeighedBelowTare =
-    hasTareWeight && isWeighedAmountValid && parsedWeighedAmount < tareWeight;
-  const netWeighedAmount = Math.max(parsedWeighedAmount - tareWeight, 0);
-  const canAddWeighedEntry =
-    isWeighedAmountValid && !isWeighedBelowTare && isOpen;
 
   const packageEntryTotal =
     Number.isFinite(parsedPackageCount) && Number.isFinite(parsedPackageSize)
@@ -121,81 +90,142 @@ export function InventoryStageModal({
     parsedPackageCount > 0 &&
     parsedPackageSize > 0;
 
-  const canAddManualEntry =
-    manualAmount.trim().length > 0 &&
-    Number.isFinite(parsedManualAmount) &&
-    parsedManualAmount >= 0 &&
-    (!hasTareWeight || stagedInterpretation === "delta");
-
   const normalizedQuantityUnit = useMemo(
     () => (quantityUnit ? quantityUnit : null),
     [quantityUnit],
   );
 
-  const conversionUnits = useMemo(() => {
+  const selectableUnits = useMemo(() => {
     if (!normalizedQuantityUnit) {
       return [];
     }
-    if (unitConversions.length === 0) {
-      return [];
-    }
-    const unique = new Set<string>();
-    unitConversions.forEach((conversion) => {
+    const normalizedDefault = normalizedQuantityUnit.trim().toLowerCase();
+    const universalConversions = unitConversions.filter(
+      (conversion) => conversion.source === "universal",
+    );
+    const productConversions = unitConversions.filter(
+      (conversion) => conversion.source === "product",
+    );
+    const universalUnits = new Set<string>();
+    universalConversions.forEach((conversion) => {
       if (conversion.from_unit) {
-        unique.add(conversion.from_unit);
+        universalUnits.add(conversion.from_unit);
       }
       if (conversion.to_unit) {
-        unique.add(conversion.to_unit);
+        universalUnits.add(conversion.to_unit);
       }
     });
-    unique.add(normalizedQuantityUnit);
-    const units = Array.from(unique).filter((unit) =>
-      resolveUnitConversionFactor(
-        unitConversions,
-        unit,
-        normalizedQuantityUnit,
-      ),
+    universalUnits.add(normalizedQuantityUnit);
+    const connectedUniversalUnits = Array.from(universalUnits).filter(
+      (unit) => {
+        const normalized = unit.trim().toLowerCase();
+        if (!normalized) {
+          return false;
+        }
+        if (normalized === normalizedDefault) {
+          return true;
+        }
+        return (
+          resolveUnitConversionFactor(
+            universalConversions,
+            unit,
+            normalizedQuantityUnit,
+          ) !== null
+        );
+      },
     );
-    const nonDefaultUnits = units.filter(
-      (unit) => unit.trim() !== normalizedQuantityUnit,
+    const productUnits = new Set<string>();
+    productConversions.forEach((conversion) => {
+      const fromNormalized = conversion.from_unit.trim().toLowerCase();
+      const toNormalized = conversion.to_unit.trim().toLowerCase();
+      if (fromNormalized === normalizedDefault) {
+        productUnits.add(conversion.to_unit);
+      } else if (toNormalized === normalizedDefault) {
+        productUnits.add(conversion.from_unit);
+      }
+    });
+    const units = new Set<string>([
+      normalizedQuantityUnit,
+      ...connectedUniversalUnits,
+      ...productUnits,
+    ]);
+    const ordered = Array.from(units);
+    ordered.sort((a, b) => a.localeCompare(b));
+    const defaultIndex = ordered.findIndex(
+      (unit) => unit.trim().toLowerCase() === normalizedDefault,
     );
-    const ordered = nonDefaultUnits.length > 0 ? nonDefaultUnits : units;
-    return ordered.sort((a, b) => a.localeCompare(b));
+    if (defaultIndex > 0) {
+      const [defaultUnit] = ordered.splice(defaultIndex, 1);
+      ordered.unshift(defaultUnit);
+    }
+    return ordered;
   }, [normalizedQuantityUnit, unitConversions]);
 
+  const measurementUnitSuggestions = useMemo(() => {
+    if (!isUnitFiltering) {
+      return selectableUnits;
+    }
+    const normalized = measurementUnit.trim().toLowerCase();
+    if (!normalized) {
+      return selectableUnits;
+    }
+    return selectableUnits.filter((unit) =>
+      unit.toLowerCase().includes(normalized),
+    );
+  }, [isUnitFiltering, measurementUnit, selectableUnits]);
+
   useEffect(() => {
-    if (stageEntryType !== "conversion") {
+    if (stageEntryType !== "measurement") {
       return;
     }
-    if (!conversionUnit) {
-      if (conversionUnits.length === 1) {
-        setConversionUnit(conversionUnits[0]);
-      }
+    if (!normalizedQuantityUnit) {
       return;
     }
-    if (!conversionUnits.includes(conversionUnit)) {
-      setConversionUnit(conversionUnits[0] ?? "");
+    if (!measurementUnit) {
+      setMeasurementUnit(normalizedQuantityUnit);
+      return;
     }
-  }, [conversionUnit, conversionUnits, stageEntryType]);
+    const normalized = measurementUnit.trim().toLowerCase();
+    const exactMatch = selectableUnits.find(
+      (unit) => unit.trim().toLowerCase() === normalized,
+    );
+    if (exactMatch && exactMatch !== measurementUnit) {
+      setMeasurementUnit(exactMatch);
+    }
+  }, [
+    measurementUnit,
+    normalizedQuantityUnit,
+    selectableUnits,
+    stageEntryType,
+  ]);
 
   const conversionFactor = useMemo(() => {
-    if (!normalizedQuantityUnit || !conversionUnit) {
+    if (!normalizedQuantityUnit || !measurementUnit) {
       return null;
+    }
+    if (
+      measurementUnit.trim().toLowerCase() ===
+      normalizedQuantityUnit.trim().toLowerCase()
+    ) {
+      return 1;
     }
     return resolveUnitConversionFactor(
       unitConversions,
-      conversionUnit,
+      measurementUnit,
       normalizedQuantityUnit,
     );
-  }, [conversionUnit, normalizedQuantityUnit, unitConversions]);
+  }, [measurementUnit, normalizedQuantityUnit, unitConversions]);
 
-  const tareForConversion = useMemo(() => {
-    if (!conversionUnit || !normalizedQuantityUnit) {
+  const conversionTareAmount = useMemo(() => {
+    if (!measurementUnit || !normalizedQuantityUnit) {
       return null;
     }
-    const normalizedFrom = conversionUnit.trim().toLowerCase();
+    const normalizedFrom = measurementUnit.trim().toLowerCase();
     const normalizedDefault = normalizedQuantityUnit.trim().toLowerCase();
     const direct = unitConversions.find((entry) => {
+      if (entry.source !== "product") {
+        return false;
+      }
       const from = entry.from_unit.trim().toLowerCase();
       const to = entry.to_unit.trim().toLowerCase();
       return (
@@ -210,59 +240,187 @@ export function InventoryStageModal({
       return null;
     }
     return direct.tare;
-  }, [conversionUnit, normalizedQuantityUnit, unitConversions]);
+  }, [measurementUnit, normalizedQuantityUnit, unitConversions]);
 
-  const tareEnabled = useTareAdjustment && tareForConversion !== null;
-  const conversionGrossValid =
-    conversionAmount.trim().length > 0 &&
-    Number.isFinite(parsedConversionAmount) &&
-    parsedConversionAmount >= 0;
-  const conversionTareTooLarge =
-    tareEnabled &&
-    conversionGrossValid &&
-    tareForConversion !== null &&
-    parsedConversionAmount < tareForConversion;
-  const conversionNetAmount = conversionGrossValid
-    ? Math.max(
-        parsedConversionAmount -
-          (tareEnabled && tareForConversion !== null ? tareForConversion : 0),
-        0,
-      )
-    : 0;
-  const autoConvertedAmount =
-    conversionGrossValid && conversionFactor !== null
-      ? roundToSix(conversionNetAmount * conversionFactor)
-      : null;
+  const hasTareOption =
+    hasTareWeight || typeof conversionTareAmount === "number";
+
+  const defaultTareAmount = useMemo(() => {
+    if (typeof conversionTareAmount === "number") {
+      return conversionTareAmount;
+    }
+    if (hasTareWeight) {
+      return tareWeight;
+    }
+    return null;
+  }, [conversionTareAmount, hasTareWeight, tareWeight]);
 
   useEffect(() => {
-    if (stageEntryType !== "conversion") {
+    if (!isOpen || stageEntryType !== "measurement") {
+      return;
+    }
+    setApplyTareWeight(hasTareOption);
+    setConvertedAmount("");
+    setIsConvertedManual(false);
+    setTareAmount(defaultTareAmount !== null ? String(defaultTareAmount) : "");
+    setIsTareManual(false);
+    setIsTareToggleManual(false);
+  }, [defaultTareAmount, hasTareOption, isOpen, stageEntryType]);
+
+  const measurementValid =
+    measurementAmount.trim().length > 0 &&
+    Number.isFinite(parsedMeasurementAmount) &&
+    parsedMeasurementAmount >= 0;
+
+  useEffect(() => {
+    if (stageEntryType !== "measurement") {
+      return;
+    }
+    if (!hasTareOption) {
+      return;
+    }
+    if (isTareToggleManual) {
+      return;
+    }
+    setApplyTareWeight(true);
+  }, [hasTareOption, isTareToggleManual, stageEntryType]);
+
+  useEffect(() => {
+    if (stageEntryType !== "measurement") {
+      return;
+    }
+    if (!hasTareOption || !applyTareWeight) {
+      return;
+    }
+    if (isTareManual) {
+      return;
+    }
+    if (defaultTareAmount === null) {
+      return;
+    }
+    setTareAmount(String(defaultTareAmount));
+  }, [
+    applyTareWeight,
+    defaultTareAmount,
+    hasTareOption,
+    isTareManual,
+    stageEntryType,
+  ]);
+
+  const parsedConvertedAmount = Number(convertedAmount);
+  const convertedValid =
+    convertedAmount.trim().length > 0 &&
+    Number.isFinite(parsedConvertedAmount) &&
+    parsedConvertedAmount >= 0;
+  const tareApplied = hasTareOption && applyTareWeight;
+  const parsedTareAmount = Number(tareAmount);
+  const tareValid =
+    !tareApplied ||
+    (tareAmount.trim().length > 0 &&
+      Number.isFinite(parsedTareAmount) &&
+      parsedTareAmount >= 0);
+  const tareTooLarge =
+    tareApplied && tareValid && parsedTareAmount > parsedMeasurementAmount;
+  const measuredNetAmount =
+    measurementValid && tareValid
+      ? Math.max(
+          parsedMeasurementAmount - (tareApplied ? parsedTareAmount : 0),
+          0,
+        )
+      : null;
+  const calculatedConvertedAmount =
+    measuredNetAmount !== null && conversionFactor !== null
+      ? roundToSix(measuredNetAmount * conversionFactor)
+      : null;
+  const netAmount = convertedValid ? parsedConvertedAmount : null;
+
+  useEffect(() => {
+    if (stageEntryType !== "measurement") {
       return;
     }
     if (isConvertedManual) {
       return;
     }
-    if (autoConvertedAmount === null) {
+    if (calculatedConvertedAmount === null) {
       setConvertedAmount("");
       return;
     }
-    setConvertedAmount(String(autoConvertedAmount));
-  }, [autoConvertedAmount, isConvertedManual, stageEntryType]);
+    setConvertedAmount(String(calculatedConvertedAmount));
+  }, [calculatedConvertedAmount, isConvertedManual, stageEntryType]);
 
-  const closeAndReset = () => {
-    setWeighedAmount("");
+  const canAddMeasurementEntry =
+    measurementValid &&
+    conversionFactor !== null &&
+    measurementUnit.trim().length > 0 &&
+    convertedValid &&
+    tareValid &&
+    !tareTooLarge;
+
+  const addMeasurementEntry = () => {
+    if (
+      !canAddMeasurementEntry ||
+      netAmount === null ||
+      !normalizedQuantityUnit
+    ) {
+      return;
+    }
+    onAddMeasurement({
+      grossAmount: parsedMeasurementAmount,
+      netAmount: netAmount,
+      submissionAmount: tareApplied ? netAmount : parsedConvertedAmount,
+      fromUnit: measurementUnit,
+      toUnit: normalizedQuantityUnit,
+      factor: conversionFactor ?? 1,
+      tareApplied: tareApplied,
+      tareAmount: tareApplied ? parsedTareAmount : null,
+    });
+    closeAndReset();
+  };
+
+  const addPackageEntry = () => {
+    if (!canAddPackageEntry) {
+      return;
+    }
+    onAddPackage(parsedPackageCount, parsedPackageSize);
     setPackageCount("");
     setPackageSize("");
-    setManualAmount("");
-    setConversionAmount("");
-    setConversionUnit("");
+    closeAndReset();
+  };
+
+  const handleMeasurementEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    addMeasurementEntry();
+  };
+
+  const handlePackageEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    addPackageEntry();
+  };
+
+  const closeAndReset = () => {
+    setMeasurementAmount("");
+    setMeasurementUnit("");
+    setPackageCount("");
+    setPackageSize("");
+    setApplyTareWeight(hasTareOption);
     setConvertedAmount("");
-    setUseTareAdjustment(true);
     setIsConvertedManual(false);
+    setTareAmount(defaultTareAmount !== null ? String(defaultTareAmount) : "");
+    setIsTareManual(false);
+    setIsTareToggleManual(false);
+    setUnitDropdownOpen(false);
+    setUnitFiltering(false);
     onStageEntryTypeChange(null);
     onClose();
   };
 
-  const formatAmountWithUnit = (value: number): string => {
+  const formatAmountWithUnit = (value: number, unit: string | null): string => {
     if (!Number.isFinite(value)) {
       return "—";
     }
@@ -270,16 +428,7 @@ export function InventoryStageModal({
     const amountLabel = rounded.toLocaleString(undefined, {
       maximumFractionDigits: 2,
     });
-    return normalizedQuantityUnit
-      ? `${amountLabel} ${normalizedQuantityUnit}`
-      : amountLabel;
-  };
-
-  const formatConversionAmount = (value: number | null): string => {
-    if (value === null || !Number.isFinite(value)) {
-      return "—";
-    }
-    return value.toLocaleString(undefined, { maximumFractionDigits: 6 });
+    return unit ? `${amountLabel} ${unit}` : amountLabel;
   };
 
   return !isOpen ? null : (
@@ -303,45 +452,17 @@ export function InventoryStageModal({
           </button>
         </div>
         <div className="mt-4 flex gap-2">
-          {normalizedQuantityUnit && conversionUnits.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => onStageEntryTypeChange("conversion")}
-              className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                stageEntryType === "conversion"
-                  ? "border-neutral-900 bg-neutral-50 text-neutral-900"
-                  : "border-neutral-200 text-neutral-700 hover:border-neutral-900 hover:text-neutral-900"
-              }`}
-            >
-              Convert unit
-            </button>
-          ) : null}
-          {!hasTareWeight || stagedInterpretation === "delta" ? (
-            <button
-              type="button"
-              onClick={() => onStageEntryTypeChange("manual")}
-              className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                stageEntryType === "manual"
-                  ? "border-neutral-900 bg-neutral-50 text-neutral-900"
-                  : "border-neutral-200 text-neutral-700 hover:border-neutral-900 hover:text-neutral-900"
-              }`}
-            >
-              {hasTareWeight ? "Change amount" : "Measurement"}
-            </button>
-          ) : null}
-          {hasTareWeight ? (
-            <button
-              type="button"
-              onClick={() => onStageEntryTypeChange("tare")}
-              className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                stageEntryType === "tare"
-                  ? "border-neutral-900 bg-neutral-50 text-neutral-900"
-                  : "border-neutral-200 text-neutral-700 hover:border-neutral-900 hover:text-neutral-900"
-              }`}
-            >
-              Weighed (tare)
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => onStageEntryTypeChange("measurement")}
+            className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+              stageEntryType === "measurement"
+                ? "border-neutral-900 bg-neutral-50 text-neutral-900"
+                : "border-neutral-200 text-neutral-700 hover:border-neutral-900 hover:text-neutral-900"
+            }`}
+          >
+            Measurement
+          </button>
           <button
             type="button"
             onClick={() => onStageEntryTypeChange("package")}
@@ -355,125 +476,187 @@ export function InventoryStageModal({
           </button>
         </div>
         <div className="mt-4 space-y-3">
-          {stageEntryType === "manual" ? (
+          {stageEntryType === "measurement" ? (
             <div className="space-y-2 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
               <p className="text-sm font-semibold text-neutral-900">
-                {hasTareWeight ? "Change amount" : "Measurement"}
+                Measurement
               </p>
               <p className="text-xs text-neutral-600">
-                {hasTareWeight
-                  ? "Enter the amount to add or remove. Tare weight isn't needed for adjustments."
-                  : "Enter a measured amount (e.g., what is left in an opened item without tare handling)."}
+                Enter the measured amount and choose a unit. The total will be
+                converted to {normalizedQuantityUnit ?? "the default unit"}.
               </p>
-              <div className="relative">
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="0"
-                  value={manualAmount}
-                  ref={manualAmountInputRef}
-                  onChange={(event) => setManualAmount(event.target.value)}
-                  className={`w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none ${
-                    quantityUnit ? "pr-16" : ""
-                  }`}
-                  placeholder={
-                    hasTareWeight
-                      ? "Enter the change amount"
-                      : "Enter measured amount"
-                  }
-                />
-                {quantityUnit ? (
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-neutral-500">
-                    {quantityUnit}
-                  </span>
-                ) : null}
-              </div>
-              {!canAddManualEntry && manualAmount.trim().length > 0 ? (
-                <p className="text-xs text-rose-600">
-                  Enter a non-negative number.
-                </p>
-              ) : null}
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!canAddManualEntry) {
-                      return;
+              <div className="grid grid-cols-[1fr_1fr] gap-2">
+                <div className="relative">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.001"
+                    min="0"
+                    value={measurementAmount}
+                    ref={measurementAmountInputRef}
+                    onChange={(event) =>
+                      setMeasurementAmount(event.target.value)
                     }
-                    onAddManual(parsedManualAmount);
-                    setManualAmount("");
-                    closeAndReset();
-                  }}
-                  disabled={!canAddManualEntry}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold text-white transition ${
-                    canAddManualEntry
-                      ? "bg-neutral-900 hover:bg-neutral-800"
-                      : "bg-neutral-400"
-                  }`}
-                >
-                  Add entry
-                </button>
+                    onKeyDown={handleMeasurementEnter}
+                    className="w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none"
+                    placeholder="Measured amount"
+                  />
+                </div>
+                <div className="relative">
+                  <input
+                    ref={measurementUnitInputRef}
+                    value={measurementUnit}
+                    onChange={(event) => {
+                      setMeasurementUnit(event.target.value);
+                      setUnitFiltering(true);
+                    }}
+                    onFocus={(event) => {
+                      setUnitDropdownOpen(true);
+                      setUnitFiltering(false);
+                      event.currentTarget.select();
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        setUnitDropdownOpen(false);
+                        setUnitFiltering(false);
+                        const normalized = measurementUnit.trim().toLowerCase();
+                        if (!normalized) {
+                          return;
+                        }
+                        const exactMatch = selectableUnits.find(
+                          (unit) => unit.trim().toLowerCase() === normalized,
+                        );
+                        if (exactMatch) {
+                          if (exactMatch !== measurementUnit) {
+                            setMeasurementUnit(exactMatch);
+                          }
+                        } else {
+                          setMeasurementUnit("");
+                        }
+                      }, 120);
+                    }}
+                    onKeyDown={handleMeasurementEnter}
+                    className="w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none"
+                    placeholder="Select unit"
+                    aria-expanded={isUnitDropdownOpen}
+                  />
+                  {isUnitDropdownOpen && measurementUnitSuggestions.length ? (
+                    <div className="absolute left-0 top-12 z-10 max-h-56 w-full overflow-y-auto rounded-2xl border border-neutral-200 bg-white shadow-lg">
+                      {measurementUnitSuggestions.map((unit) => (
+                        <button
+                          key={unit}
+                          type="button"
+                          className="block w-full px-4 py-2 text-left text-sm text-neutral-800 hover:bg-neutral-100"
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            setMeasurementUnit(unit);
+                            setUnitDropdownOpen(false);
+                            setUnitFiltering(false);
+                          }}
+                        >
+                          {unit}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          ) : null}
-          {stageEntryType === "tare" ? (
-            <div className="space-y-2 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-              <p className="text-sm font-semibold text-neutral-900">
-                Weighed tare container
-              </p>
-              <p className="text-xs text-neutral-600">
-                Weigh the container holding opened product and enter the gross
-                weight (container + contents).
-              </p>
               <div className="relative">
                 <input
                   type="number"
                   inputMode="decimal"
-                  step="0.01"
+                  step="0.000001"
                   min="0"
-                  value={weighedAmount}
-                  ref={stagedWeighedInputRef}
-                  onChange={(event) => setWeighedAmount(event.target.value)}
+                  value={convertedAmount}
+                  onChange={(event) => {
+                    setConvertedAmount(event.target.value);
+                    setIsConvertedManual(true);
+                  }}
+                  onKeyDown={handleMeasurementEnter}
                   className={`w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none ${
-                    quantityUnit ? "pr-16" : ""
+                    normalizedQuantityUnit ? "pr-16" : ""
                   }`}
-                  placeholder="Gross weight incl. tare"
+                  placeholder="Converted amount"
                 />
-                {quantityUnit ? (
+                {normalizedQuantityUnit ? (
                   <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-neutral-500">
-                    {quantityUnit}
+                    {normalizedQuantityUnit}
                   </span>
                 ) : null}
               </div>
-              {!isWeighedAmountValid && weighedAmount.trim().length > 0 ? (
+              {hasTareOption ? (
+                <label className="flex items-center gap-2 text-xs text-neutral-600">
+                  <input
+                    type="checkbox"
+                    checked={applyTareWeight}
+                    onChange={(event) => {
+                      setApplyTareWeight(event.target.checked);
+                      setIsTareToggleManual(true);
+                    }}
+                    className="h-4 w-4 rounded border-neutral-300 text-neutral-900"
+                  />
+                  Apply tare weight
+                </label>
+              ) : null}
+              {tareApplied ? (
+                <div className="relative">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.0001"
+                    min="0"
+                    value={tareAmount}
+                    onChange={(event) => {
+                      setTareAmount(event.target.value);
+                      setIsTareManual(true);
+                    }}
+                    onKeyDown={handleMeasurementEnter}
+                    className={`w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none ${
+                      normalizedQuantityUnit ? "pr-16" : ""
+                    }`}
+                    placeholder="Tare weight"
+                  />
+                  {normalizedQuantityUnit ? (
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-neutral-500">
+                      {normalizedQuantityUnit}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              {conversionFactor === null ? (
                 <p className="text-xs text-rose-600">
-                  Enter a non-negative number.
+                  Select a unit connected to{" "}
+                  {normalizedQuantityUnit ?? "the default unit"}.
                 </p>
-              ) : isWeighedBelowTare ? (
+              ) : !convertedValid && convertedAmount.trim().length > 0 ? (
                 <p className="text-xs text-rose-600">
-                  Measurement must be at least the tare weight (
-                  {formatAmountWithUnit(tareWeight)}).
+                  Enter a non-negative converted amount.
                 </p>
-              ) : hasTareWeight ? (
+              ) : !tareValid && tareApplied ? (
+                <p className="text-xs text-rose-600">
+                  Enter a non-negative tare amount.
+                </p>
+              ) : tareTooLarge ? (
+                <p className="text-xs text-rose-600">
+                  Converted amount must be greater than tare weight.
+                </p>
+              ) : measurementValid && convertedValid && tareApplied ? (
                 <p className="text-xs text-neutral-500">
-                  Net after tare: {formatAmountWithUnit(netWeighedAmount)}.
+                  Net after tare:{" "}
+                  {formatAmountWithUnit(netAmount ?? 0, normalizedQuantityUnit)}
                 </p>
-              ) : null}
+              ) : (
+                <p className="text-xs text-neutral-500">
+                  Enter a measurement to preview the conversion.
+                </p>
+              )}
               <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!canAddWeighedEntry) {
-                      return;
-                    }
-                    onAddTare(parsedWeighedAmount);
-                    setWeighedAmount("");
-                    closeAndReset();
-                  }}
-                  disabled={!canAddWeighedEntry}
+                  onClick={addMeasurementEntry}
+                  disabled={!canAddMeasurementEntry}
                   className={`rounded-full px-4 py-2 text-sm font-semibold text-white transition ${
-                    canAddWeighedEntry
+                    canAddMeasurementEntry
                       ? "bg-neutral-900 hover:bg-neutral-800"
                       : "bg-neutral-400"
                   }`}
@@ -501,6 +684,7 @@ export function InventoryStageModal({
                     value={packageCount}
                     ref={packageCountInputRef}
                     onChange={(event) => setPackageCount(event.target.value)}
+                    onKeyDown={handlePackageEnter}
                     className="w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none"
                     placeholder="Packages"
                   />
@@ -516,6 +700,7 @@ export function InventoryStageModal({
                     min="0"
                     value={packageSize}
                     onChange={(event) => setPackageSize(event.target.value)}
+                    onKeyDown={handlePackageEnter}
                     className={`w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none ${
                       quantityUnit ? "pr-16" : ""
                     }`}
@@ -539,176 +724,21 @@ export function InventoryStageModal({
                 </p>
               ) : (
                 <p className="text-xs text-neutral-500">
-                  This entry adds {formatAmountWithUnit(packageEntryTotal)} to
-                  the total.
+                  This entry adds{" "}
+                  {formatAmountWithUnit(
+                    packageEntryTotal,
+                    normalizedQuantityUnit,
+                  )}{" "}
+                  to the total.
                 </p>
               )}
               <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!canAddPackageEntry) {
-                      return;
-                    }
-                    onAddPackage(parsedPackageCount, parsedPackageSize);
-                    setPackageCount("");
-                    setPackageSize("");
-                    closeAndReset();
-                  }}
+                  onClick={addPackageEntry}
                   disabled={!canAddPackageEntry}
                   className={`rounded-full px-4 py-2 text-sm font-semibold text-white transition ${
                     canAddPackageEntry
-                      ? "bg-neutral-900 hover:bg-neutral-800"
-                      : "bg-neutral-400"
-                  }`}
-                >
-                  Add entry
-                </button>
-              </div>
-            </div>
-          ) : null}
-          {stageEntryType === "conversion" ? (
-            <div className="space-y-2 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-              <p className="text-sm font-semibold text-neutral-900">
-                Convert measurement
-              </p>
-              <p className="text-xs text-neutral-600">
-                Enter a measurement in another unit, then convert it to{" "}
-                {normalizedQuantityUnit ?? "the default unit"}.
-              </p>
-              <div className="grid grid-cols-[1fr_1fr] gap-2">
-                <div className="relative">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.001"
-                    min="0"
-                    value={conversionAmount}
-                    ref={conversionAmountInputRef}
-                    onChange={(event) => {
-                      setConversionAmount(event.target.value);
-                      setIsConvertedManual(false);
-                    }}
-                    className="w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none"
-                    placeholder="Measured amount"
-                  />
-                </div>
-                <div>
-                  <select
-                    value={conversionUnit}
-                    onChange={(event) => {
-                      setConversionUnit(event.target.value);
-                      setIsConvertedManual(false);
-                    }}
-                    className="w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none"
-                  >
-                    <option value="">Select unit</option>
-                    {conversionUnits.map((unit) => (
-                      <option key={unit} value={unit}>
-                        {unit}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              {tareForConversion !== null ? (
-                <label className="flex items-center gap-2 text-xs text-neutral-600">
-                  <input
-                    type="checkbox"
-                    checked={tareEnabled}
-                    onChange={(event) => {
-                      setUseTareAdjustment(event.target.checked);
-                      setIsConvertedManual(false);
-                    }}
-                    className="h-4 w-4 rounded border-neutral-300 text-neutral-900"
-                  />
-                  Apply tare ({tareForConversion.toLocaleString()}{" "}
-                  {conversionUnit})
-                </label>
-              ) : null}
-              {conversionFactor === null ? (
-                <p className="text-xs text-rose-600">
-                  Select a unit that converts to{" "}
-                  {normalizedQuantityUnit ?? "the default unit"}.
-                </p>
-              ) : conversionTareTooLarge ? (
-                <p className="text-xs text-rose-600">
-                  Measured amount must be greater than tare.
-                </p>
-              ) : conversionGrossValid ? (
-                <p className="text-xs text-neutral-500">
-                  Net {conversionNetAmount.toLocaleString()} {conversionUnit} →{" "}
-                  {formatConversionAmount(autoConvertedAmount)}{" "}
-                  {normalizedQuantityUnit}
-                </p>
-              ) : (
-                <p className="text-xs text-neutral-500">
-                  Enter a measurement to compute the converted amount.
-                </p>
-              )}
-              <div className="relative">
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.000001"
-                  min="0"
-                  value={convertedAmount}
-                  onChange={(event) => {
-                    setConvertedAmount(event.target.value);
-                    setIsConvertedManual(true);
-                  }}
-                  className={`w-full rounded-2xl border border-neutral-200 px-4 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none ${
-                    normalizedQuantityUnit ? "pr-16" : ""
-                  }`}
-                  placeholder="Converted amount"
-                />
-                {normalizedQuantityUnit ? (
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-neutral-500">
-                    {normalizedQuantityUnit}
-                  </span>
-                ) : null}
-              </div>
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (
-                      !conversionGrossValid ||
-                      conversionFactor === null ||
-                      conversionUnit.trim().length === 0 ||
-                      !Number.isFinite(parsedConvertedAmount) ||
-                      parsedConvertedAmount < 0 ||
-                      conversionTareTooLarge
-                    ) {
-                      return;
-                    }
-                    onAddConversion({
-                      grossAmount: parsedConversionAmount,
-                      netAmount: conversionNetAmount,
-                      submissionAmount: roundToSix(parsedConvertedAmount),
-                      fromUnit: conversionUnit,
-                      toUnit: normalizedQuantityUnit ?? conversionUnit,
-                      factor: conversionFactor,
-                      tareApplied: tareEnabled,
-                      tareAmount: tareEnabled ? tareForConversion : null,
-                    });
-                    closeAndReset();
-                  }}
-                  disabled={
-                    !conversionGrossValid ||
-                    conversionFactor === null ||
-                    conversionUnit.trim().length === 0 ||
-                    !Number.isFinite(parsedConvertedAmount) ||
-                    parsedConvertedAmount < 0 ||
-                    conversionTareTooLarge
-                  }
-                  className={`rounded-full px-4 py-2 text-sm font-semibold text-white transition ${
-                    conversionGrossValid &&
-                    conversionFactor !== null &&
-                    conversionUnit.trim().length > 0 &&
-                    Number.isFinite(parsedConvertedAmount) &&
-                    parsedConvertedAmount >= 0 &&
-                    !conversionTareTooLarge
                       ? "bg-neutral-900 hover:bg-neutral-800"
                       : "bg-neutral-400"
                   }`}

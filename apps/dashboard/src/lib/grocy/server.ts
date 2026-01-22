@@ -24,13 +24,24 @@ function resolveApiBaseUrl(): string {
   return apiBaseUrl;
 }
 
-const loadGrocyInstances = cache(async (): Promise<GrocyInstanceSummary[]> => {
+type FetchGrocyInstancesOptions = {
+  forceRefresh?: boolean;
+};
+
+async function requestGrocyInstances(
+  options?: FetchGrocyInstancesOptions,
+): Promise<GrocyInstanceSummary[]> {
   const apiBaseUrl = resolveApiBaseUrl();
   const url = new URL("/grocy/instances", apiBaseUrl);
-  const response = await fetch(url, {
+  const requestInit: RequestInit & { next?: { revalidate?: number } } = {
     headers: { Accept: "application/json" },
-    next: { revalidate: 120 },
-  });
+  };
+  if (options?.forceRefresh) {
+    requestInit.cache = "no-store";
+  } else {
+    requestInit.next = { revalidate: 120 };
+  }
+  const response = await fetch(url, requestInit);
 
   if (!response.ok) {
     const errorDetail = await safeReadResponseText(response);
@@ -41,9 +52,22 @@ const loadGrocyInstances = cache(async (): Promise<GrocyInstanceSummary[]> => {
 
   const payload = (await response.json()) as ListInstancesResponsePayload;
   return deserializeGrocyInstanceSummaries(payload);
+}
+
+const loadGrocyInstances = cache(async (): Promise<GrocyInstanceSummary[]> => {
+  return requestGrocyInstances();
 });
 
 export async function fetchGrocyInstances(): Promise<GrocyInstanceSummary[]> {
+  return loadGrocyInstances();
+}
+
+export async function fetchGrocyInstancesForDashboard(
+  options?: FetchGrocyInstancesOptions,
+): Promise<GrocyInstanceSummary[]> {
+  if (options?.forceRefresh) {
+    return requestGrocyInstances(options);
+  }
   return loadGrocyInstances();
 }
 

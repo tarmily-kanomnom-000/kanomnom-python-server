@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GrocyProductInventoryEntry } from "@/lib/grocy/types";
 import {
   buildStorageKey,
@@ -29,6 +29,18 @@ export type InventoryStagedEntry =
     }
   | {
       id: string;
+      kind: "measurement";
+      submissionAmount: number;
+      grossAmount: number;
+      netAmount: number;
+      fromUnit: string;
+      toUnit: string;
+      factor: number;
+      tareApplied: boolean;
+      tareAmount: number | null;
+    }
+  | {
+      id: string;
       kind: "conversion";
       submissionAmount: number;
       grossAmount: number;
@@ -51,6 +63,23 @@ type StagingState = {
   deltaDirection: DeltaDirection;
 };
 
+const normalizeNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed.length) {
+      return null;
+    }
+    const parsed = Number(trimmed);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+};
+
 const buildDefaultState = (): StagingState => ({
   stagedEntries: [],
   stagedInterpretation: "absolute",
@@ -65,8 +94,6 @@ const sanitizeStagedEntries = (
   if (!Array.isArray(rawEntries)) {
     return [];
   }
-  const isFiniteNumber = (value: unknown): value is number =>
-    typeof value === "number" && Number.isFinite(value);
   return rawEntries
     .map((entry) => {
       if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
@@ -82,13 +109,13 @@ const sanitizeStagedEntries = (
         if (!allowTare) {
           return null;
         }
-        const grossAmount = record.grossAmount;
-        const netAmount = record.netAmount;
-        const submissionAmount = record.submissionAmount;
+        const grossAmount = normalizeNumber(record.grossAmount);
+        const netAmount = normalizeNumber(record.netAmount);
+        const submissionAmount = normalizeNumber(record.submissionAmount);
         if (
-          isFiniteNumber(grossAmount) &&
-          isFiniteNumber(netAmount) &&
-          isFiniteNumber(submissionAmount)
+          grossAmount !== null &&
+          netAmount !== null &&
+          submissionAmount !== null
         ) {
           return {
             id: idValue,
@@ -101,9 +128,9 @@ const sanitizeStagedEntries = (
         return null;
       }
       if (kind === "package") {
-        const quantity = record.quantity;
-        const packageSize = record.packageSize;
-        if (isFiniteNumber(quantity) && isFiniteNumber(packageSize)) {
+        const quantity = normalizeNumber(record.quantity);
+        const packageSize = normalizeNumber(record.packageSize);
+        if (quantity !== null && packageSize !== null) {
           const submissionAmount = quantity * packageSize;
           return {
             id: idValue,
@@ -119,8 +146,8 @@ const sanitizeStagedEntries = (
         if (allowTare && !allowManualForTare) {
           return null;
         }
-        const submissionAmount = record.submissionAmount;
-        if (isFiniteNumber(submissionAmount) && submissionAmount >= 0) {
+        const submissionAmount = normalizeNumber(record.submissionAmount);
+        if (submissionAmount !== null && submissionAmount >= 0) {
           return {
             id: idValue,
             kind: "manual",
@@ -129,41 +156,52 @@ const sanitizeStagedEntries = (
         }
       }
       if (kind === "conversion") {
-        const grossAmount = record.grossAmount;
-        const netAmount = record.netAmount;
-        const submissionAmount = record.submissionAmount;
-        const fromUnit = record.fromUnit;
-        const toUnit = record.toUnit;
-        const factor = record.factor;
-        const tareApplied = record.tareApplied;
-        const tareAmount = record.tareAmount;
-        if (
-          isFiniteNumber(grossAmount) &&
-          isFiniteNumber(netAmount) &&
-          isFiniteNumber(submissionAmount) &&
-          typeof fromUnit === "string" &&
-          typeof toUnit === "string" &&
-          isFiniteNumber(factor) &&
-          typeof tareApplied === "boolean" &&
-          (tareAmount === null || isFiniteNumber(tareAmount))
-        ) {
-          return {
-            id: idValue,
-            kind: "conversion",
-            grossAmount,
-            netAmount,
-            submissionAmount,
-            fromUnit,
-            toUnit,
-            factor,
-            tareApplied,
-            tareAmount: tareAmount === null ? null : tareAmount,
-          };
-        }
+        return normalizeConversionEntry(record, idValue, "conversion");
+      }
+      if (kind === "measurement") {
+        return normalizeConversionEntry(record, idValue, "measurement");
       }
       return null;
     })
     .filter((entry): entry is InventoryStagedEntry => entry !== null);
+};
+
+const normalizeConversionEntry = (
+  record: Record<string, unknown>,
+  idValue: string,
+  kind: "conversion" | "measurement",
+): InventoryStagedEntry | null => {
+  const grossAmount = normalizeNumber(record.grossAmount);
+  const netAmount = normalizeNumber(record.netAmount);
+  const submissionAmount = normalizeNumber(record.submissionAmount);
+  const fromUnit = record.fromUnit;
+  const toUnit = record.toUnit;
+  const factor = normalizeNumber(record.factor);
+  const tareApplied = record.tareApplied;
+  const tareAmount = normalizeNumber(record.tareAmount);
+  if (
+    grossAmount !== null &&
+    netAmount !== null &&
+    submissionAmount !== null &&
+    typeof fromUnit === "string" &&
+    typeof toUnit === "string" &&
+    factor !== null &&
+    typeof tareApplied === "boolean"
+  ) {
+    return {
+      id: idValue,
+      kind,
+      grossAmount,
+      netAmount,
+      submissionAmount,
+      fromUnit,
+      toUnit,
+      factor,
+      tareApplied,
+      tareAmount,
+    };
+  }
+  return null;
 };
 
 type UseInventoryStagingParams = {
@@ -183,10 +221,8 @@ type UseInventoryStagingResult = {
   isAmountValid: boolean;
   setStagedInterpretation: (next: StagedInterpretation) => void;
   setDeltaDirection: (next: DeltaDirection) => void;
-  addTareEntry: (grossAmount: number) => void;
-  addManualEntry: (amount: number) => void;
   addPackageEntry: (quantity: number, packageSize: number) => void;
-  addConversionEntry: (entry: ConversionEntryInput) => void;
+  addMeasurementEntry: (entry: MeasurementEntryInput) => void;
   removeStagedEntry: (id: string) => void;
   clearStagedEntries: () => void;
   resetStaging: () => void;
@@ -194,7 +230,7 @@ type UseInventoryStagingResult = {
   tareWeight: number;
 };
 
-type ConversionEntryInput = {
+type MeasurementEntryInput = {
   grossAmount: number;
   netAmount: number;
   submissionAmount: number;
@@ -218,18 +254,15 @@ export function useInventoryStaging({
       : null;
 
   const [state, setState] = useState<StagingState>(buildDefaultState);
-  const hydrationStateRef = useRef<{ key: string | null; hydrated: boolean }>({
-    key: null,
-    hydrated: false,
-  });
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     if (!stagingKey) {
-      hydrationStateRef.current = { key: null, hydrated: false };
+      setIsHydrated(true);
       setState(buildDefaultState());
       return;
     }
-    hydrationStateRef.current = { key: stagingKey, hydrated: false };
+    setIsHydrated(false);
     const payload = readStoredPayload<{
       entries?: unknown;
       updatedAt?: number;
@@ -238,7 +271,7 @@ export function useInventoryStaging({
     }>(stagingKey);
     if (!payload) {
       setState(buildDefaultState());
-      hydrationStateRef.current = { key: stagingKey, hydrated: true };
+      setIsHydrated(true);
       return;
     }
     try {
@@ -250,7 +283,7 @@ export function useInventoryStaging({
       if (!updatedAt || Date.now() - updatedAt > STAGING_TTL_MS) {
         clearStoredPayload(stagingKey);
         setState(buildDefaultState());
-        hydrationStateRef.current = { key: stagingKey, hydrated: true };
+        setIsHydrated(true);
         return;
       }
       const interpretation: StagedInterpretation =
@@ -265,7 +298,7 @@ export function useInventoryStaging({
       if (!hydrated.length) {
         clearStoredPayload(stagingKey);
         setState(buildDefaultState());
-        hydrationStateRef.current = { key: stagingKey, hydrated: true };
+        setIsHydrated(true);
         return;
       }
       setState({
@@ -273,7 +306,7 @@ export function useInventoryStaging({
         stagedInterpretation: interpretation,
         deltaDirection: direction,
       });
-      hydrationStateRef.current = { key: stagingKey, hydrated: true };
+      setIsHydrated(true);
     } catch (error) {
       console.warn("Failed to hydrate inventory staging state; clearing", {
         stagingKey,
@@ -281,38 +314,37 @@ export function useInventoryStaging({
       });
       clearStoredPayload(stagingKey);
       setState(buildDefaultState());
-      hydrationStateRef.current = { key: stagingKey, hydrated: true };
+      setIsHydrated(true);
     }
-  }, [stagingKey, hasTareWeight]);
+  }, [hasTareWeight, stagingKey]);
 
   useEffect(() => {
-    if (!stagingKey) {
-      return;
-    }
-    if (
-      hydrationStateRef.current.key !== stagingKey ||
-      !hydrationStateRef.current.hydrated
-    ) {
-      return;
-    }
-    if (state.stagedEntries.length === 0) {
-      clearStoredPayload(stagingKey);
+    if (!stagingKey || !isHydrated) {
       return;
     }
     try {
-      writeStoredPayload(stagingKey, {
+      if (state.stagedEntries.length === 0) {
+        clearStoredPayload(stagingKey);
+        return;
+      }
+      const ok = writeStoredPayload(stagingKey, {
         updatedAt: Date.now(),
         entries: state.stagedEntries,
         interpretation: state.stagedInterpretation,
         direction: state.deltaDirection,
       });
+      if (!ok) {
+        console.warn("Failed to persist inventory staging state", {
+          stagingKey,
+        });
+      }
     } catch (error) {
       console.warn("Failed to persist inventory staging state", {
         stagingKey,
         error,
       });
     }
-  }, [state, stagingKey]);
+  }, [isHydrated, state, stagingKey]);
 
   const stagedTotal = useMemo(
     () =>
@@ -327,7 +359,8 @@ export function useInventoryStaging({
     const hasTareEntries = state.stagedEntries.some(
       (entry) =>
         entry.kind === "tare" ||
-        (entry.kind === "conversion" && entry.tareApplied),
+        ((entry.kind === "conversion" || entry.kind === "measurement") &&
+          entry.tareApplied),
     );
     if (!hasTareWeight && !hasTareEntries) {
       return null;
@@ -337,7 +370,10 @@ export function useInventoryStaging({
         if (entry.kind === "tare") {
           return total + entry.netAmount;
         }
-        if (entry.kind === "conversion" && entry.tareApplied) {
+        if (
+          (entry.kind === "conversion" || entry.kind === "measurement") &&
+          entry.tareApplied
+        ) {
           return total + entry.netAmount;
         }
         return total + entry.submissionAmount;
@@ -354,44 +390,6 @@ export function useInventoryStaging({
     state.stagedInterpretation === "absolute"
       ? submissionBaseAmount
       : submissionBaseAmount * adjustmentSign;
-
-  const addTareEntry = useCallback(
-    (grossAmount: number) => {
-      const netAmount = Math.max(grossAmount - tareWeight, 0);
-      const id =
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `tare-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      setState((current) => ({
-        ...current,
-        stagedEntries: [
-          ...current.stagedEntries,
-          {
-            id,
-            kind: "tare",
-            submissionAmount: netAmount,
-            grossAmount,
-            netAmount,
-          },
-        ],
-      }));
-    },
-    [tareWeight],
-  );
-
-  const addManualEntry = useCallback((amount: number) => {
-    const id =
-      typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `manual-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    setState((current) => ({
-      ...current,
-      stagedEntries: [
-        ...current.stagedEntries,
-        { id, kind: "manual", submissionAmount: amount },
-      ],
-    }));
-  }, []);
 
   const addPackageEntry = useCallback(
     (quantity: number, packageSize: number) => {
@@ -417,18 +415,18 @@ export function useInventoryStaging({
     [],
   );
 
-  const addConversionEntry = useCallback((entry: ConversionEntryInput) => {
+  const addMeasurementEntry = useCallback((entry: MeasurementEntryInput) => {
     const id =
       typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
-        : `conversion-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        : `measurement-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     setState((current) => ({
       ...current,
       stagedEntries: [
         ...current.stagedEntries,
         {
           id,
-          kind: "conversion",
+          kind: "measurement",
           submissionAmount: entry.submissionAmount,
           grossAmount: entry.grossAmount,
           netAmount: entry.netAmount,
@@ -454,18 +452,7 @@ export function useInventoryStaging({
       ...current,
       stagedEntries: [],
     }));
-    if (!stagingKey) {
-      return;
-    }
-    try {
-      clearStoredPayload(stagingKey);
-    } catch (error) {
-      console.warn("Failed to clear inventory staging state", {
-        stagingKey,
-        error,
-      });
-    }
-  }, [stagingKey]);
+  }, []);
 
   const resetStaging = useCallback(() => {
     setState(buildDefaultState());
@@ -485,10 +472,8 @@ export function useInventoryStaging({
       setState((current) => ({ ...current, stagedInterpretation: next })),
     setDeltaDirection: (next) =>
       setState((current) => ({ ...current, deltaDirection: next })),
-    addTareEntry,
-    addManualEntry,
     addPackageEntry,
-    addConversionEntry,
+    addMeasurementEntry,
     removeStagedEntry,
     clearStagedEntries,
     resetStaging,

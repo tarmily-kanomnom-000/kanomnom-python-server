@@ -32,6 +32,7 @@ Fields:
 
 - `quantity_units.json`: unit definitions keyed by their names, no database ids.
 - `product_groups.json`: product group definitions keyed by their names, no database ids.
+- `quantity_unit_conversions.json`: universal unit conversion definitions (name-to-name) used to build the shared conversion graph.
 
 The FastAPI Grocy route resolves each name to the actual ids returned by Grocy, ensuring inserts remain consistent even when Grocy assigns new identifiers.
 

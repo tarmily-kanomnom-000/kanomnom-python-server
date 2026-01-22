@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type DateRange,
@@ -9,8 +9,12 @@ import {
 } from "@/components/grocy/list-controls";
 import { useSyncedQueryState } from "@/hooks/use-synced-query-state";
 import type { DashboardRole } from "@/lib/auth/types";
+import { submitInventoryCorrection } from "@/lib/grocy/client";
 import { GROCY_QUERY_PARAMS } from "@/lib/grocy/query-params";
-import type { GrocyProductInventoryEntry } from "@/lib/grocy/types";
+import type {
+  GrocyProductInventoryEntry,
+  InventoryCorrectionRequestPayload,
+} from "@/lib/grocy/types";
 
 import {
   isDateRangeActive,
@@ -84,6 +88,7 @@ const serializeSearchQueryParam = (value: string): string | null => {
 type ProductsPanelProps = {
   isLoading: boolean;
   errorMessage: string | null;
+  instanceErrorMessage?: string | null;
   products: GrocyProductInventoryEntry[];
   activeInstanceId: string | null;
   locationNamesById: Record<number, string>;
@@ -96,6 +101,7 @@ type ProductsPanelProps = {
 export function ProductsPanel({
   isLoading,
   errorMessage,
+  instanceErrorMessage,
   products,
   activeInstanceId,
   locationNamesById,
@@ -164,9 +170,15 @@ export function ProductsPanel({
     product: GrocyProductInventoryEntry;
     action: ProductActionType;
   } | null>(null);
-  const [notification, setNotification] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const notificationTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastInstanceId = useRef<string | null>(null);
+  const [quickActionPendingIds, setQuickActionPendingIds] = useState(
+    () => new Set<number>(),
+  );
   const [productInteractionMode, setProductInteractionMode] =
     useSyncedQueryState<ProductInteractionMode>({
       key: PRODUCT_MODE_PARAM,
@@ -229,7 +241,10 @@ export function ProductsPanel({
       (product) => product.id === activeAction.product.id,
     );
     if (updated && updated !== activeAction.product) {
-      setActiveAction({ product: updated, action: activeAction.action });
+      setActiveAction({
+        product: updated,
+        action: activeAction.action,
+      });
     }
   }, [products, activeAction]);
 
@@ -431,8 +446,52 @@ export function ProductsPanel({
   };
 
   const handleActionSuccess = (message: string) => {
-    setNotification(message);
+    setNotification({ type: "success", message });
   };
+
+  const handleQuickSetZero = useCallback(
+    async (product: GrocyProductInventoryEntry) => {
+      if (!activeInstanceId) {
+        return;
+      }
+      setQuickActionPendingIds((current) => {
+        const next = new Set(current);
+        next.add(product.id);
+        return next;
+      });
+      try {
+        const tareWeight =
+          Number.isFinite(product.tare_weight) && product.tare_weight > 0
+            ? product.tare_weight
+            : 0;
+        const payload: InventoryCorrectionRequestPayload = {
+          newAmount: tareWeight,
+          bestBeforeDate: null,
+          locationId: product.location_id ?? null,
+          note: null,
+          metadata: null,
+        };
+        const updatedProduct = await submitInventoryCorrection(
+          activeInstanceId,
+          product.id,
+          payload,
+        );
+        onProductUpdate?.(updatedProduct);
+        setNotification({ type: "success", message: "Stock set to 0." });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to set stock to 0.";
+        setNotification({ type: "error", message });
+      } finally {
+        setQuickActionPendingIds((current) => {
+          const next = new Set(current);
+          next.delete(product.id);
+          return next;
+        });
+      }
+    },
+    [activeInstanceId, onProductUpdate],
+  );
 
   const handlePrimaryProductSelection = (
     product: GrocyProductInventoryEntry,
@@ -479,13 +538,24 @@ export function ProductsPanel({
   return (
     <div className="space-y-4">
       {notification ? (
-        <div className="fixed right-6 top-6 z-50 w-80 rounded-3xl border border-emerald-300 bg-emerald-50 px-6 py-4 text-base font-semibold text-emerald-900 shadow-2xl">
-          {notification}
+        <div
+          className={`fixed right-6 top-6 z-50 w-80 rounded-3xl border px-6 py-4 text-base font-semibold shadow-2xl ${
+            notification.type === "success"
+              ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+              : "border-rose-300 bg-rose-50 text-rose-900"
+          }`}
+        >
+          {notification.message}
         </div>
       ) : null}
       {purchaseDefaultsError ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
           {purchaseDefaultsError}
+        </div>
+      ) : null}
+      {instanceErrorMessage ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          {instanceErrorMessage}
         </div>
       ) : null}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -554,6 +624,9 @@ export function ProductsPanel({
           onSelectAction={(product, action) =>
             setActiveAction({ product, action })
           }
+          productInteractionMode={productInteractionMode}
+          onQuickSetZero={handleQuickSetZero}
+          quickActionPendingIds={quickActionPendingIds}
         />
       ) : (
         <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-6 text-sm text-neutral-600">

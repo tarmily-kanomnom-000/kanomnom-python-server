@@ -25,13 +25,20 @@ type ProductsTableProps = {
     product: GrocyProductInventoryEntry,
     action: ProductActionType,
   ) => void;
+  productInteractionMode: "details" | "purchase" | "inventory";
+  onQuickSetZero: (product: GrocyProductInventoryEntry) => void;
+  quickActionPendingIds: Set<number>;
 };
 
 export function ProductsTable({
   products,
   onSelectProduct,
   onSelectAction,
+  productInteractionMode,
+  onQuickSetZero,
+  quickActionPendingIds,
 }: ProductsTableProps) {
+  const showQuickSetZero = productInteractionMode === "inventory";
   return (
     <div className="overflow-visible rounded-2xl border border-neutral-100 bg-white">
       <table className="min-w-full divide-y divide-neutral-200 text-left text-sm text-neutral-800">
@@ -48,6 +55,7 @@ export function ProductsTable({
           {products.map((product) => {
             const rowKey = `${product.id}-${product.last_stock_updated_at.getTime?.() ?? product.last_stock_updated_at}`;
             const stockStatus = resolveProductStockStatus(product);
+            const isQuickActionPending = quickActionPendingIds.has(product.id);
             const rowToneClass =
               stockStatus?.tone === "critical"
                 ? "bg-red-100"
@@ -109,12 +117,27 @@ export function ProductsTable({
                     {daysSince} day{daysSince === 1 ? "" : "s"}
                   </button>
                   <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                    <ProductRowActions
-                      product={product}
-                      onActionSelect={(action) =>
-                        onSelectAction(product, action)
-                      }
-                    />
+                    <div className="flex items-center gap-2">
+                      {showQuickSetZero ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onQuickSetZero(product);
+                          }}
+                          disabled={isQuickActionPending}
+                          className="inline-flex items-center rounded-full border border-red-300 bg-red-100 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition hover:border-red-400 hover:bg-red-200 disabled:cursor-not-allowed disabled:border-red-200 disabled:bg-red-50 disabled:text-red-400"
+                        >
+                          {isQuickActionPending ? "Setting…" : "Set to 0"}
+                        </button>
+                      ) : null}
+                      <ProductRowActions
+                        product={product}
+                        onActionSelect={(action) =>
+                          onSelectAction(product, action)
+                        }
+                      />
+                    </div>
                   </div>
                 </td>
               </tr>

@@ -108,6 +108,7 @@ Following this structure ensures Grocy integrations stay debuggable, typed, and 
   Use `src/lib/offline/shopping-list-cache.ts` as the public barrel export.
   Actions `add_item`, `remove_item`, `update_item`, and `replay_snapshot` queue when offline; consecutive updates are merged, and add/remove/update actions are batched per instance during sync. `complete_list` queues and runs once online without being dropped by snapshots.
 - Storage adapter: `src/lib/offline/local-storage.ts` centralizes the `kanomnom:pwa` prefix, JSON encode/decode, and persistence failure notification; both shopping-list storage and Grocy caches use it.
+- Inventory staging persistence: `kanomnom:pwa:inventory-staging:<instanceIndex>:<productId>` stores staged corrections for a product; entries are hydrated when reopening the inventory form.
 - Refresh: “Refresh data” passes `forceRefresh` through to the API, which overwrites the cached list with fresh server data. Product cache busting only appends `cache_buster` when a version bump occurs or `forceRefresh` is requested.
 - Single source of truth: Connectivity/offline state comes only from `status.ts`/`useSyncStatus`; avoid duplicating online flags or navigator checks elsewhere.
 - Scope: Instances/products and shopping list data are cached; shopping list mutations replay when online. Add new data types by reusing the helpers above and the `fetchWithOfflineCache` wrapper.

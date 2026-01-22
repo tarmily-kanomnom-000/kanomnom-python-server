@@ -14,7 +14,11 @@ import { ProductsPanel } from "@/components/grocy/instances/products-panel";
 import { useBrowserSearchParams } from "@/hooks/use-browser-search-params";
 import { useQueryParamUpdater } from "@/hooks/use-query-param-updater";
 import type { DashboardRole } from "@/lib/auth/types";
-import { fetchGrocyProduct, fetchGrocyProducts } from "@/lib/grocy/client";
+import {
+  fetchGrocyInstances,
+  fetchGrocyProduct,
+  fetchGrocyProducts,
+} from "@/lib/grocy/client";
 import {
   GROCY_QUERY_PARAMS,
   INVENTORY_QUERY_PARAM_KEYS,
@@ -30,26 +34,30 @@ type InstancesPickerProps = {
 };
 
 export function InstancesPicker({ instances, userRole }: InstancesPickerProps) {
+  const [instanceSummaries, setInstanceSummaries] =
+    useState<GrocyInstanceSummary[]>(instances);
   const searchParams = useBrowserSearchParams();
   const updateQueryParams = useQueryParamUpdater();
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(
     () =>
       resolveInstanceSelection(
         searchParams.get(GROCY_QUERY_PARAMS.instance),
-        instances,
+        instanceSummaries,
       ),
   );
   const [products, setProducts] = useState<GrocyProductInventoryEntry[]>([]);
   const [productError, setProductError] = useState<string | null>(null);
+  const [instanceError, setInstanceError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const latestRequestIdRef = useRef(0);
+  const latestInstanceRequestIdRef = useRef(0);
 
   const selectedInstance = useMemo(
     () =>
-      instances.find(
+      instanceSummaries.find(
         (instance) => instance.instance_index === selectedInstanceId,
       ) ?? null,
-    [instances, selectedInstanceId],
+    [instanceSummaries, selectedInstanceId],
   );
 
   const locationNamesById = useMemo(() => {
@@ -78,7 +86,7 @@ export function InstancesPicker({ instances, userRole }: InstancesPickerProps) {
         : null;
     const resolvedSelection = resolveInstanceSelection(
       browserInstanceId ?? queryInstanceId,
-      instances,
+      instanceSummaries,
     );
     setSelectedInstanceId((current) =>
       current === resolvedSelection ? current : resolvedSelection,
@@ -86,7 +94,7 @@ export function InstancesPicker({ instances, userRole }: InstancesPickerProps) {
     if (!browserInstanceId && resolvedSelection) {
       updateQueryParams({ [GROCY_QUERY_PARAMS.instance]: resolvedSelection });
     }
-  }, [instances, searchParams, updateQueryParams]);
+  }, [instanceSummaries, searchParams, updateQueryParams]);
 
   const loadProducts = useCallback(
     (options?: { forceRefresh?: boolean }) => {
@@ -127,9 +135,39 @@ export function InstancesPicker({ instances, userRole }: InstancesPickerProps) {
     [selectedInstance],
   );
 
+  const loadInstances = useCallback((options?: { forceRefresh?: boolean }) => {
+    const requestId = latestInstanceRequestIdRef.current + 1;
+    latestInstanceRequestIdRef.current = requestId;
+
+    setInstanceError(null);
+    startTransition(() => {
+      fetchGrocyInstances({ forceRefresh: options?.forceRefresh ?? false })
+        .then((items) => {
+          if (latestInstanceRequestIdRef.current !== requestId) {
+            return;
+          }
+          setInstanceSummaries(items);
+        })
+        .catch((error: unknown) => {
+          if (latestInstanceRequestIdRef.current !== requestId) {
+            return;
+          }
+          setInstanceError(
+            error instanceof Error
+              ? error.message
+              : "Failed to refresh Grocy instance data.",
+          );
+        });
+    });
+  }, []);
+
   useEffect(() => {
     loadProducts();
   }, [loadProducts]);
+
+  useEffect(() => {
+    setInstanceSummaries(instances);
+  }, [instances]);
 
   const handleProductUpdate = useCallback(
     async (updatedProduct: GrocyProductInventoryEntry) => {
@@ -173,18 +211,20 @@ export function InstancesPicker({ instances, userRole }: InstancesPickerProps) {
 
   const handleRefreshProducts = useCallback(() => {
     loadProducts({ forceRefresh: true });
-  }, [loadProducts]);
+    loadInstances({ forceRefresh: true });
+  }, [loadInstances, loadProducts]);
 
   return (
     <section className="space-y-6">
       <InstanceSelector
-        instances={instances}
+        instances={instanceSummaries}
         selectedInstanceId={selectedInstanceId}
         onInstanceChange={handleInstanceChange}
       />
       <ProductsPanel
         isLoading={isPending}
         errorMessage={productError}
+        instanceErrorMessage={instanceError}
         products={products}
         activeInstanceId={selectedInstance?.instance_index ?? null}
         locationNamesById={locationNamesById}

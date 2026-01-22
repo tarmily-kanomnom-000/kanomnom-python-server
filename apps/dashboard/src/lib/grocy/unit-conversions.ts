@@ -23,30 +23,51 @@ export function resolveUnitConversionFactors(
   if (requests.length === 0) {
     return [];
   }
-  const graph = buildConversionGraph(conversions);
-  return requests.map((request) =>
-    resolveConversionFactor(
-      graph,
-      normalizeUnitName(request.from_unit),
-      normalizeUnitName(request.to_unit),
-    ),
-  );
+  const { productEdges, universalEdges } = splitConversionEdges(conversions);
+  return requests.map((request) => {
+    const fromUnit = normalizeUnitName(request.from_unit);
+    const toUnit = normalizeUnitName(request.to_unit);
+    if (!fromUnit || !toUnit) {
+      return null;
+    }
+    if (fromUnit === toUnit) {
+      return 1;
+    }
+    const direct = resolveDirectUniversal(universalEdges, fromUnit, toUnit);
+    if (direct !== null) {
+      return direct;
+    }
+    return resolveConversionFactor(
+      productEdges,
+      universalEdges,
+      fromUnit,
+      toUnit,
+    );
+  });
 }
 
-function buildConversionGraph(
+function splitConversionEdges(
   conversions: ProductUnitConversionDefinition[],
-): Map<string, Array<[string, number]>> {
-  const graph = new Map<string, Array<[string, number]>>();
+): {
+  productEdges: Map<string, Array<[string, number]>>;
+  universalEdges: Map<string, Array<[string, number]>>;
+} {
+  const productEdges = new Map<string, Array<[string, number]>>();
+  const universalEdges = new Map<string, Array<[string, number]>>();
   for (const conversion of conversions) {
     const fromKey = normalizeUnitName(conversion.from_unit);
     const toKey = normalizeUnitName(conversion.to_unit);
     if (!fromKey || !toKey || conversion.factor <= 0) {
       continue;
     }
-    addConversionEdge(graph, fromKey, toKey, conversion.factor);
-    addConversionEdge(graph, toKey, fromKey, 1 / conversion.factor);
+    if (conversion.source === "universal") {
+      addConversionEdge(universalEdges, fromKey, toKey, conversion.factor);
+      continue;
+    }
+    addConversionEdge(productEdges, fromKey, toKey, conversion.factor);
+    addConversionEdge(productEdges, toKey, fromKey, 1 / conversion.factor);
   }
-  return graph;
+  return { productEdges, universalEdges };
 }
 
 function addConversionEdge(
@@ -63,17 +84,29 @@ function addConversionEdge(
   }
 }
 
-function resolveConversionFactor(
-  graph: Map<string, Array<[string, number]>>,
+function resolveDirectUniversal(
+  universalEdges: Map<string, Array<[string, number]>>,
   fromUnit: string,
   toUnit: string,
 ): number | null {
-  if (!fromUnit || !toUnit) {
+  const edges = universalEdges.get(fromUnit);
+  if (!edges) {
     return null;
   }
-  if (fromUnit === toUnit) {
-    return 1;
+  for (const [nextUnit, edgeFactor] of edges) {
+    if (nextUnit === toUnit) {
+      return edgeFactor;
+    }
   }
+  return null;
+}
+
+function resolveConversionFactor(
+  productEdges: Map<string, Array<[string, number]>>,
+  universalEdges: Map<string, Array<[string, number]>>,
+  fromUnit: string,
+  toUnit: string,
+): number | null {
   const visited = new Set([fromUnit]);
   const queue: Array<[string, number]> = [[fromUnit, 1]];
   while (queue.length > 0) {
@@ -82,11 +115,11 @@ function resolveConversionFactor(
       continue;
     }
     const [current, factor] = entry;
-    const edges = graph.get(current);
-    if (!edges) {
-      continue;
-    }
-    for (const [nextUnit, edgeFactor] of edges) {
+    const combinedEdges = [
+      ...(productEdges.get(current) ?? []),
+      ...(universalEdges.get(current) ?? []),
+    ];
+    for (const [nextUnit, edgeFactor] of combinedEdges) {
       if (visited.has(nextUnit)) {
         continue;
       }

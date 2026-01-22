@@ -76,11 +76,18 @@ export type GrocyQuantityUnit = {
   is_discrete: boolean | null;
 };
 
+export type GrocyQuantityUnitConversion = {
+  from_unit_name: string;
+  to_unit_name: string;
+  factor: number;
+};
+
 export type ProductUnitConversionDefinition = {
   from_unit: string;
   to_unit: string;
   factor: number;
   tare?: number;
+  source?: "universal" | "product";
 };
 
 export type ProductDescriptionMetadata = {

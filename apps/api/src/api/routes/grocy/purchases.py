@@ -449,7 +449,7 @@ def _build_grist_record_fields(
 ) -> dict[str, Any]:
     fields: dict[str, Any] = {
         "product": product.name,
-        "pruchase_date": purchase_epoch,
+        "purchase_date": purchase_epoch,
         "notes": (purchase.note or "").strip(),
     }
     fields["on_sale"] = False

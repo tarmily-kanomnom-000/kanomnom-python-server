@@ -65,6 +65,16 @@ class GrocyQuantityUnitsResponse(BaseModel):
     quantity_units: list[GrocyQuantityUnitPayload]
 
 
+class GrocyQuantityUnitConversionPayload(BaseModel):
+    from_unit_name: str
+    to_unit_name: str
+    factor: float
+
+
+class GrocyQuantityUnitConversionsResponse(BaseModel):
+    conversions: list[GrocyQuantityUnitConversionPayload]
+
+
 class InstanceAddressPayload(BaseModel):
     line1: str
     line2: str | None = None
