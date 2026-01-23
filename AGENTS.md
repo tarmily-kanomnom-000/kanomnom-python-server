@@ -63,6 +63,9 @@ Avoid hand-rolled caches, retry loops, or timers.
 
 **All** public and internal functions, class attributes, and module interfaces require type hints.
 
+**API responses** (both fetched from external services and returned by the Python server) must have accompanying models.
+Avoid passing raw dicts around when a typed model can be used instead.
+
 ```python
 def score(text: str, weights: dict[str, float]) -> float: ...
 ```

@@ -11,18 +11,24 @@ apps/api/grocy_manifest/
 
 ## Instance Metadata
 
-Each instance folder must contain a `metadata.yaml` file with connection details. Example:
+Each instance folder must contain a `metadata.yaml` file with connection details and a `credentials.yaml` file with the API key. The server uses the default entry and supports multiple credentials per instance.
 
 ```yaml
-"grocy_url": "http://grocy_home:80"
-"api_key": "example-api-key"
-"location_name": "Home"
-"location_types": ["Warehouse", "Factory"]
+grocy_url: "http://grocy_home:80"
+location_name: "Home"
+location_types: ["Warehouse", "Factory"]
+```
+
+```yaml
+credentials:
+  - name: primary
+    default: true
+    api_key: "example-api-key"
 ```
 
 Fields:
 - `grocy_url`: full URL (including port) reachable from this tooling.
-- `api_key`: API key created in Grocy (Settings → Users → API Keys).
+- `api_key` (credentials.yaml): API key created in Grocy (Settings → Users → API Keys).
 - `location_name`: human readable label for dashboards.
 - `location_types`: list of tags describing the physical site (warehouse/factory/retail, etc.).
 
@@ -55,11 +61,11 @@ Re-running it is safe—the route checks semantically (by entity name) before po
 ## Manual Prerequisites (per instance)
 
 1. Create a new admin user and delete the default admin account.
-2. Generate an API key named `kanomnom-python-server` (or match whatever you store in `metadata.yaml`).
+2. Generate an API key named `kanomnom-python-server` (or match whatever you store in `credentials.yaml`).
 3. Settings → Stock Settings → Common → *Decimal places allowed for amounts* → set to **6**.
 4. Settings → Stock Settings → Purchase → enable *Show purchased date on purchase*.
 
-After satisfying these requirements and filling `metadata.yaml`, call `POST /grocy/{instance_index}/initialize`.
+After satisfying these requirements and filling `metadata.yaml` + `credentials.yaml`, call `POST /grocy/{instance_index}/initialize`.
 
 ## Future Work
 

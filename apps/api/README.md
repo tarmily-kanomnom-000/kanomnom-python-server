@@ -8,6 +8,8 @@ This folder contains the FastAPI + Flet server as well as all Grocy governance t
 apps/api/
 ├── Dockerfile.*              # Service-specific container builds
 ├── grocy_manifest/           # Declarative Grocy instance metadata + universal config
+├── medusa_manifest/          # Declarative Medusa instance metadata
+├── nextcloud_manifest/       # Declarative Nextcloud CalDAV instance metadata
 ├── pyproject.toml            # Python dependencies for this runtime
 ├── src/                      # FastAPI app, pages, and shared libraries
 ├── tests/                    # Pytest suites
@@ -17,6 +19,8 @@ apps/api/
 ## Environment
 
 Copy `.env.default` to `.env` inside this directory, then adjust variables for your Grocy instances and any other service dependencies. The root docker-compose files reference `apps/api/.env`, so running compose from the repository root will still apply the values.
+
+Nextcloud CalDAV credentials and calendar metadata are documented in `apps/api/docs/nextcloud_integration.md`.
 
 ```
 cp .env.default .env

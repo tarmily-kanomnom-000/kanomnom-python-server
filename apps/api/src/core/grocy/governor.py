@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict
 
 from core.grocy.client import GrocyClient
+from core.grocy.credentials import InstanceCredentialsRepository
 from core.grocy.exceptions import ManifestNotFoundError
 from core.grocy.manager import GrocyManager
 from core.grocy.metadata import InstanceMetadataRepository
@@ -18,8 +19,14 @@ from core.grocy.services import (
 class GrocyGovernor:
     """Governs lifecycle and coordination across Grocy instances."""
 
-    def __init__(self, metadata_repository: InstanceMetadataRepository, manifest_root: Path) -> None:
+    def __init__(
+        self,
+        metadata_repository: InstanceMetadataRepository,
+        credentials_repository: InstanceCredentialsRepository,
+        manifest_root: Path,
+    ) -> None:
         self.metadata_repository = metadata_repository
+        self.credentials_repository = credentials_repository
         self.manifest_root = manifest_root
         self._managers: Dict[str, GrocyManager] = {}
 
@@ -32,7 +39,8 @@ class GrocyGovernor:
         if instance_index in self._managers:
             return self._managers[instance_index]
         metadata = self.metadata_repository.load(instance_index)
-        client = GrocyClient(metadata.grocy_url, metadata.api_key, metadata.instance_timezone)
+        credentials = self.credentials_repository.load(instance_index)
+        client = GrocyClient(metadata.grocy_url, credentials.api_key, metadata.instance_timezone)
         manager = GrocyManager(instance_index, client)
         self._managers[instance_index] = manager
         return manager

@@ -5,7 +5,7 @@ from typing import Optional, Union
 
 import phonenumbers
 from email_validator import EmailNotValidError, ValidatedEmail, validate_email
-from phonenumbers import PhoneNumber
+from phonenumbers import PhoneNumber, PhoneNumberFormat
 from pydantic import BaseModel, ConfigDict, RootModel, field_validator
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -48,6 +48,7 @@ class Inquiry(BaseModel):
     inquiry: str
     last_updated: datetime
     location: str
+    medusa_order_id: Optional[str] = None
     attachments: Optional[list] = None
 
     @field_validator("preferred_contact_method", mode="before")
@@ -117,3 +118,21 @@ class Inquiry(BaseModel):
 
 class Inquiries(RootModel[list[Inquiry]]):
     pass
+
+
+def format_phone_number(value: PhoneNumber | str | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, PhoneNumber):
+        phone = value
+    else:
+        try:
+            phone = phonenumbers.parse(str(value), "US")
+        except Exception:
+            return str(value)
+    if not phonenumbers.is_valid_number(phone):
+        return str(value)
+    if phone.country_code == 1:
+        national = phonenumbers.format_number(phone, PhoneNumberFormat.NATIONAL)
+        return f"+{phone.country_code} {national}"
+    return phonenumbers.format_number(phone, PhoneNumberFormat.INTERNATIONAL)

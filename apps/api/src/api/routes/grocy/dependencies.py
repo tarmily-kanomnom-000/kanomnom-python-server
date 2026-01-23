@@ -4,7 +4,11 @@ from pathlib import Path
 
 from fastapi import APIRouter
 
-from core.grocy import GrocyGovernor, InstanceMetadataRepository
+from core.grocy import (
+    GrocyGovernor,
+    InstanceCredentialsRepository,
+    InstanceMetadataRepository,
+)
 
 router = APIRouter(prefix="/grocy", tags=["grocy"])
 
@@ -13,6 +17,7 @@ SERVICE_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST_ROOT = SERVICE_ROOT / "grocy_manifest"
 
 metadata_repository = InstanceMetadataRepository(MANIFEST_ROOT)
-governor = GrocyGovernor(metadata_repository, MANIFEST_ROOT)
+credentials_repository = InstanceCredentialsRepository(MANIFEST_ROOT)
+governor = GrocyGovernor(metadata_repository, credentials_repository, MANIFEST_ROOT)
 
 __all__ = ["router", "governor"]

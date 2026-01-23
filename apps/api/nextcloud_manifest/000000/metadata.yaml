@@ -1,0 +1,17 @@
+dav_url: "https://nextcloud.tarmily.com/remote.php/dav"
+calendars:
+  - name: "Ka-Nom Nom – Shifts"
+    description: "Staffing schedule"
+    tags: ["shifts"]
+  - name: "Ka-Nom Nom – Production"
+    description: "Production planning"
+    tags: ["production"]
+  - name: "Ka-Nom Nom – Store Hours & Pop-ups"
+    description: "Store hours and pop-up events"
+    tags: ["store_hours", "popups"]
+  - name: "Ka-Nom Nom – Daily Ops"
+    description: "Daily operations"
+    tags: ["daily_ops"]
+  - name: "Ka-Nom Nom – Orders"
+    description: "Customer order follow-ups"
+    tags: ["orders", "task"]

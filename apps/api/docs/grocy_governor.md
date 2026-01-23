@@ -81,7 +81,7 @@ Each metadata dataclass returns an empty dict when none of its attributes are po
 
 ### Design Considerations
 
-1. **Single Source of Truth**: All Grocy connectivity details flow from `apps/api/grocy_manifest/<instance>/metadata.yaml`; the governor never caches credentials outside memory and can drop/reload managers when metadata changes.
+1. **Single Source of Truth**: Grocy connectivity details flow from `apps/api/grocy_manifest/<instance>/metadata.yaml` plus `credentials.yaml` (default entry); the governor never caches credentials outside memory and can drop/reload managers when manifests change.
 2. **Separation of Concerns**: HTTP transport (client), domain orchestration (manager/services), and system-wide governance (governor) remain isolated so we can test and extend them independently.
 3. **Extensibility Hooks**: The governor exposes `available_instances()` and `manager_for()` today, but its constructor already accepts repositories, making it trivial to inject future persistence layers or policy engines. Typed Grocy response models (`apps/api/src/core/grocy/responses.py`) ensure future routes reuse strict, validated parsing logic for products, stock logs, locations, and product groups.
 

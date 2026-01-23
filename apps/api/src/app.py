@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from flet.fastapi import app as flet_fastapi
 from telegram.ext import Application
 
-from api.routes import grist, grocy
+from api.routes import grist, grocy, medusa
 from bot import BOT_ENABLED, TELEGRAM_INQURY_GROUP_CHAT_ID, telegram_app
 from core.cache.cache_service import get_cache_service
 from core.cache.grist_cache_refresher import (
@@ -90,22 +90,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await grist_cache_refresher.stop()
         raise
 
-    weather_stop_event: asyncio.Event | None = None
-    weather_task: asyncio.Task | None = None
+    # weather_stop_event: asyncio.Event | None = None
+    # weather_task: asyncio.Task | None = None
 
-    weather_stop_event = asyncio.Event()
-    weather_task = asyncio.create_task(_weather_ingest_loop(weather_stop_event))
+    # weather_stop_event = asyncio.Event()
+    # weather_task = asyncio.create_task(_weather_ingest_loop(weather_stop_event))
 
     try:
         yield  # Continue running FastAPI
     finally:
-        if weather_stop_event:
-            weather_stop_event.set()
-        if weather_task:
-            try:
-                await weather_task
-            except asyncio.CancelledError:
-                logging.info("Weather ingest scheduler cancelled during shutdown.")
+        # if weather_stop_event:
+        #     weather_stop_event.set()
+        # if weather_task:
+        #     try:
+        #         await weather_task
+        #     except asyncio.CancelledError:
+        #         logging.info("Weather ingest scheduler cancelled during shutdown.")
         await tandoor_cache_refresher.stop()
         await grist_cache_refresher.stop()
         if bot_started:
@@ -227,6 +227,7 @@ async def redirect_to_flet() -> RedirectResponse:
 
 app.include_router(grist.router)
 app.include_router(grocy.router)
+app.include_router(medusa.router)
 
 
 @app.get("/")

@@ -5,7 +5,6 @@ address:
   line 2: Unit 728
   postal code: '19129'
   state: PA
-api_key: qH59ZkDe2hRJO6K1Pc4Z1NZ08e0Lj3BYgJXOUhb6avXgrlT7B7
 grocy_url: http://grocy-test-01:80
 instance_timezone: "America/New_York"
 location_name: Test-01

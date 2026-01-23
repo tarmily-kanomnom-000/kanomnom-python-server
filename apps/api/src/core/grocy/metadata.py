@@ -35,7 +35,6 @@ class InstanceMetadataRepository:
         location_types = _require_string_list(parsed.get("location_types"), "location_types")
         return InstanceMetadata(
             grocy_url=_require_string(parsed.get("grocy_url"), "grocy_url"),
-            api_key=_require_string(parsed.get("api_key"), "api_key"),
             location_name=_require_string(parsed.get("location_name"), "location_name"),
             location_types=location_types,
             instance_timezone=instance_timezone,

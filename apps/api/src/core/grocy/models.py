@@ -23,11 +23,17 @@ class InstanceMetadata:
     """Connection metadata for a Grocy instance declared in metadata.yaml."""
 
     grocy_url: str
-    api_key: str
     location_name: str
     location_types: list[str]
     instance_timezone: str | None = None
     address: InstanceAddress | None = None
+
+
+@dataclass(frozen=True)
+class InstanceCredentials:
+    """Credentials stored alongside Grocy instance metadata."""
+
+    api_key: str
 
 
 @dataclass
