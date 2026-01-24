@@ -18,7 +18,9 @@ _KIND_REGISTRY: dict[str, type["BaseNoteMetadata"]] = {}
 
 def _register_metadata(kind: str, cls: type["BaseNoteMetadata"]) -> None:
     if kind in _KIND_REGISTRY:
-        raise ValueError(f"Metadata kind '{kind}' is already registered by {_KIND_REGISTRY[kind].__name__}")
+        raise ValueError(
+            f"Metadata kind '{kind}' is already registered by {_KIND_REGISTRY[kind].__name__}"
+        )
     _KIND_REGISTRY[kind] = cls
 
 
@@ -162,7 +164,11 @@ def _normalize_loss_details(value: Any) -> tuple[LossDetail, ...]:
         else:
             raise ValueError("Loss reason must be a string or enum value.")
         note_value = entry.get("note")
-        note = note_value.strip() if isinstance(note_value, str) and note_value.strip() else None
+        note = (
+            note_value.strip()
+            if isinstance(note_value, str) and note_value.strip()
+            else None
+        )
         if reason in seen:
             continue
         seen.add(reason)
@@ -206,8 +212,14 @@ class PurchaseEntryNoteMetadata(BaseNoteMetadata):
     on_sale: bool = False
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "shipping_cost", _normalize_optional_number(self.shipping_cost, "shipping_cost"))
-        object.__setattr__(self, "tax_rate", _normalize_optional_number(self.tax_rate, "tax_rate"))
+        object.__setattr__(
+            self,
+            "shipping_cost",
+            _normalize_optional_number(self.shipping_cost, "shipping_cost"),
+        )
+        object.__setattr__(
+            self, "tax_rate", _normalize_optional_number(self.tax_rate, "tax_rate")
+        )
         object.__setattr__(self, "brand", _normalize_optional_text(self.brand, "brand"))
         object.__setattr__(
             self,
@@ -222,13 +234,19 @@ class PurchaseEntryNoteMetadata(BaseNoteMetadata):
         object.__setattr__(
             self,
             "package_quantity",
-            _normalize_optional_positive_number(self.package_quantity, "package_quantity"),
+            _normalize_optional_positive_number(
+                self.package_quantity, "package_quantity"
+            ),
         )
-        object.__setattr__(self, "currency", _normalize_optional_text(self.currency, "currency"))
+        object.__setattr__(
+            self, "currency", _normalize_optional_text(self.currency, "currency")
+        )
         object.__setattr__(
             self,
             "conversion_rate",
-            _normalize_optional_positive_number(self.conversion_rate, "conversion_rate"),
+            _normalize_optional_positive_number(
+                self.conversion_rate, "conversion_rate"
+            ),
         )
         object.__setattr__(
             self,
@@ -263,14 +281,24 @@ class PurchaseEntryNoteMetadata(BaseNoteMetadata):
     @classmethod
     def from_attrs(cls, attrs: Mapping[str, Any]) -> "PurchaseEntryNoteMetadata":
         return cls(
-            shipping_cost=_normalize_optional_number(attrs.get("shipping_cost"), "shipping_cost"),
+            shipping_cost=_normalize_optional_number(
+                attrs.get("shipping_cost"), "shipping_cost"
+            ),
             tax_rate=_normalize_optional_number(attrs.get("tax_rate"), "tax_rate"),
             brand=_normalize_optional_text(attrs.get("brand"), "brand"),
-            package_size=_normalize_optional_positive_number(attrs.get("package_size"), "package_size"),
-            package_price=_normalize_optional_number(attrs.get("package_price"), "package_price"),
-            package_quantity=_normalize_optional_positive_number(attrs.get("package_quantity"), "package_quantity"),
+            package_size=_normalize_optional_positive_number(
+                attrs.get("package_size"), "package_size"
+            ),
+            package_price=_normalize_optional_number(
+                attrs.get("package_price"), "package_price"
+            ),
+            package_quantity=_normalize_optional_positive_number(
+                attrs.get("package_quantity"), "package_quantity"
+            ),
             currency=_normalize_optional_text(attrs.get("currency"), "currency"),
-            conversion_rate=_normalize_optional_positive_number(attrs.get("conversion_rate"), "conversion_rate"),
+            conversion_rate=_normalize_optional_positive_number(
+                attrs.get("conversion_rate"), "conversion_rate"
+            ),
             on_sale=_normalize_optional_bool(attrs.get("on_sale"), "on_sale") or False,
         )
 
@@ -288,9 +316,15 @@ class ProductUnitConversion:
     tare: float | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "from_unit", _normalize_required_text(self.from_unit, "from_unit"))
-        object.__setattr__(self, "to_unit", _normalize_required_text(self.to_unit, "to_unit"))
-        object.__setattr__(self, "factor", _normalize_required_positive_number(self.factor, "factor"))
+        object.__setattr__(
+            self, "from_unit", _normalize_required_text(self.from_unit, "from_unit")
+        )
+        object.__setattr__(
+            self, "to_unit", _normalize_required_text(self.to_unit, "to_unit")
+        )
+        object.__setattr__(
+            self, "factor", _normalize_required_positive_number(self.factor, "factor")
+        )
         object.__setattr__(self, "tare", _normalize_optional_number(self.tare, "tare"))
 
     def to_attrs(self) -> dict[str, Any]:
@@ -306,7 +340,9 @@ class ProductUnitConversion:
     @classmethod
     def from_attrs(cls, attrs: Mapping[str, Any]) -> "ProductUnitConversion":
         if not isinstance(attrs, Mapping):
-            raise ValueError("Unit conversions must be objects with from_unit, to_unit, and factor fields.")
+            raise ValueError(
+                "Unit conversions must be objects with from_unit, to_unit, and factor fields."
+            )
         return cls(
             from_unit=_normalize_required_text(attrs.get("from_unit"), "from_unit"),
             to_unit=_normalize_required_text(attrs.get("to_unit"), "to_unit"),
@@ -333,7 +369,9 @@ def _normalize_unit_conversions(value: Any) -> tuple[ProductUnitConversion, ...]
         elif isinstance(entry, Mapping):
             normalized.append(ProductUnitConversion.from_attrs(entry))
         else:
-            raise ValueError("Each conversion entry must be an object with from_unit, to_unit, and factor.")
+            raise ValueError(
+                "Each conversion entry must be an object with from_unit, to_unit, and factor."
+            )
     return tuple(normalized)
 
 
@@ -346,19 +384,25 @@ class ProductDescriptionMetadata(BaseNoteMetadata):
     unit_conversions: tuple[ProductUnitConversion, ...] = ()
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "unit_conversions", _normalize_unit_conversions(self.unit_conversions))
+        object.__setattr__(
+            self, "unit_conversions", _normalize_unit_conversions(self.unit_conversions)
+        )
 
     def to_attrs(self) -> dict[str, Any]:
         if not self.unit_conversions:
             return {}
         return {
             "kind": self.kind,
-            "unit_conversions": [conversion.to_attrs() for conversion in self.unit_conversions],
+            "unit_conversions": [
+                conversion.to_attrs() for conversion in self.unit_conversions
+            ],
         }
 
     @classmethod
     def from_attrs(cls, attrs: Mapping[str, Any]) -> "ProductDescriptionMetadata":
-        return cls(unit_conversions=_normalize_unit_conversions(attrs.get("unit_conversions")))
+        return cls(
+            unit_conversions=_normalize_unit_conversions(attrs.get("unit_conversions"))
+        )
 
 
 _register_metadata(ProductDescriptionMetadata.kind, ProductDescriptionMetadata)
@@ -371,14 +415,18 @@ def normalize_product_description_metadata(
     if not metadata.unit_conversions:
         return metadata
     if not unit_name_lookup:
-        raise ValueError("Unable to validate unit conversions because Grocy quantity units are unavailable.")
+        raise ValueError(
+            "Unable to validate unit conversions because Grocy quantity units are unavailable."
+        )
     seen_pairs: set[tuple[str, str]] = set()
     sanitized: list[ProductUnitConversion] = []
     for conversion in metadata.unit_conversions:
         from_key = _normalize_unit_name(conversion.from_unit)
         to_key = _normalize_unit_name(conversion.to_unit)
         if not from_key or not to_key:
-            raise ValueError("Unit conversions must include from_unit and to_unit names.")
+            raise ValueError(
+                "Unit conversions must include from_unit and to_unit names."
+            )
         if from_key not in unit_name_lookup:
             raise ValueError(f"Unknown Grocy quantity unit '{conversion.from_unit}'.")
         if to_key not in unit_name_lookup:
@@ -402,7 +450,9 @@ def resolve_unit_conversion_factors(
     conversions: Sequence[ProductUnitConversion],
     requests: Sequence[tuple[str, str]],
 ) -> dict[tuple[str, str], float | None]:
-    normalized_requests = [(_normalize_unit_name(req[0]), _normalize_unit_name(req[1])) for req in requests]
+    normalized_requests = [
+        (_normalize_unit_name(req[0]), _normalize_unit_name(req[1])) for req in requests
+    ]
     if not normalized_requests:
         return {}
     graph: dict[str, list[tuple[str, float]]] = {}
@@ -416,7 +466,9 @@ def resolve_unit_conversion_factors(
         graph.setdefault(from_key, []).append((to_key, conversion.factor))
         graph.setdefault(to_key, []).append((from_key, 1 / conversion.factor))
     results: dict[tuple[str, str], float | None] = {}
-    for raw_request, (from_key, to_key) in zip(requests, normalized_requests, strict=True):
+    for raw_request, (from_key, to_key) in zip(
+        requests, normalized_requests, strict=True
+    ):
         if not from_key or not to_key:
             results[raw_request] = None
             continue
@@ -462,7 +514,11 @@ class QuantityUnitDescriptionMetadata(BaseNoteMetadata):
     is_discrete: bool | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "is_discrete", _normalize_optional_bool(self.is_discrete, "is_discrete"))
+        object.__setattr__(
+            self,
+            "is_discrete",
+            _normalize_optional_bool(self.is_discrete, "is_discrete"),
+        )
 
     def to_attrs(self) -> dict[str, Any]:
         attrs: dict[str, Any] = {}
@@ -475,10 +531,16 @@ class QuantityUnitDescriptionMetadata(BaseNoteMetadata):
 
     @classmethod
     def from_attrs(cls, attrs: Mapping[str, Any]) -> "QuantityUnitDescriptionMetadata":
-        return cls(is_discrete=_normalize_optional_bool(attrs.get("is_discrete"), "is_discrete"))
+        return cls(
+            is_discrete=_normalize_optional_bool(
+                attrs.get("is_discrete"), "is_discrete"
+            )
+        )
 
 
-_register_metadata(QuantityUnitDescriptionMetadata.kind, QuantityUnitDescriptionMetadata)
+_register_metadata(
+    QuantityUnitDescriptionMetadata.kind, QuantityUnitDescriptionMetadata
+)
 
 
 @dataclass(frozen=True)
@@ -490,7 +552,9 @@ class ProductGroupDescriptionMetadata(BaseNoteMetadata):
     allergens: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "allergens", _normalize_string_sequence(self.allergens, "allergens"))
+        object.__setattr__(
+            self, "allergens", _normalize_string_sequence(self.allergens, "allergens")
+        )
 
     def to_attrs(self) -> dict[str, Any]:
         attrs: dict[str, Any] = {}
@@ -503,10 +567,14 @@ class ProductGroupDescriptionMetadata(BaseNoteMetadata):
 
     @classmethod
     def from_attrs(cls, attrs: Mapping[str, Any]) -> "ProductGroupDescriptionMetadata":
-        return cls(allergens=_normalize_string_sequence(attrs.get("allergens"), "allergens"))
+        return cls(
+            allergens=_normalize_string_sequence(attrs.get("allergens"), "allergens")
+        )
 
 
-_register_metadata(ProductGroupDescriptionMetadata.kind, ProductGroupDescriptionMetadata)
+_register_metadata(
+    ProductGroupDescriptionMetadata.kind, ProductGroupDescriptionMetadata
+)
 
 
 @dataclass(frozen=True)
@@ -525,7 +593,9 @@ class InventoryCorrectionNoteMetadata(BaseNoteMetadata):
             return {}
         return {
             "kind": self.kind,
-            "losses": [{"reason": loss.reason.value, "note": loss.note} for loss in self.losses],
+            "losses": [
+                {"reason": loss.reason.value, "note": loss.note} for loss in self.losses
+            ],
         }
 
     @classmethod
@@ -535,7 +605,9 @@ class InventoryCorrectionNoteMetadata(BaseNoteMetadata):
         )
 
 
-_register_metadata(InventoryCorrectionNoteMetadata.kind, InventoryCorrectionNoteMetadata)
+_register_metadata(
+    InventoryCorrectionNoteMetadata.kind, InventoryCorrectionNoteMetadata
+)
 
 
 @dataclass(frozen=True)
@@ -587,7 +659,9 @@ def decode_structured_note(raw: str | None) -> DecodedGrocyNote:
 
     version = payload.get("v")
     if version != NOTE_VERSION:
-        logger.warning("Encountered unsupported note version %s; returning plain text.", version)
+        logger.warning(
+            "Encountered unsupported note version %s; returning plain text.", version
+        )
 
     note_text = payload.get("note")
     if not isinstance(note_text, str):

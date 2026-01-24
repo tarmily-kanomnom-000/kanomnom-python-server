@@ -321,7 +321,9 @@ def ensure_location_table_exists(conn: PgConnection) -> None:
     conn.commit()
 
 
-def upsert_locations_and_get_ids(conn: PgConnection, locations: List[LocationConfig]) -> Dict[Tuple[str, str], int]:
+def upsert_locations_and_get_ids(
+    conn: PgConnection, locations: List[LocationConfig]
+) -> Dict[Tuple[str, str], int]:
     ids: Dict[Tuple[str, str], int] = {}
     with conn.cursor() as cur:
         for location in locations:

@@ -7,9 +7,6 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util import Retry
-
 from core.grocy.responses import (
     GrocyLocation,
     GrocyProduct,
@@ -27,6 +24,8 @@ from core.grocy.responses import (
     parse_stock_entries,
     parse_stock_log_entries,
 )
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,9 @@ _ALLOWED_METHODS = frozenset({"GET", "POST", "PUT"})
 class GrocyClient:
     """Thin HTTP client that encapsulates Grocy's REST API semantics."""
 
-    def __init__(self, base_url: str, api_key: str, instance_timezone: str | None) -> None:
+    def __init__(
+        self, base_url: str, api_key: str, instance_timezone: str | None
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
         self.session.headers.update({"GROCY-API-KEY": api_key})
@@ -57,7 +58,9 @@ class GrocyClient:
         """Create a quantity unit via Grocy's API."""
         return self._request("POST", "/api/objects/quantity_units", payload)
 
-    def update_quantity_unit(self, unit_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    def update_quantity_unit(
+        self, unit_id: int, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         """Update an existing quantity unit via Grocy's API."""
         return self._request("PUT", f"/api/objects/quantity_units/{unit_id}", payload)
 
@@ -78,7 +81,9 @@ class GrocyClient:
 
     def list_product_stock_entries(self, product_id: int) -> list[GrocyStockEntry]:
         """Fetch stock entries for a specific product."""
-        payload = self._request("GET", f"/api/stock/products/{product_id}/entries", None)
+        payload = self._request(
+            "GET", f"/api/stock/products/{product_id}/entries", None
+        )
         return parse_product_stock_entries(payload, self._source_timezone)
 
     def list_locations(self) -> list[GrocyLocation]:
@@ -95,9 +100,13 @@ class GrocyClient:
         """Create a shopping location via Grocy's API."""
         return self._request("POST", "/api/objects/shopping_locations", payload)
 
-    def update_shopping_location(self, location_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    def update_shopping_location(
+        self, location_id: int, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         """Update a shopping location via Grocy's API."""
-        return self._request("PUT", f"/api/objects/shopping_locations/{location_id}", payload)
+        return self._request(
+            "PUT", f"/api/objects/shopping_locations/{location_id}", payload
+        )
 
     def list_product_groups(self) -> list[GrocyProductGroup]:
         """Fetch product group definitions from Grocy."""
@@ -108,19 +117,29 @@ class GrocyClient:
         """Create a product group via Grocy's API."""
         return self._request("POST", "/api/objects/product_groups", payload)
 
-    def update_product_group(self, group_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    def update_product_group(
+        self, group_id: int, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         """Update a product group via Grocy's API."""
         return self._request("PUT", f"/api/objects/product_groups/{group_id}", payload)
 
-    def update_product(self, product_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    def update_product(
+        self, product_id: int, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         """Update a product via Grocy's API."""
         return self._request("PUT", f"/api/objects/products/{product_id}", payload)
 
-    def correct_product_inventory(self, product_id: int, payload: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
+    def correct_product_inventory(
+        self, product_id: int, payload: dict[str, Any]
+    ) -> dict[str, Any] | list[dict[str, Any]]:
         """Apply an inventory correction for the provided product."""
-        return self._request("POST", f"/api/stock/products/{product_id}/inventory", payload)
+        return self._request(
+            "POST", f"/api/stock/products/{product_id}/inventory", payload
+        )
 
-    def add_product_purchase_entry(self, product_id: int, payload: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
+    def add_product_purchase_entry(
+        self, product_id: int, payload: dict[str, Any]
+    ) -> dict[str, Any] | list[dict[str, Any]]:
         """Record a purchase entry for the provided product."""
         return self._request("POST", f"/api/stock/products/{product_id}/add", payload)
 
@@ -144,7 +163,11 @@ class GrocyClient:
             elapsed_ms = (perf_counter() - start) * 1000
             logger.error(
                 "grocy_request_timeout",
-                extra={"method": method, "path": path, "elapsed_ms": round(elapsed_ms, 2)},
+                extra={
+                    "method": method,
+                    "path": path,
+                    "elapsed_ms": round(elapsed_ms, 2),
+                },
             )
             raise
         try:

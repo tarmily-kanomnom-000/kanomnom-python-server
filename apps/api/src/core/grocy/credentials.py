@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
 from core.grocy.models import InstanceCredentials
 
 
@@ -18,7 +17,9 @@ class InstanceCredentialsRepository:
         """Load the credentials.yaml file for a specific Grocy instance."""
         credentials_path = self.manifest_root / instance_index / "credentials.yaml"
         if not credentials_path.exists():
-            raise FileNotFoundError(f"Missing credentials for instance {instance_index}: {credentials_path}")
+            raise FileNotFoundError(
+                f"Missing credentials for instance {instance_index}: {credentials_path}"
+            )
         parsed = _parse_credentials_file(credentials_path)
         return _resolve_credentials(parsed, credentials_path)
 

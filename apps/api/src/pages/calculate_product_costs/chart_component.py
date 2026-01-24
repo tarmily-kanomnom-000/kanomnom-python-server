@@ -50,7 +50,12 @@ class CostChartComponent:
             border_radius=5,
         )
 
-    def create_cost_chart(self, product_name: str, cost_data: list[tuple[datetime, float]], on_chart_click=None) -> ft.Container:
+    def create_cost_chart(
+        self,
+        product_name: str,
+        cost_data: list[tuple[datetime, float]],
+        on_chart_click=None,
+    ) -> ft.Container:
         """
         Create a line chart showing cost over time.
 
@@ -87,7 +92,9 @@ class CostChartComponent:
                     x=i,
                     y=cost,
                     tooltip=tooltip,
-                    tooltip_style=ft.TextStyle(color=ft.Colors.WHITE, size=12, weight=ft.FontWeight.BOLD),
+                    tooltip_style=ft.TextStyle(
+                        color=ft.Colors.WHITE, size=12, weight=ft.FontWeight.BOLD
+                    ),
                 )
             )
             min_cost = min(min_cost, cost)
@@ -130,8 +137,12 @@ class CostChartComponent:
         chart = ft.LineChart(
             data_series=[chart_data, avg_line_data],
             border=ft.border.all(1, ft.Colors.GREY_400),
-            horizontal_grid_lines=ft.ChartGridLines(color=ft.Colors.GREY_300, width=1, dash_pattern=[3, 3]),
-            vertical_grid_lines=ft.ChartGridLines(color=ft.Colors.GREY_300, width=1, dash_pattern=[3, 3]),
+            horizontal_grid_lines=ft.ChartGridLines(
+                color=ft.Colors.GREY_300, width=1, dash_pattern=[3, 3]
+            ),
+            vertical_grid_lines=ft.ChartGridLines(
+                color=ft.Colors.GREY_300, width=1, dash_pattern=[3, 3]
+            ),
             left_axis=ft.ChartAxis(
                 title=ft.Text("Cost ($)", size=12, weight=ft.FontWeight.BOLD),
                 title_size=40,
@@ -142,8 +153,12 @@ class CostChartComponent:
                 title_size=40,
                 labels_size=40,
                 labels=[
-                    ft.ChartAxisLabel(value=i, label=ft.Text(date.strftime("%Y-%m"), size=10))
-                    for i, (date, _) in enumerate(cost_data[:: max(1, len(cost_data) // 6)])  # Show max 6 labels
+                    ft.ChartAxisLabel(
+                        value=i, label=ft.Text(date.strftime("%Y-%m"), size=10)
+                    )
+                    for i, (date, _) in enumerate(
+                        cost_data[:: max(1, len(cost_data) // 6)]
+                    )  # Show max 6 labels
                 ],
             ),
             min_y=y_min,
@@ -153,7 +168,11 @@ class CostChartComponent:
             expand=True,
             tooltip_bgcolor=ft.Colors.BLACK87,  # Dark background for better contrast
             interactive=True,  # Enable hover interactions
-            on_chart_event=self._create_chart_event_handler(cost_data, on_chart_click) if on_chart_click else None,
+            on_chart_event=(
+                self._create_chart_event_handler(cost_data, on_chart_click)
+                if on_chart_click
+                else None
+            ),
         )
 
         return ft.Container(
@@ -190,7 +209,9 @@ class CostChartComponent:
             padding=15,
         )
 
-    def create_cost_summary(self, cost_data: list[tuple[datetime, float]]) -> ft.Container:
+    def create_cost_summary(
+        self, cost_data: list[tuple[datetime, float]]
+    ) -> ft.Container:
         """Create a summary of cost statistics."""
         if not cost_data:
             return ft.Container()
@@ -214,24 +235,54 @@ class CostChartComponent:
                         [
                             ft.Column(
                                 [
-                                    ft.Text("Average Cost", size=12, weight=ft.FontWeight.BOLD),
-                                    ft.Text(f"${avg_cost:.4f}", size=14, color=ft.Colors.BLUE),
+                                    ft.Text(
+                                        "Average Cost",
+                                        size=12,
+                                        weight=ft.FontWeight.BOLD,
+                                    ),
+                                    ft.Text(
+                                        f"${avg_cost:.4f}",
+                                        size=14,
+                                        color=ft.Colors.BLUE,
+                                    ),
                                 ],
                                 expand=1,
                             ),
                             ft.Column(
                                 [
-                                    ft.Text("Minimum Cost", size=12, weight=ft.FontWeight.BOLD),
-                                    ft.Text(f"${min_cost:.4f}", size=14, color=ft.Colors.GREEN),
-                                    ft.Text(min_date.strftime("%Y-%m"), size=10, color=ft.Colors.GREY),
+                                    ft.Text(
+                                        "Minimum Cost",
+                                        size=12,
+                                        weight=ft.FontWeight.BOLD,
+                                    ),
+                                    ft.Text(
+                                        f"${min_cost:.4f}",
+                                        size=14,
+                                        color=ft.Colors.GREEN,
+                                    ),
+                                    ft.Text(
+                                        min_date.strftime("%Y-%m"),
+                                        size=10,
+                                        color=ft.Colors.GREY,
+                                    ),
                                 ],
                                 expand=1,
                             ),
                             ft.Column(
                                 [
-                                    ft.Text("Maximum Cost", size=12, weight=ft.FontWeight.BOLD),
-                                    ft.Text(f"${max_cost:.4f}", size=14, color=ft.Colors.RED),
-                                    ft.Text(max_date.strftime("%Y-%m"), size=10, color=ft.Colors.GREY),
+                                    ft.Text(
+                                        "Maximum Cost",
+                                        size=12,
+                                        weight=ft.FontWeight.BOLD,
+                                    ),
+                                    ft.Text(
+                                        f"${max_cost:.4f}", size=14, color=ft.Colors.RED
+                                    ),
+                                    ft.Text(
+                                        max_date.strftime("%Y-%m"),
+                                        size=10,
+                                        color=ft.Colors.GREY,
+                                    ),
                                 ],
                                 expand=1,
                             ),
@@ -245,7 +296,9 @@ class CostChartComponent:
             margin=ft.margin.only(top=10),
         )
 
-    def _create_chart_event_handler(self, cost_data: list[tuple[datetime, float]], on_chart_click):
+    def _create_chart_event_handler(
+        self, cost_data: list[tuple[datetime, float]], on_chart_click
+    ):
         """Create a simplified chart event handler for click events."""
 
         def handle_chart_event(e):

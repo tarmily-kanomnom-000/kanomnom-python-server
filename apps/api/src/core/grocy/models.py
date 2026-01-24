@@ -51,9 +51,15 @@ class QuantityUnitDefinition:
         """Hydrate a manifest entry into a strongly typed definition."""
         return QuantityUnitDefinition(
             name=str(raw["name"]),
-            description=str(raw["description"]) if raw.get("description") is not None else None,
+            description=(
+                str(raw["description"]) if raw.get("description") is not None else None
+            ),
             name_plural=str(raw["name_plural"]),
-            plural_forms=str(raw["plural_forms"]) if raw.get("plural_forms") is not None else None,
+            plural_forms=(
+                str(raw["plural_forms"])
+                if raw.get("plural_forms") is not None
+                else None
+            ),
             active=int(raw["active"]),
         )
 
@@ -86,7 +92,9 @@ class ProductGroupDefinition:
         """Hydrate a manifest entry into a strongly typed definition."""
         return ProductGroupDefinition(
             name=str(raw["name"]),
-            description=str(raw["description"]) if raw.get("description") is not None else None,
+            description=(
+                str(raw["description"]) if raw.get("description") is not None else None
+            ),
             active=int(raw["active"]),
         )
 
@@ -117,7 +125,9 @@ class ShoppingLocationDefinition:
         """Hydrate the manifest entry into a strongly typed definition."""
         return ShoppingLocationDefinition(
             name=str(raw["name"]),
-            description=str(raw["description"]) if raw.get("description") is not None else None,
+            description=(
+                str(raw["description"]) if raw.get("description") is not None else None
+            ),
             active=int(raw["active"]),
         )
 
@@ -155,9 +165,16 @@ class UniversalManifest:
             ]
         )
         return UniversalManifest(
-            quantity_units=[QuantityUnitDefinition.from_dict(item) for item in quantity_units],
-            product_groups=[ProductGroupDefinition.from_dict(item) for item in product_groups],
-            shopping_locations=[ShoppingLocationDefinition.from_dict(item) for item in shopping_locations],
+            quantity_units=[
+                QuantityUnitDefinition.from_dict(item) for item in quantity_units
+            ],
+            product_groups=[
+                ProductGroupDefinition.from_dict(item) for item in product_groups
+            ],
+            shopping_locations=[
+                ShoppingLocationDefinition.from_dict(item)
+                for item in shopping_locations
+            ],
         )
 
 
@@ -176,4 +193,6 @@ def _load_json_array_candidates(paths: Sequence[Path]) -> list[dict[str, Any]]:
         if path.exists():
             return _load_json_array(path)
     attempted = ", ".join(str(path) for path in paths)
-    raise FileNotFoundError(f"Expected one of the following manifest files to exist: {attempted}")
+    raise FileNotFoundError(
+        f"Expected one of the following manifest files to exist: {attempted}"
+    )

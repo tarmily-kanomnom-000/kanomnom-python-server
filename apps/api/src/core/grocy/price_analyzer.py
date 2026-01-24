@@ -27,7 +27,9 @@ class PriceAnalyzer:
             self._shopping_locations_cache = self.grocy_client.list_shopping_locations()
         return self._shopping_locations_cache
 
-    def get_last_purchase_price(self, product_id: int, *, use_cache: bool = True) -> dict | None:
+    def get_last_purchase_price(
+        self, product_id: int, *, use_cache: bool = True
+    ) -> dict | None:
         """
         Get the most recent purchase price for a product.
 
@@ -36,9 +38,16 @@ class PriceAnalyzer:
         """
         try:
             # Get all stock log entries and filter for this product's purchases
-            all_stock_entries = self._get_stock_log() if use_cache else self.grocy_client.list_stock_log()
+            all_stock_entries = (
+                self._get_stock_log()
+                if use_cache
+                else self.grocy_client.list_stock_log()
+            )
             stock_entries = [
-                entry for entry in all_stock_entries if entry.product_id == product_id and entry.transaction_type == "purchase"
+                entry
+                for entry in all_stock_entries
+                if entry.product_id == product_id
+                and entry.transaction_type == "purchase"
             ]
 
             if not stock_entries:
@@ -57,7 +66,11 @@ class PriceAnalyzer:
             # Get shopping location name
             location_name = "Unknown"
             if latest.shopping_location_id:
-                shopping_locations = self._get_shopping_locations() if use_cache else self.grocy_client.list_shopping_locations()
+                shopping_locations = (
+                    self._get_shopping_locations()
+                    if use_cache
+                    else self.grocy_client.list_shopping_locations()
+                )
                 for location in shopping_locations:
                     if location.id == latest.shopping_location_id:
                         location_name = location.name
@@ -65,7 +78,9 @@ class PriceAnalyzer:
 
             return {
                 "unit_price": round(unit_price, 2),
-                "purchase_date": latest.purchased_date.isoformat() if latest.purchased_date else None,
+                "purchase_date": (
+                    latest.purchased_date.isoformat() if latest.purchased_date else None
+                ),
                 "shopping_location_name": location_name,
             }
 

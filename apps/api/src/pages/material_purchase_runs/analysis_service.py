@@ -11,7 +11,6 @@ from statistics import NormalDist
 from typing import Iterable, Sequence
 
 import polars as pl
-
 from shared.grist_material_transformer import normalize_material_purchase_dataframe
 from shared.grist_schema import MaterialPurchaseSchema
 
@@ -176,16 +175,21 @@ class MaterialPurchaseAnalyticsService:
             )
 
         best_source_map = self._derive_best_sources(records)
-        projections = self._build_projections(records, best_source_map, threshold, analysis_time)
+        projections = self._build_projections(
+            records, best_source_map, threshold, analysis_time
+        )
 
         low_supply = [
             projection
             for projection in projections
             if projection.days_until_runout is not None
-            and projection.days_until_runout <= self._run_config.low_supply_threshold_days
+            and projection.days_until_runout
+            <= self._run_config.low_supply_threshold_days
         ]
 
-        cadence_schedule, cadence_warnings = self._build_cadence_schedule(projections, analysis_time)
+        cadence_schedule, cadence_warnings = self._build_cadence_schedule(
+            projections, analysis_time
+        )
 
         return MaterialPurchaseAnalyticsResult(
             generated_at=analysis_time,
@@ -199,10 +203,20 @@ class MaterialPurchaseAnalyticsService:
     def _normalize_dataframe(self, dataframe: pl.DataFrame) -> pl.DataFrame:
         normalized = normalize_material_purchase_dataframe(dataframe, self._schema)
 
-        required_columns = ["material", "purchase_date", "package_size", "quantity", "unit"]
-        missing = [column for column in required_columns if column not in normalized.columns]
+        required_columns = [
+            "material",
+            "purchase_date",
+            "package_size",
+            "quantity",
+            "unit",
+        ]
+        missing = [
+            column for column in required_columns if column not in normalized.columns
+        ]
         if missing:
-            raise KeyError(f"Missing required normalized columns: {', '.join(sorted(missing))}")
+            raise KeyError(
+                f"Missing required normalized columns: {', '.join(sorted(missing))}"
+            )
 
         selected_order = [
             "material",
@@ -218,7 +232,9 @@ class MaterialPurchaseAnalyticsService:
         existing = [column for column in selected_order if column in normalized.columns]
         return normalized.select(existing)
 
-    def _derive_best_sources(self, records: Sequence[dict[str, object]]) -> dict[str, tuple[str | None, float | None]]:
+    def _derive_best_sources(
+        self, records: Sequence[dict[str, object]]
+    ) -> dict[str, tuple[str | None, float | None]]:
         best_sources: dict[str, tuple[str | None, float | None]] = {}
         for record in records:
             material = record.get("material")
@@ -236,7 +252,11 @@ class MaterialPurchaseAnalyticsService:
                 continue
 
             current_best = best_sources.get(material)
-            if current_best is None or current_best[1] is None or cost_value < current_best[1]:
+            if (
+                current_best is None
+                or current_best[1] is None
+                or cost_value < current_best[1]
+            ):
                 best_sources[material] = (source, cost_value)
         return best_sources
 
@@ -266,7 +286,12 @@ class MaterialPurchaseAnalyticsService:
             )
             if projection and projection.total_purchases >= max(1, min_purchases):
                 projections.append(projection)
-        projections.sort(key=lambda item: (item.days_until_runout is None, item.days_until_runout or 0.0))
+        projections.sort(
+            key=lambda item: (
+                item.days_until_runout is None,
+                item.days_until_runout or 0.0,
+            )
+        )
         return projections
 
     def _analyze_material(
@@ -276,11 +301,17 @@ class MaterialPurchaseAnalyticsService:
         best_source: tuple[str | None, float | None] | None,
         analysis_time: datetime,
     ) -> MaterialPurchaseProjection | None:
-        records_sorted = sorted(records, key=lambda row: row.get("purchase_date") or datetime.min)
+        records_sorted = sorted(
+            records, key=lambda row: row.get("purchase_date") or datetime.min
+        )
         total_purchases = len(records_sorted)
         last_record = records_sorted[-1]
 
-        last_purchase_date = last_record.get("purchase_date") if isinstance(last_record.get("purchase_date"), datetime) else None
+        last_purchase_date = (
+            last_record.get("purchase_date")
+            if isinstance(last_record.get("purchase_date"), datetime)
+            else None
+        )
         unit_counts = Counter()
         for record in records_sorted:
             unit_value = record.get("unit")
@@ -297,7 +328,9 @@ class MaterialPurchaseAnalyticsService:
         intervals = self._build_usage_intervals(records_sorted)
 
         frequency_samples = [interval.duration_days for interval in intervals]
-        purchase_frequency_days = self._weighted_average(list(reversed(frequency_samples)))
+        purchase_frequency_days = self._weighted_average(
+            list(reversed(frequency_samples))
+        )
 
         infrequent_material = (
             purchase_frequency_days is not None
@@ -317,7 +350,11 @@ class MaterialPurchaseAnalyticsService:
             usage_confidence = usage_estimate.confidence
             usage_variance = usage_estimate.usage_variance
 
-        if last_purchase_date and last_purchase_date.tzinfo and analysis_time.tzinfo is None:
+        if (
+            last_purchase_date
+            and last_purchase_date.tzinfo
+            and analysis_time.tzinfo is None
+        ):
             now = analysis_time.replace(tzinfo=last_purchase_date.tzinfo)
         else:
             now = analysis_time
@@ -331,7 +368,9 @@ class MaterialPurchaseAnalyticsService:
             and days_since_last_purchase is not None
         ):
             if days_since_last_purchase > 0:
-                usage_per_day = units_last_purchase / max(days_since_last_purchase, self._usage_config.minimum_interval_days)
+                usage_per_day = units_last_purchase / max(
+                    days_since_last_purchase, self._usage_config.minimum_interval_days
+                )
                 usage_confidence = max(usage_confidence, 0.3)
 
         units_remaining_estimate = None
@@ -339,7 +378,12 @@ class MaterialPurchaseAnalyticsService:
         estimated_runout_date = None
         remaining_supply_window: RemainingSupplyWindow | None = None
 
-        if not infrequent_material and usage_per_day is not None and usage_per_day > 0 and units_last_purchase is not None:
+        if (
+            not infrequent_material
+            and usage_per_day is not None
+            and usage_per_day > 0
+            and units_last_purchase is not None
+        ):
             if days_since_last_purchase is None:
                 days_since_last_purchase = 0.0
             units_consumed = usage_per_day * days_since_last_purchase
@@ -353,14 +397,20 @@ class MaterialPurchaseAnalyticsService:
                 estimated_runout_date = now + timedelta(days=days_until_runout)
                 total_units = units_last_purchase
                 if isinstance(last_purchase_date, datetime):
-                    aggregated_units = self._aggregate_same_day_units(records_sorted, last_purchase_date)
+                    aggregated_units = self._aggregate_same_day_units(
+                        records_sorted, last_purchase_date
+                    )
                     if aggregated_units is not None:
                         total_units = aggregated_units
                 remaining_supply_window = self._probabilistic_remaining_supply_window(
                     units_purchased=total_units,
                     usage_mean=usage_per_day,
                     usage_variance=usage_variance,
-                    days_since_last_purchase=days_since_last_purchase if days_since_last_purchase is not None else 0.0,
+                    days_since_last_purchase=(
+                        days_since_last_purchase
+                        if days_since_last_purchase is not None
+                        else 0.0
+                    ),
                     bias_days=bias_days,
                     now=now,
                 )
@@ -405,7 +455,9 @@ class MaterialPurchaseAnalyticsService:
             remaining_supply_window=remaining_supply_window,
         )
 
-    def _build_usage_intervals(self, records: Sequence[dict[str, object]]) -> list[UsageInterval]:
+    def _build_usage_intervals(
+        self, records: Sequence[dict[str, object]]
+    ) -> list[UsageInterval]:
         merged_records = self._merge_same_day_records(records)
         intervals: list[UsageInterval] = []
         for index in range(len(merged_records) - 1):
@@ -418,7 +470,10 @@ class MaterialPurchaseAnalyticsService:
             delta_days = self._calculate_days_between(start, end)
             if delta_days is None:
                 continue
-            if self._usage_config.maximum_interval_days > 0 and delta_days > self._usage_config.maximum_interval_days:
+            if (
+                self._usage_config.maximum_interval_days > 0
+                and delta_days > self._usage_config.maximum_interval_days
+            ):
                 continue
 
             units = self._to_float(current.get("units_purchased"))
@@ -432,18 +487,27 @@ class MaterialPurchaseAnalyticsService:
                 continue
             intervals.append(interval)
 
-        if self._usage_config.max_intervals > 0 and len(intervals) > self._usage_config.max_intervals:
+        if (
+            self._usage_config.max_intervals > 0
+            and len(intervals) > self._usage_config.max_intervals
+        ):
             intervals = intervals[-self._usage_config.max_intervals :]
         return intervals
 
-    def _merge_same_day_records(self, records: Sequence[dict[str, object]]) -> list[dict[str, object]]:
+    def _merge_same_day_records(
+        self, records: Sequence[dict[str, object]]
+    ) -> list[dict[str, object]]:
         merged: list[dict[str, object]] = []
         for record in records:
             purchase_date = record.get("purchase_date")
             if merged:
                 last_record = merged[-1]
                 last_date = last_record.get("purchase_date")
-                if isinstance(purchase_date, datetime) and isinstance(last_date, datetime) and purchase_date == last_date:
+                if (
+                    isinstance(purchase_date, datetime)
+                    and isinstance(last_date, datetime)
+                    and purchase_date == last_date
+                ):
                     merged[-1] = self._combine_same_day_record(last_record, record)
                     continue
             merged.append(record.copy())
@@ -455,10 +519,18 @@ class MaterialPurchaseAnalyticsService:
         extra: dict[str, object],
     ) -> dict[str, object]:
         combined = base.copy()
-        combined["units_purchased"] = self._sum_numeric(base.get("units_purchased"), extra.get("units_purchased"))
-        combined["quantity"] = self._sum_numeric(base.get("quantity"), extra.get("quantity"))
-        combined["total_cost"] = self._sum_numeric(base.get("total_cost"), extra.get("total_cost"))
-        combined["total_cost_USD"] = self._sum_numeric(base.get("total_cost_USD"), extra.get("total_cost_USD"))
+        combined["units_purchased"] = self._sum_numeric(
+            base.get("units_purchased"), extra.get("units_purchased")
+        )
+        combined["quantity"] = self._sum_numeric(
+            base.get("quantity"), extra.get("quantity")
+        )
+        combined["total_cost"] = self._sum_numeric(
+            base.get("total_cost"), extra.get("total_cost")
+        )
+        combined["total_cost_USD"] = self._sum_numeric(
+            base.get("total_cost_USD"), extra.get("total_cost_USD")
+        )
         return combined
 
     def _aggregate_same_day_units(
@@ -478,7 +550,9 @@ class MaterialPurchaseAnalyticsService:
                 found = True
         return total if found else None
 
-    def _estimate_reorder_bias(self, records: Sequence[dict[str, object]]) -> float | None:
+    def _estimate_reorder_bias(
+        self, records: Sequence[dict[str, object]]
+    ) -> float | None:
         if len(records) < 3:
             return None
 
@@ -504,7 +578,9 @@ class MaterialPurchaseAnalyticsService:
                 continue
 
             next_purchase = records[pivot + 1].get("purchase_date")
-            if not isinstance(last_purchase, datetime) or not isinstance(next_purchase, datetime):
+            if not isinstance(last_purchase, datetime) or not isinstance(
+                next_purchase, datetime
+            ):
                 continue
 
             actual_days = self._calculate_days_between(last_purchase, next_purchase)
@@ -576,7 +652,9 @@ class MaterialPurchaseAnalyticsService:
             confidence=PROBABILITY_INTERVAL[1] - PROBABILITY_INTERVAL[0],
         )
 
-    def _lognormal_parameters(self, mean: float, variance: float) -> tuple[float, float] | None:
+    def _lognormal_parameters(
+        self, mean: float, variance: float
+    ) -> tuple[float, float] | None:
         if mean <= 0:
             return None
         if variance <= 0:
@@ -632,7 +710,9 @@ class MaterialPurchaseAnalyticsService:
 
             chosen_index = 0
             if safe_lower is not None:
-                candidates = [idx for idx, run in enumerate(runs) if run.offset_days <= safe_lower]
+                candidates = [
+                    idx for idx, run in enumerate(runs) if run.offset_days <= safe_lower
+                ]
                 if candidates:
                     chosen_index = max(candidates)
             assignment_run = runs[chosen_index]
@@ -671,19 +751,25 @@ class MaterialPurchaseAnalyticsService:
 
         return scheduled_runs, cadence_warnings
 
-    def _lower_runout_bound(self, projection: MaterialPurchaseProjection) -> float | None:
+    def _lower_runout_bound(
+        self, projection: MaterialPurchaseProjection
+    ) -> float | None:
         window = projection.remaining_supply_window
         if window and window.lower_days is not None:
             return window.lower_days
         return projection.days_until_runout
 
-    def _populate_purchase_plan(self, assignment: SupplyRunAssignment, interval_days: int) -> None:
+    def _populate_purchase_plan(
+        self, assignment: SupplyRunAssignment, interval_days: int
+    ) -> None:
         projection = assignment.projection
         usage = projection.usage_per_day
         if usage is None or usage <= 0:
             return
 
-        projected_units = self._project_units_on_run_date(projection, assignment.run_offset_days)
+        projected_units = self._project_units_on_run_date(
+            projection, assignment.run_offset_days
+        )
         assignment.projected_units_on_run_date = projected_units
 
         required_units = usage * interval_days
@@ -692,7 +778,9 @@ class MaterialPurchaseAnalyticsService:
         assignment.recommended_purchase_units = recommended_units
 
         if projection.best_unit_cost is not None:
-            assignment.recommended_purchase_cost = recommended_units * projection.best_unit_cost
+            assignment.recommended_purchase_cost = (
+                recommended_units * projection.best_unit_cost
+            )
 
     def _project_units_on_run_date(
         self,
@@ -725,7 +813,9 @@ class MaterialPurchaseAnalyticsService:
             return configured_default
         return max(1, min_purchases)
 
-    def _compute_average_units(self, records: Sequence[dict[str, object]]) -> float | None:
+    def _compute_average_units(
+        self, records: Sequence[dict[str, object]]
+    ) -> float | None:
         units: list[float] = []
         for record in records:
             value = self._to_float(record.get("units_purchased"))
@@ -750,7 +840,9 @@ class MaterialPurchaseAnalyticsService:
             return None
         return sum(weighted_values) / total_weight
 
-    def _calculate_days_between(self, earlier: datetime | None, later: datetime | None) -> float | None:
+    def _calculate_days_between(
+        self, earlier: datetime | None, later: datetime | None
+    ) -> float | None:
         if earlier is None or later is None:
             return None
         delta = later - earlier
@@ -778,7 +870,9 @@ class MaterialPurchaseAnalyticsService:
         analysis_time: datetime,
     ) -> list[SupplyRunGroup]:
         groups: dict[datetime, list[MaterialPurchaseProjection]] = {}
-        horizon_limit = analysis_time + timedelta(days=self._run_config.upcoming_horizon_days)
+        horizon_limit = analysis_time + timedelta(
+            days=self._run_config.upcoming_horizon_days
+        )
 
         for projection in projections:
             if projection.estimated_runout_date is None:
@@ -795,7 +889,9 @@ class MaterialPurchaseAnalyticsService:
         supply_groups: list[SupplyRunGroup] = []
         for bucket, materials in sorted(groups.items(), key=lambda item: item[0]):
             label = self._format_group_label(bucket)
-            supply_groups.append(SupplyRunGroup(label=label, target_date=bucket, materials=materials))
+            supply_groups.append(
+                SupplyRunGroup(label=label, target_date=bucket, materials=materials)
+            )
 
         return supply_groups
 

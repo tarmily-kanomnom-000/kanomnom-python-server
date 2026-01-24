@@ -32,7 +32,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--describe-table",
         type=str,
-        help=("Print column documentation for either 'weather_hourly' or " "'weather_window_metrics' and exit."),
+        help=(
+            "Print column documentation for either 'weather_hourly' or "
+            "'weather_window_metrics' and exit."
+        ),
     )
     return parser.parse_args()
 

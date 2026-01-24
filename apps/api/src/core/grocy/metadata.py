@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import yaml
-
 from core.grocy.exceptions import MetadataNotFoundError
 from core.grocy.models import InstanceAddress, InstanceMetadata
 
@@ -28,11 +27,15 @@ class InstanceMetadataRepository:
         """Load the metadata.yaml file for a specific Grocy instance."""
         metadata_path = self.manifest_root / instance_index / "metadata.yaml"
         if not metadata_path.exists():
-            raise MetadataNotFoundError(f"Missing metadata for instance {instance_index}: {metadata_path}")
+            raise MetadataNotFoundError(
+                f"Missing metadata for instance {instance_index}: {metadata_path}"
+            )
         parsed = _parse_metadata_file(metadata_path)
         address = _hydrate_address(parsed.get("address"))
         instance_timezone = _extract_timezone(parsed.get("instance_timezone"))
-        location_types = _require_string_list(parsed.get("location_types"), "location_types")
+        location_types = _require_string_list(
+            parsed.get("location_types"), "location_types"
+        )
         return InstanceMetadata(
             grocy_url=_require_string(parsed.get("grocy_url"), "grocy_url"),
             location_name=_require_string(parsed.get("location_name"), "location_name"),

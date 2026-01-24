@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from api.routes.grocy.shopping_list import _serialize_updates
 from core.grocy.shopping_list_manager import ShoppingListManager
 from models.shopping_list import BulkItemUpdate, BulkUpdateRequest
@@ -251,7 +250,9 @@ def test_bulk_remove_updates_location_order(tmp_path: Path) -> None:
     }
     manager.save_active_list(instance_index, base_list)
 
-    removed = manager.bulk_remove_items(instance_index, BulkRemoveRequest(item_ids=["remove-1"]))
+    removed = manager.bulk_remove_items(
+        instance_index, BulkRemoveRequest(item_ids=["remove-1"])
+    )
     assert len(removed) == 1
 
     updated = manager.load_active_list(instance_index)

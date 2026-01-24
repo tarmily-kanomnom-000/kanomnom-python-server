@@ -40,14 +40,20 @@ class IngredientsCalculationService:
             return False
 
         try:
-            intermediate_servings, raw_ingredients = self._calculator.calculate_ingredients_and_servings(selected_quantities)
+            intermediate_servings, raw_ingredients = (
+                self._calculator.calculate_ingredients_and_servings(selected_quantities)
+            )
             self.state.intermediate_servings = intermediate_servings
             self.state.raw_ingredients = raw_ingredients
 
             logger.info("Calculated %d raw ingredients", len(raw_ingredients))
-            logger.info("Calculated %d intermediate servings", len(intermediate_servings))
+            logger.info(
+                "Calculated %d intermediate servings", len(intermediate_servings)
+            )
             return True
-        except Exception:  # noqa: BLE001 - surfaced via log, caller shows failure message
+        except (
+            Exception
+        ):  # noqa: BLE001 - surfaced via log, caller shows failure message
             logger.exception("Calculation failed")
             return False
 
@@ -61,13 +67,22 @@ class IngredientsCalculationService:
         try:
             remaining_servings = self._calculate_remaining_servings()
             if remaining_servings:
-                self.state.raw_ingredients = self._calculator.calculate_raw_ingredients_from_remaining(remaining_servings)
+                self.state.raw_ingredients = (
+                    self._calculator.calculate_raw_ingredients_from_remaining(
+                        remaining_servings
+                    )
+                )
             else:
                 self.state.raw_ingredients = {}
 
-            logger.info("Recalculated with existing amounts: %d raw ingredients", len(self.state.raw_ingredients))
+            logger.info(
+                "Recalculated with existing amounts: %d raw ingredients",
+                len(self.state.raw_ingredients),
+            )
             return True
-        except Exception:  # noqa: BLE001 - surfaced via log, caller shows failure message
+        except (
+            Exception
+        ):  # noqa: BLE001 - surfaced via log, caller shows failure message
             logger.exception("Recalculation failed")
             return False
 
@@ -78,10 +93,14 @@ class IngredientsCalculationService:
             return {}
 
         remaining_servings: IntermediateServings = {}
-        recipe_lookup = {recipe.name.lower(): recipe for recipe in self._calculator.recipes}
+        recipe_lookup = {
+            recipe.name.lower(): recipe for recipe in self._calculator.recipes
+        }
 
         for recipe_name, needed_servings in self.state.intermediate_servings.items():
-            existing_servings = self._calculate_existing_servings(recipe_name, recipe_lookup)
+            existing_servings = self._calculate_existing_servings(
+                recipe_name, recipe_lookup
+            )
             remaining = max(0.0, needed_servings - existing_servings)
 
             if remaining > 0:
@@ -97,7 +116,9 @@ class IngredientsCalculationService:
 
         return remaining_servings
 
-    def _calculate_existing_servings(self, recipe_name: str, recipe_lookup: dict[str, Recipe]) -> float:
+    def _calculate_existing_servings(
+        self, recipe_name: str, recipe_lookup: dict[str, Recipe]
+    ) -> float:
         """Calculate existing servings for a recipe from weight and servings inputs."""
 
         existing_amounts = self.state.existing_intermediate_amounts.get(recipe_name)
@@ -108,11 +129,15 @@ class IngredientsCalculationService:
         existing_weight = existing_amounts.get("weight", 0.0)
 
         if existing_weight > 0:
-            existing_servings += self._convert_weight_to_servings(recipe_name, existing_weight, recipe_lookup)
+            existing_servings += self._convert_weight_to_servings(
+                recipe_name, existing_weight, recipe_lookup
+            )
 
         return existing_servings
 
-    def _convert_weight_to_servings(self, recipe_name: str, weight: float, recipe_lookup: dict[str, Recipe]) -> float:
+    def _convert_weight_to_servings(
+        self, recipe_name: str, weight: float, recipe_lookup: dict[str, Recipe]
+    ) -> float:
         """Convert weight to servings for a recipe."""
 
         recipe_key = recipe_name.lower()
@@ -122,11 +147,15 @@ class IngredientsCalculationService:
             return 0.0
 
         if not recipe.produced_amount or recipe.produced_amount <= 0:
-            logger.warning("Recipe %s has no production amount for weight conversion", recipe_name)
+            logger.warning(
+                "Recipe %s has no production amount for weight conversion", recipe_name
+            )
             return 0.0
 
         servings = weight / recipe.produced_amount
-        logger.debug("Converted %sg to %s servings for %s", weight, servings, recipe_name)
+        logger.debug(
+            "Converted %sg to %s servings for %s", weight, servings, recipe_name
+        )
         return servings
 
     def get_calculation_summary(self) -> dict[str, int]:

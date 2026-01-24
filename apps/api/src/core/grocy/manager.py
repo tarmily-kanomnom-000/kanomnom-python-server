@@ -51,12 +51,24 @@ class GrocyManager:
     def __init__(self, instance_index: str, client: GrocyClient) -> None:
         self.instance_index = instance_index
         self.client = client
-        self._quantity_unit_syncer: EntitySyncer[QuantityUnitDefinition] = EntitySyncer()
-        self._product_group_syncer: EntitySyncer[ProductGroupDefinition] = EntitySyncer()
-        self._shopping_location_syncer: EntitySyncer[ShoppingLocationDefinition] = EntitySyncer()
-        self.quantity_units = QuantityUnitService(self.client, self._quantity_unit_syncer)
-        self.product_groups = ProductGroupService(self.client, self._product_group_syncer)
-        self.shopping_locations = ShoppingLocationService(self.client, self._shopping_location_syncer)
+        self._quantity_unit_syncer: EntitySyncer[QuantityUnitDefinition] = (
+            EntitySyncer()
+        )
+        self._product_group_syncer: EntitySyncer[ProductGroupDefinition] = (
+            EntitySyncer()
+        )
+        self._shopping_location_syncer: EntitySyncer[ShoppingLocationDefinition] = (
+            EntitySyncer()
+        )
+        self.quantity_units = QuantityUnitService(
+            self.client, self._quantity_unit_syncer
+        )
+        self.product_groups = ProductGroupService(
+            self.client, self._product_group_syncer
+        )
+        self.shopping_locations = ShoppingLocationService(
+            self.client, self._shopping_location_syncer
+        )
         self._inventory = ProductInventoryService(
             self.client,
             get_grocy_product_cache(),
@@ -69,17 +81,25 @@ class GrocyManager:
         self._shopping_locations_cache = get_grocy_shopping_locations_cache()
         self._quantity_units_cache = get_grocy_quantity_units_cache()
 
-    def ensure_quantity_units(self, manifest: UniversalManifest) -> QuantityUnitSyncResult:
+    def ensure_quantity_units(
+        self, manifest: UniversalManifest
+    ) -> QuantityUnitSyncResult:
         """Ensure the provided manifest quantity units exist in Grocy."""
         return self.quantity_units.ensure_quantity_units(manifest.quantity_units)
 
-    def ensure_product_groups(self, manifest: UniversalManifest) -> ProductGroupSyncResult:
+    def ensure_product_groups(
+        self, manifest: UniversalManifest
+    ) -> ProductGroupSyncResult:
         """Ensure the provided manifest product groups exist in Grocy."""
         return self.product_groups.ensure_product_groups(manifest.product_groups)
 
-    def ensure_shopping_locations(self, manifest: UniversalManifest) -> ShoppingLocationSyncResult:
+    def ensure_shopping_locations(
+        self, manifest: UniversalManifest
+    ) -> ShoppingLocationSyncResult:
         """Ensure the provided manifest shopping locations exist in Grocy."""
-        result = self.shopping_locations.ensure_shopping_locations(manifest.shopping_locations)
+        result = self.shopping_locations.ensure_shopping_locations(
+            manifest.shopping_locations
+        )
         self._shopping_locations_cache.clear_cache(self.instance_index)
         return result
 
@@ -100,7 +120,9 @@ class GrocyManager:
         updates: list[ProductDescriptionMetadataUpdate],
     ) -> list[ProductInventoryView]:
         """Update structured description metadata for multiple products."""
-        return self._inventory.update_product_description_metadata(self.instance_index, updates)
+        return self._inventory.update_product_description_metadata(
+            self.instance_index, updates
+        )
 
     def list_locations(self) -> list[GrocyLocation]:
         """Return cached Grocy locations for this instance."""
@@ -114,8 +136,12 @@ class GrocyManager:
         self, product_id: int, correction: InventoryCorrection
     ) -> tuple[InventoryCorrection, dict[str, Any] | list[dict[str, Any]] | None]:
         """Apply an inventory correction to a Grocy product."""
-        resolved = self._inventory.resolve_inventory_correction(self.instance_index, product_id, correction)
-        response = self.client.correct_product_inventory(product_id, resolved.to_payload())
+        resolved = self._inventory.resolve_inventory_correction(
+            self.instance_index, product_id, correction
+        )
+        response = self.client.correct_product_inventory(
+            product_id, resolved.to_payload()
+        )
         self._refresh_inventory_caches()
         return resolved, response
 
@@ -123,8 +149,12 @@ class GrocyManager:
         self, product_id: int, adjustment: InventoryAdjustment
     ) -> tuple[InventoryCorrection, dict[str, Any] | list[dict[str, Any]] | None]:
         """Apply a delta-based inventory adjustment to a Grocy product."""
-        resolved = self._inventory.resolve_inventory_adjustment(self.instance_index, product_id, adjustment)
-        response = self.client.correct_product_inventory(product_id, resolved.to_payload())
+        resolved = self._inventory.resolve_inventory_adjustment(
+            self.instance_index, product_id, adjustment
+        )
+        response = self.client.correct_product_inventory(
+            product_id, resolved.to_payload()
+        )
         self._refresh_inventory_caches()
         return resolved, response
 
@@ -132,14 +162,22 @@ class GrocyManager:
         self, product_id: int, entry: PurchaseEntryDraft
     ) -> tuple[PurchaseEntry, dict[str, Any] | list[dict[str, Any]] | None]:
         """Record a purchase entry for a Grocy product."""
-        resolved = self._inventory.resolve_purchase_entry(self.instance_index, product_id, entry)
-        response = self.client.add_product_purchase_entry(product_id, resolved.to_payload())
+        resolved = self._inventory.resolve_purchase_entry(
+            self.instance_index, product_id, entry
+        )
+        response = self.client.add_product_purchase_entry(
+            product_id, resolved.to_payload()
+        )
         self._refresh_inventory_caches()
         return resolved, response
 
-    def get_purchase_entry_defaults(self, product_id: int, shopping_location_id: int | None) -> PurchaseEntryDefaults:
+    def get_purchase_entry_defaults(
+        self, product_id: int, shopping_location_id: int | None
+    ) -> PurchaseEntryDefaults:
         """Return default metadata suggestions for purchase entry mutations."""
-        return self._inventory.build_purchase_defaults(self.instance_index, product_id, shopping_location_id)
+        return self._inventory.build_purchase_defaults(
+            self.instance_index, product_id, shopping_location_id
+        )
 
     def get_purchase_entry_defaults_batch(
         self, product_ids: list[int], shopping_location_id: int | None
@@ -147,7 +185,11 @@ class GrocyManager:
         """Return purchase metadata defaults for multiple products."""
         defaults: list[PurchaseEntryDefaults] = []
         for product_id in product_ids:
-            defaults.append(self._inventory.build_purchase_defaults(self.instance_index, product_id, shopping_location_id))
+            defaults.append(
+                self._inventory.build_purchase_defaults(
+                    self.instance_index, product_id, shopping_location_id
+                )
+            )
         return defaults
 
     def list_shopping_locations(self) -> list[GrocyShoppingLocation]:
@@ -172,7 +214,10 @@ class GrocyManager:
         if not normalized_name:
             raise ValueError("shopping_location_name must not be empty.")
         existing = self.list_shopping_locations()
-        lookup = {_normalize_shopping_location_name(location.name): location for location in existing}
+        lookup = {
+            _normalize_shopping_location_name(location.name): location
+            for location in existing
+        }
         match = lookup.get(_normalize_shopping_location_name(normalized_name))
         if match is not None:
             return match
@@ -180,22 +225,31 @@ class GrocyManager:
         def _reload_lookup() -> dict[str, GrocyShoppingLocation]:
             self._shopping_locations_cache.clear_cache(self.instance_index)
             refreshed = self.list_shopping_locations()
-            return {_normalize_shopping_location_name(location.name): location for location in refreshed}
+            return {
+                _normalize_shopping_location_name(location.name): location
+                for location in refreshed
+            }
 
         payload = {"name": normalized_name, "active": 1}
         try:
             self.client.create_shopping_location(payload)
         except Exception:
             refreshed_lookup = _reload_lookup()
-            resolved = refreshed_lookup.get(_normalize_shopping_location_name(normalized_name))
+            resolved = refreshed_lookup.get(
+                _normalize_shopping_location_name(normalized_name)
+            )
             if resolved is not None:
                 return resolved
             raise
 
         refreshed_lookup = _reload_lookup()
-        resolved = refreshed_lookup.get(_normalize_shopping_location_name(normalized_name))
+        resolved = refreshed_lookup.get(
+            _normalize_shopping_location_name(normalized_name)
+        )
         if resolved is None:
-            raise RuntimeError(f"Shopping location '{normalized_name}' was not created.")
+            raise RuntimeError(
+                f"Shopping location '{normalized_name}' was not created."
+            )
         return resolved
 
     def _refresh_inventory_caches(self) -> None:

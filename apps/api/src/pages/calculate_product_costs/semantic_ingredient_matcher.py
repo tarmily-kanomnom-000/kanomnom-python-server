@@ -18,7 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 class SemanticIngredientMatcher:
-    def __init__(self, api_client: Callable = None, fuzzy_threshold: float = 40.0, max_candidates: int = 3):
+    def __init__(
+        self,
+        api_client: Callable = None,
+        fuzzy_threshold: float = 40.0,
+        max_candidates: int = 3,
+    ):
         """
         Initialize semantic matcher with an API client function.
 
@@ -30,16 +35,22 @@ class SemanticIngredientMatcher:
         self.api_client = api_client
         self.fuzzy_threshold = fuzzy_threshold
         self.max_candidates = max_candidates
-        self.match_cache = LRUCache(maxsize=1000)  # LRU Cache for ingredient -> material matches
+        self.match_cache = LRUCache(
+            maxsize=1000
+        )  # LRU Cache for ingredient -> material matches
 
-        logger.info(f"Initialized semantic matcher (fuzzy_threshold={fuzzy_threshold}, max_candidates={max_candidates})")
+        logger.info(
+            f"Initialized semantic matcher (fuzzy_threshold={fuzzy_threshold}, max_candidates={max_candidates})"
+        )
 
     def set_api_client(self, api_client: Callable):
         """Set or update the API client function."""
         self.api_client = api_client
         logger.info("Updated API client for semantic matcher")
 
-    def _filter_materials_by_fuzzy_score(self, unmatched_ingredients: list[str], available_materials: list[str]) -> list[str]:
+    def _filter_materials_by_fuzzy_score(
+        self, unmatched_ingredients: list[str], available_materials: list[str]
+    ) -> list[str]:
         """
         Filter available materials using fuzzy string matching to get best candidates.
 
@@ -69,7 +80,9 @@ class SemanticIngredientMatcher:
             for match, _, _ in matches:
                 candidate_materials.add(match)
 
-            logger.debug(f"🔍 Fuzzy search for '{ingredient}': {len(matches)} candidates (scores >= {self.fuzzy_threshold})")
+            logger.debug(
+                f"🔍 Fuzzy search for '{ingredient}': {len(matches)} candidates (scores >= {self.fuzzy_threshold})"
+            )
 
         candidates_list = list(candidate_materials)
         original_count = len(available_materials)
@@ -81,10 +94,17 @@ class SemanticIngredientMatcher:
 
         return candidates_list
 
-    def _create_matching_prompt(self, unmatched_ingredients: list[str], available_materials: list[str]) -> list[dict[str, str]]:
+    def _create_matching_prompt(
+        self, unmatched_ingredients: list[str], available_materials: list[str]
+    ) -> list[dict[str, str]]:
         """Create the prompt messages for matching unmatched ingredients to available materials."""
-        ingredients_list = "\n".join(f"{i + 1}. {ingredient}" for i, ingredient in enumerate(unmatched_ingredients))
-        materials_list = "\n".join(f"{i + 1}. {material}" for i, material in enumerate(available_materials))
+        ingredients_list = "\n".join(
+            f"{i + 1}. {ingredient}"
+            for i, ingredient in enumerate(unmatched_ingredients)
+        )
+        materials_list = "\n".join(
+            f"{i + 1}. {material}" for i, material in enumerate(available_materials)
+        )
 
         return [
             {
@@ -132,7 +152,9 @@ Now match the ingredients:""",
             },
         ]
 
-    def find_ingredient_matches(self, unmatched_ingredients: list[str], available_materials: list[str]) -> dict[str, str]:
+    def find_ingredient_matches(
+        self, unmatched_ingredients: list[str], available_materials: list[str]
+    ) -> dict[str, str]:
         """
         Find matches between unmatched recipe ingredients and available materials.
         Uses fuzzy string matching to pre-filter materials before LLM call for efficiency.
@@ -148,23 +170,31 @@ Now match the ingredients:""",
             return {}
 
         # Pre-filter materials using fuzzy matching to reduce LLM workload
-        candidate_materials = self._filter_materials_by_fuzzy_score(unmatched_ingredients, available_materials)
+        candidate_materials = self._filter_materials_by_fuzzy_score(
+            unmatched_ingredients, available_materials
+        )
 
         # Log LLM call details
         logger.info("🤖 Calling LLM for semantic matching")
         logger.info(f"   📝 Unmatched ingredients: {unmatched_ingredients}")
-        logger.info(f"   📦 Candidate materials: {candidate_materials} options (filtered from {len(available_materials)})")
+        logger.info(
+            f"   📦 Candidate materials: {candidate_materials} options (filtered from {len(available_materials)})"
+        )
 
         try:
             # Create the prompt messages with filtered candidates
-            messages = self._create_matching_prompt(unmatched_ingredients, candidate_materials)
+            messages = self._create_matching_prompt(
+                unmatched_ingredients, candidate_materials
+            )
 
             # Call the API client
             response = self.api_client(messages, max_tokens=1024)
 
             if response:
                 # Parse the response and build matches (use candidate_materials for validation)
-                matches = self._parse_matching_response(response, unmatched_ingredients, candidate_materials)
+                matches = self._parse_matching_response(
+                    response, unmatched_ingredients, candidate_materials
+                )
 
                 # Log results
                 successful_matches = {k: v for k, v in matches.items() if v is not None}
@@ -184,7 +214,10 @@ Now match the ingredients:""",
             return {}
 
     def _parse_matching_response(
-        self, response: str, unmatched_ingredients: list[str], available_materials: list[str]
+        self,
+        response: str,
+        unmatched_ingredients: list[str],
+        available_materials: list[str],
     ) -> dict[str, str]:
         """Parse the LLM response to build ingredient matches."""
         matches = {}
@@ -209,7 +242,10 @@ Now match the ingredients:""",
                             material_found = None
 
                             for orig_ingredient in unmatched_ingredients:
-                                if recipe_ingredient.lower() == orig_ingredient.lower().strip():
+                                if (
+                                    recipe_ingredient.lower()
+                                    == orig_ingredient.lower().strip()
+                                ):
                                     recipe_found = orig_ingredient
                                     break
 
@@ -238,7 +274,9 @@ Now match the ingredients:""",
 
         return matches
 
-    def find_best_matches(self, recipe_ingredients: list[str], available_materials: list[str]) -> list[MatchResult]:
+    def find_best_matches(
+        self, recipe_ingredients: list[str], available_materials: list[str]
+    ) -> list[MatchResult]:
         """
         Find the best matching purchase materials for multiple recipe ingredients using two-pass matching with caching.
 
@@ -250,7 +288,10 @@ Now match the ingredients:""",
             list[MatchResult]: list of match results with metadata about match type
         """
         if not recipe_ingredients or not available_materials:
-            return [MatchResult(ingredient, None, "no_match") for ingredient in recipe_ingredients]
+            return [
+                MatchResult(ingredient, None, "no_match")
+                for ingredient in recipe_ingredients
+            ]
 
         results = []
         unmatched_ingredients = []
@@ -260,28 +301,40 @@ Now match the ingredients:""",
             if ingredient in self.match_cache:
                 cached_result = self.match_cache[ingredient]
                 results.append(cached_result)
-                logger.debug(f"🔄 Using cached match for '{ingredient}': {cached_result.matched_material}")
+                logger.debug(
+                    f"🔄 Using cached match for '{ingredient}': {cached_result.matched_material}"
+                )
             else:
                 # Pass 1: Plural/singular matching (case-insensitive)
-                exact_match = self._find_plural_singular_match(ingredient, available_materials)
+                exact_match = self._find_plural_singular_match(
+                    ingredient, available_materials
+                )
 
                 if exact_match:
                     match_result = MatchResult(ingredient, exact_match, "exact")
                     results.append(match_result)
-                    self.match_cache[ingredient] = match_result  # Cache exact matches too
+                    self.match_cache[ingredient] = (
+                        match_result  # Cache exact matches too
+                    )
                 else:
                     unmatched_ingredients.append(ingredient)
 
         # Pass 2: Semantic matching for uncached, unmatched ingredients
         if unmatched_ingredients:
-            logger.info(f"🔍 Semantic matching needed for {len(unmatched_ingredients)} uncached ingredients")
-            semantic_matches = self.find_ingredient_matches(unmatched_ingredients, available_materials)
+            logger.info(
+                f"🔍 Semantic matching needed for {len(unmatched_ingredients)} uncached ingredients"
+            )
+            semantic_matches = self.find_ingredient_matches(
+                unmatched_ingredients, available_materials
+            )
             for ingredient in unmatched_ingredients:
                 match = semantic_matches.get(ingredient)
                 if match:
                     match_result = MatchResult(ingredient, match, "semantic")
                     results.append(match_result)
-                    self.match_cache[ingredient] = match_result  # Cache semantic matches
+                    self.match_cache[ingredient] = (
+                        match_result  # Cache semantic matches
+                    )
                 else:
                     match_result = MatchResult(ingredient, None, "no_match")
                     results.append(match_result)
@@ -289,7 +342,9 @@ Now match the ingredients:""",
 
         return results
 
-    def _find_plural_singular_match(self, ingredient: str, available_materials: list[str]) -> Optional[str]:
+    def _find_plural_singular_match(
+        self, ingredient: str, available_materials: list[str]
+    ) -> Optional[str]:
         """
         Find match handling plural/singular variations using inflect.
 
@@ -304,7 +359,9 @@ Now match the ingredients:""",
         p = inflect.engine()
 
         # Create set of material names for faster lookup
-        materials_lower = {material.lower().strip(): material for material in available_materials}
+        materials_lower = {
+            material.lower().strip(): material for material in available_materials
+        }
 
         # Try exact match first
         if ingredient_lower in materials_lower:
@@ -334,7 +391,9 @@ def get_semantic_matcher(
     global _semantic_matcher
 
     if _semantic_matcher is None:
-        _semantic_matcher = SemanticIngredientMatcher(api_client, fuzzy_threshold, max_candidates)
+        _semantic_matcher = SemanticIngredientMatcher(
+            api_client, fuzzy_threshold, max_candidates
+        )
     elif api_client:
         _semantic_matcher.set_api_client(api_client)
     return _semantic_matcher

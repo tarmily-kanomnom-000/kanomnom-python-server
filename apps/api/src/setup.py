@@ -4,7 +4,9 @@ from pathlib import Path
 
 from dotenv import dotenv_values, load_dotenv
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 TANDOOR_URL = os.getenv("TANDOOR_URL")

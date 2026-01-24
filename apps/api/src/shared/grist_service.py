@@ -16,7 +16,6 @@ from typing import Any
 import httpx
 import polars as pl
 import requests
-
 from core.cache.cache_service import get_cache_service
 from shared.grist_schema import MaterialPurchaseSchema
 from shared.polars_cleaners import sanitize_numeric_columns, sanitize_string_columns
@@ -30,13 +29,17 @@ GRIST_OPEX_DOCUMENT_ID = os.getenv("GRIST_OPEX_DOCUMENT_ID")
 GRIST_INVENTORY_PURCHASES_TABLE_ID = os.getenv("GRIST_INVENTORY_PURCHASES_TABLE_ID")
 GRIST_MATERIAL_PURCHASES_TABLE_ID = os.getenv("GRIST_MATERIAL_PURCHASES_TABLE_ID")
 _GRIST_RESPONSE_DUMP_DIR = Path(os.getenv("GRIST_RESPONSE_DUMP_DIR", "request_dumps"))
-_IGNORED_RESPONSE_FIELDS: frozenset[str] = frozenset({"material_price_summaries", "receipt"})
+_IGNORED_RESPONSE_FIELDS: frozenset[str] = frozenset(
+    {"material_price_summaries", "receipt"}
+)
 
 
 def _describe_dtypes(dataframe: pl.DataFrame) -> dict[str, str]:
     """Return a mapping of column name to dtype string for logging."""
 
-    return {column: str(dtype) for column, dtype in zip(dataframe.columns, dataframe.dtypes)}
+    return {
+        column: str(dtype) for column, dtype in zip(dataframe.columns, dataframe.dtypes)
+    }
 
 
 def _epoch_to_datetime(epoch_seconds: Any) -> datetime | None:
@@ -48,11 +51,15 @@ def _epoch_to_datetime(epoch_seconds: Any) -> datetime | None:
     try:
         return datetime.fromtimestamp(int(epoch_seconds))
     except (TypeError, ValueError, OverflowError) as exc:
-        logger.error("Unable to convert epoch value '%s' to datetime: %s", epoch_seconds, exc)
+        logger.error(
+            "Unable to convert epoch value '%s' to datetime: %s", epoch_seconds, exc
+        )
         return None
 
 
-def _convert_epoch_seconds_to_datetime(dataframe: pl.DataFrame, column: str) -> pl.DataFrame:
+def _convert_epoch_seconds_to_datetime(
+    dataframe: pl.DataFrame, column: str
+) -> pl.DataFrame:
     """Convert an epoch-seconds column to timezone-naive datetimes."""
 
     if column not in dataframe.columns:
@@ -62,7 +69,9 @@ def _convert_epoch_seconds_to_datetime(dataframe: pl.DataFrame, column: str) -> 
         pl.when(pl.col(column).is_null())
         .then(None)
         .otherwise(
-            pl.col(column).cast(pl.Int64, strict=False).map_elements(_epoch_to_datetime, return_dtype=pl.Datetime(time_unit="us"))
+            pl.col(column)
+            .cast(pl.Int64, strict=False)
+            .map_elements(_epoch_to_datetime, return_dtype=pl.Datetime(time_unit="us"))
         )
         .alias(column)
     )
@@ -102,8 +111,14 @@ def _persist_grist_response(payload: dict[str, Any]) -> Path | None:
             try:
                 existing_dump.unlink()
             except OSError as delete_error:
-                logger.warning("Unable to delete stale Grist dump %s: %s", existing_dump, delete_error)
-        target_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+                logger.warning(
+                    "Unable to delete stale Grist dump %s: %s",
+                    existing_dump,
+                    delete_error,
+                )
+        target_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+        )
         logger.info("Persisted Grist response for debugging: %s", target_path)
         return target_path
     except Exception as exc:  # noqa: BLE001
@@ -168,7 +183,9 @@ def _log_mixed_type_columns(rows: list[dict[str, Any]]) -> None:
             if len(samples[column]) < 3:
                 samples[column].append(value)
 
-    mixed_columns = {column: types for column, types in type_map.items() if len(types) > 1}
+    mixed_columns = {
+        column: types for column, types in type_map.items() if len(types) > 1
+    }
 
     if mixed_columns:
         for column, types in sorted(mixed_columns.items()):
@@ -194,10 +211,16 @@ async def create_grist_purchase_record(fields: dict[str, Any]) -> None:
     }
     missing = [name for name, value in required_settings.items() if not value]
     if missing:
-        logger.warning("Cannot post purchase to Grist; missing config values: %s", ", ".join(missing))
+        logger.warning(
+            "Cannot post purchase to Grist; missing config values: %s",
+            ", ".join(missing),
+        )
         return
 
-    url = f"{GRIST_ENDPOINT}/api/docs/{GRIST_OPEX_DOCUMENT_ID}" f"/tables/{GRIST_INVENTORY_PURCHASES_TABLE_ID}/records"
+    url = (
+        f"{GRIST_ENDPOINT}/api/docs/{GRIST_OPEX_DOCUMENT_ID}"
+        f"/tables/{GRIST_INVENTORY_PURCHASES_TABLE_ID}/records"
+    )
     payload = {"records": [{"fields": fields}]}
     headers = {"Authorization": f"Bearer {GRIST_API_KEY}"}
 
@@ -226,13 +249,17 @@ def get_grist_table() -> pl.DataFrame:
 
     cached_df = cache_service.material_purchases_cache.get_dataframe_from_cache()
     if cached_df is not None and not cached_df.is_empty():
-        logger.info("Using cached material purchases data: %d records", cached_df.height)
+        logger.info(
+            "Using cached material purchases data: %d records", cached_df.height
+        )
         return cached_df
 
     logger.info("Cache miss - fetching fresh data from Grist API")
 
     table_records_response = requests.get(
-        url=(f"{GRIST_ENDPOINT}/api/docs/{GRIST_OPEX_DOCUMENT_ID}/tables/{GRIST_MATERIAL_PURCHASES_TABLE_ID}/records"),
+        url=(
+            f"{GRIST_ENDPOINT}/api/docs/{GRIST_OPEX_DOCUMENT_ID}/tables/{GRIST_MATERIAL_PURCHASES_TABLE_ID}/records"
+        ),
         headers={"Authorization": f"Bearer {GRIST_API_KEY}"},
         timeout=30,
     )
@@ -287,7 +314,9 @@ def get_grist_table() -> pl.DataFrame:
             purchase_date_col = "Purchase_Date"
 
         string_columns = tuple(
-            column for column in (resolved.get("material_name"), resolved.get("unit")) if column and column in dataframe.columns
+            column
+            for column in (resolved.get("material_name"), resolved.get("unit"))
+            if column and column in dataframe.columns
         )
         dataframe = sanitize_string_columns(dataframe, string_columns)
 
@@ -298,7 +327,9 @@ def get_grist_table() -> pl.DataFrame:
             "total_cost",
         )
         numeric_columns = [
-            resolved[role] for role in numeric_role_names if resolved.get(role) and resolved[role] in dataframe.columns
+            resolved[role]
+            for role in numeric_role_names
+            if resolved.get(role) and resolved[role] in dataframe.columns
         ]
         if purchase_date_col in dataframe.columns:
             numeric_columns.append(purchase_date_col)
@@ -310,7 +341,9 @@ def get_grist_table() -> pl.DataFrame:
             _log_date_column_stats(dataframe, purchase_date_col)
 
         if "id" in dataframe.columns:
-            dataframe = dataframe.with_columns(pl.col("id").cast(pl.Int64, strict=False).alias("id"))
+            dataframe = dataframe.with_columns(
+                pl.col("id").cast(pl.Int64, strict=False).alias("id")
+            )
 
         logger.info(
             "DataFrame created with %d rows and %d columns",
@@ -392,7 +425,10 @@ class DataFilterManager:
             end_filter = self.end_date
 
             if start_filter and end_filter:
-                filtered_df = df.filter((pl.col(purchase_date_col) >= start_filter) & (pl.col(purchase_date_col) <= end_filter))
+                filtered_df = df.filter(
+                    (pl.col(purchase_date_col) >= start_filter)
+                    & (pl.col(purchase_date_col) <= end_filter)
+                )
                 logger.info(
                     "Applied date filter: %s to %s",
                     start_filter.strftime("%Y-%m-%d"),
@@ -427,12 +463,20 @@ class DataFilterManager:
                 logger.info("Filtered date range: %s to %s", min_date, max_date)
                 material_col = schema_resolved.get("material_name", "material2")
                 if material_col in filtered_df.columns:
-                    unique_materials = filtered_df.select(pl.col(material_col).n_unique()).item()
-                    logger.info("Unique materials in filtered data: %d", unique_materials)
+                    unique_materials = filtered_df.select(
+                        pl.col(material_col).n_unique()
+                    ).item()
+                    logger.info(
+                        "Unique materials in filtered data: %d", unique_materials
+                    )
 
         except Exception as exc:  # noqa: BLE001
             logger.error("Error applying time filter: %s", exc)
-            self.filtered_grist_dataframe = self.grist_dataframe.clone() if self.grist_dataframe is not None else pl.DataFrame()
+            self.filtered_grist_dataframe = (
+                self.grist_dataframe.clone()
+                if self.grist_dataframe is not None
+                else pl.DataFrame()
+            )
 
     def update_date_range(self, start_date: datetime, end_date: datetime) -> None:
         """Update the date range and reapply filter."""

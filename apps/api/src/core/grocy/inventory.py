@@ -145,7 +145,9 @@ class ProductInventoryService:
         self._product_groups_cache = get_grocy_product_groups_cache()
         self._product_lookup: dict[str, dict[int, GrocyProduct]] = {}
 
-    def list_products_with_inventory(self, instance_index: str) -> list[ProductInventoryView]:
+    def list_products_with_inventory(
+        self, instance_index: str
+    ) -> list[ProductInventoryView]:
         """Return Grocy products with stock quantities and recency information."""
         products = self._load_products(instance_index)
         stock_log = self._load_stock_log(instance_index)
@@ -201,20 +203,30 @@ class ProductInventoryService:
     ) -> list[ProductInventoryView]:
         """Apply structured description metadata updates to multiple products."""
         if not updates:
-            raise ValueError("product_description updates must include at least one entry.")
+            raise ValueError(
+                "product_description updates must include at least one entry."
+            )
         context = self._build_inventory_context(instance_index)
         refreshed: list[ProductInventoryView] = []
         for update in updates:
             product = self._get_product(instance_index, update.product_id)
-            sanitized = normalize_product_description_metadata(update.metadata, context.unit_name_lookup)
-            updated_description = encode_structured_note(update.description or "", sanitized)
+            sanitized = normalize_product_description_metadata(
+                update.metadata, context.unit_name_lookup
+            )
+            updated_description = encode_structured_note(
+                update.description or "", sanitized
+            )
             if updated_description is None:
-                raise ValueError("Product description updates must include a description or unit conversions.")
+                raise ValueError(
+                    "Product description updates must include a description or unit conversions."
+                )
             self.client.update_product(product.id, {"description": updated_description})
         self.product_cache.clear_cache(instance_index)
         self._product_lookup.pop(instance_index, None)
         for update in updates:
-            refreshed.append(self.get_product_inventory(instance_index, update.product_id))
+            refreshed.append(
+                self.get_product_inventory(instance_index, update.product_id)
+            )
         return refreshed
 
     def resolve_inventory_correction(
@@ -228,7 +240,11 @@ class ProductInventoryService:
         best_before_date = correction.best_before_date
         if best_before_date is None:
             best_before_date = default_best_before_date(product)
-        location_id = correction.location_id if correction.location_id is not None else product.location_id
+        location_id = (
+            correction.location_id
+            if correction.location_id is not None
+            else product.location_id
+        )
         return InventoryCorrection(
             new_amount=correction.new_amount,
             best_before_date=best_before_date,
@@ -259,7 +275,11 @@ class ProductInventoryService:
         best_before_date = adjustment.best_before_date
         if best_before_date is None:
             best_before_date = default_best_before_date(product)
-        location_id = adjustment.location_id if adjustment.location_id is not None else product.location_id
+        location_id = (
+            adjustment.location_id
+            if adjustment.location_id is not None
+            else product.location_id
+        )
         current_stock = self._current_stock_amount(product_id)
         if product.enable_tare_weight_handling and product.tare_weight > 0:
             tare_weight = product.tare_weight
@@ -340,9 +360,13 @@ class ProductInventoryService:
         product = lookup.get(product_id)
         if product is not None:
             return product
-        raise ValueError(f"Product id {product_id} is not available for instance {instance_index}")
+        raise ValueError(
+            f"Product id {product_id} is not available for instance {instance_index}"
+        )
 
-    def _product_lookup_for_instance(self, instance_index: str) -> dict[int, GrocyProduct]:
+    def _product_lookup_for_instance(
+        self, instance_index: str
+    ) -> dict[int, GrocyProduct]:
         lookup = self._product_lookup.get(instance_index)
         if lookup is None:
             products = self._load_products(instance_index)
@@ -352,8 +376,12 @@ class ProductInventoryService:
                 self._product_lookup[instance_index] = lookup
         return lookup
 
-    def _prime_product_lookup(self, instance_index: str, products: list[GrocyProduct]) -> None:
-        self._product_lookup[instance_index] = {product.id: product for product in products}
+    def _prime_product_lookup(
+        self, instance_index: str, products: list[GrocyProduct]
+    ) -> None:
+        self._product_lookup[instance_index] = {
+            product.id: product for product in products
+        }
 
     def _build_inventory_context(self, instance_index: str) -> InventoryContext:
         """Load shared product-group and quantity-unit data for inventory views."""
@@ -402,7 +430,9 @@ class ProductInventoryService:
         fallback_timestamp: datetime,
         last_updated_override: datetime | None = None,
     ) -> ProductInventoryView:
-        last_updated = last_updated_override or latest_entry_timestamp(entries, fallback_timestamp)
+        last_updated = last_updated_override or latest_entry_timestamp(
+            entries, fallback_timestamp
+        )
         return ProductInventoryView(
             product=product,
             last_updated_at=last_updated,

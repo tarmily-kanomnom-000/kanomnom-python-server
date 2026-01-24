@@ -8,7 +8,6 @@ from datetime import datetime
 
 import flet as ft
 from flet.core.control_event import ControlEvent
-
 from shared.grist_service import DataFilterManager
 
 from .analysis_service import (
@@ -32,7 +31,9 @@ class MaterialPurchaseRunsContent(ft.Container):
         self.data_manager = DataFilterManager()
         usage_config = AdaptiveUsageConfig()
         self.run_config = SupplyRunConfig()
-        self.analytics_service = MaterialPurchaseAnalyticsService(usage_config, self.run_config)
+        self.analytics_service = MaterialPurchaseAnalyticsService(
+            usage_config, self.run_config
+        )
         self.ui_builder = MaterialPurchaseRunsUIBuilder()
 
         self.loading_indicator: ft.ProgressRing | None = None
@@ -67,8 +68,12 @@ class MaterialPurchaseRunsContent(ft.Container):
 
         self.date_filter_container = self._create_date_filter_section()
 
-        self.summary_section.controls = [ft.Text("Loading analytics...", color=ft.Colors.GREY)]
-        self.cadence_schedule_section.controls = [ft.Text("Waiting for schedule...", color=ft.Colors.GREY)]
+        self.summary_section.controls = [
+            ft.Text("Loading analytics...", color=ft.Colors.GREY)
+        ]
+        self.cadence_schedule_section.controls = [
+            ft.Text("Waiting for schedule...", color=ft.Colors.GREY)
+        ]
         self.table_section.controls = []
 
         main_column = ft.Column(
@@ -116,7 +121,9 @@ class MaterialPurchaseRunsContent(ft.Container):
             on_change=self.on_run_interval_change,
         )
 
-        apply_button = ft.ElevatedButton("Apply Filter", on_click=self.apply_date_filter)
+        apply_button = ft.ElevatedButton(
+            "Apply Filter", on_click=self.apply_date_filter
+        )
 
         return ft.Container(
             content=ft.Row(
@@ -148,7 +155,11 @@ class MaterialPurchaseRunsContent(ft.Container):
 
     def _refresh_analytics(self, *, reload_data: bool) -> None:
         action_label = "load data" if reload_data else "apply filter"
-        error_message = "Failed to load data from Grist" if reload_data else "Failed to apply filter"
+        error_message = (
+            "Failed to load data from Grist"
+            if reload_data
+            else "Failed to apply filter"
+        )
 
         def _execute() -> None:
             try:
@@ -160,11 +171,15 @@ class MaterialPurchaseRunsContent(ft.Container):
                     self.data_manager.apply_time_filter()
 
                 filtered = self.data_manager.get_filtered_data()
-                analytics = self.analytics_service.analyze(filtered, self.min_purchase_threshold)
+                analytics = self.analytics_service.analyze(
+                    filtered, self.min_purchase_threshold
+                )
                 self.state.set_analytics(analytics)
                 self._render_analytics()
             except Exception:  # noqa: BLE001
-                logger.exception("Failed to %s for material purchase analytics", action_label)
+                logger.exception(
+                    "Failed to %s for material purchase analytics", action_label
+                )
                 self.state.set_error(error_message)
                 self._render_error()
 
@@ -173,7 +188,9 @@ class MaterialPurchaseRunsContent(ft.Container):
     def on_start_date_change(self, event: ControlEvent) -> None:
         value = event.control.value or ""
         try:
-            self.data_manager.start_date = datetime.strptime(value, "%Y-%m-%d") if value else None
+            self.data_manager.start_date = (
+                datetime.strptime(value, "%Y-%m-%d") if value else None
+            )
         except ValueError:
             logger.warning("Invalid start date: %s", value)
             self.data_manager.start_date = None
@@ -181,7 +198,9 @@ class MaterialPurchaseRunsContent(ft.Container):
     def on_end_date_change(self, event: ControlEvent) -> None:
         value = event.control.value or ""
         try:
-            self.data_manager.end_date = datetime.strptime(value, "%Y-%m-%d") if value else None
+            self.data_manager.end_date = (
+                datetime.strptime(value, "%Y-%m-%d") if value else None
+            )
         except ValueError:
             logger.warning("Invalid end date: %s", value)
             self.data_manager.end_date = None
@@ -196,7 +215,9 @@ class MaterialPurchaseRunsContent(ft.Container):
 
         self.min_purchase_threshold = parsed_value if parsed_value >= 1 else 1
 
-        if self.min_purchases_field and self.min_purchases_field.value != str(self.min_purchase_threshold):
+        if self.min_purchases_field and self.min_purchases_field.value != str(
+            self.min_purchase_threshold
+        ):
             self.min_purchases_field.value = str(self.min_purchase_threshold)
             self.update()
 
@@ -211,7 +232,9 @@ class MaterialPurchaseRunsContent(ft.Container):
         self.run_interval_days = parsed_value if parsed_value >= 1 else 1
         self.run_config.target_run_interval_days = self.run_interval_days
 
-        if self.run_interval_field and self.run_interval_field.value != str(self.run_interval_days):
+        if self.run_interval_field and self.run_interval_field.value != str(
+            self.run_interval_days
+        ):
             self.run_interval_field.value = str(self.run_interval_days)
             self.update()
 
@@ -225,7 +248,9 @@ class MaterialPurchaseRunsContent(ft.Container):
             self._render_error()
             return
 
-        self.summary_section.controls = [self.ui_builder.create_summary_section(analytics)]
+        self.summary_section.controls = [
+            self.ui_builder.create_summary_section(analytics)
+        ]
         self.cadence_schedule_section.controls = [
             self.ui_builder.create_cadence_schedule_section(
                 analytics.cadence_schedule,
@@ -233,7 +258,9 @@ class MaterialPurchaseRunsContent(ft.Container):
                 low_supply={projection.material for projection in analytics.low_supply},
             )
         ]
-        self.table_section.controls = [self.ui_builder.create_projection_table(analytics.projections)]
+        self.table_section.controls = [
+            self.ui_builder.create_projection_table(analytics.projections)
+        ]
 
     def _render_error(self) -> None:
         if self.state.error_message:

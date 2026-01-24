@@ -4,9 +4,6 @@ from dataclasses import asdict
 from typing import Callable
 
 import requests
-from fastapi import HTTPException
-from fastapi.concurrency import run_in_threadpool
-
 from core.grocy.exceptions import MetadataNotFoundError
 from core.grocy.inventory import ProductInventoryView
 from core.grocy.note_metadata import (
@@ -14,6 +11,8 @@ from core.grocy.note_metadata import (
     decode_structured_note,
     normalize_product_description_metadata,
 )
+from fastapi import HTTPException
+from fastapi.concurrency import run_in_threadpool
 from models.grocy import GrocyProductInventoryEntry, GrocyStockEntryPayload
 
 from .dependencies import governor
@@ -27,7 +26,9 @@ def serialize_inventory_view(view: ProductInventoryView) -> GrocyProductInventor
     if decoded_description.metadata is not None:
         metadata = decoded_description.metadata
         if isinstance(metadata, ProductDescriptionMetadata):
-            metadata = normalize_product_description_metadata(metadata, view.unit_name_lookup)
+            metadata = normalize_product_description_metadata(
+                metadata, view.unit_name_lookup
+            )
         payload = metadata.to_api_payload()
         description_metadata = payload or None
     product_dict = asdict(view.product)
@@ -36,7 +37,11 @@ def serialize_inventory_view(view: ProductInventoryView) -> GrocyProductInventor
     stocks: list[GrocyStockEntryPayload] = []
     for stock in view.stocks:
         decoded_note = decode_structured_note(stock.note)
-        stock_dict = {key: value for key, value in asdict(stock).items() if key not in {"product_id", "note"}}
+        stock_dict = {
+            key: value
+            for key, value in asdict(stock).items()
+            if key not in {"product_id", "note"}
+        }
         stock_dict["note"] = decoded_note.note or None
         if decoded_note.metadata is not None:
             stock_dict["note_metadata"] = decoded_note.metadata.to_api_payload()
@@ -69,7 +74,11 @@ async def execute_product_mutation(
 
     try:
         await run_in_threadpool(_apply_mutation)
-        return await run_in_threadpool(lambda: governor.manager_for(instance_index).get_product_inventory(product_id))
+        return await run_in_threadpool(
+            lambda: governor.manager_for(instance_index).get_product_inventory(
+                product_id
+            )
+        )
     except MetadataNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
@@ -77,4 +86,6 @@ async def execute_product_mutation(
     except requests.HTTPError as error:  # pragma: no cover - passthrough to HTTP
         status_code = error.response.status_code if error.response else 502
         detail = error.response.text.strip() if error.response else str(error)
-        raise HTTPException(status_code=status_code, detail=detail or str(error)) from error
+        raise HTTPException(
+            status_code=status_code, detail=detail or str(error)
+        ) from error

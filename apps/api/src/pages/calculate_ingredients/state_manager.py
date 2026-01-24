@@ -43,7 +43,9 @@ class IngredientsState:
     def update_existing_weight(self, recipe_name: str, weight: float) -> None:
         """Update existing weight for a recipe and clear servings."""
 
-        record = self.existing_intermediate_amounts.setdefault(recipe_name, {"weight": 0.0, "servings": 0.0})
+        record = self.existing_intermediate_amounts.setdefault(
+            recipe_name, {"weight": 0.0, "servings": 0.0}
+        )
 
         if weight > 0:
             record["weight"] = weight
@@ -54,7 +56,9 @@ class IngredientsState:
     def update_existing_servings(self, recipe_name: str, servings: float) -> None:
         """Update existing servings for a recipe and clear weight."""
 
-        record = self.existing_intermediate_amounts.setdefault(recipe_name, {"weight": 0.0, "servings": 0.0})
+        record = self.existing_intermediate_amounts.setdefault(
+            recipe_name, {"weight": 0.0, "servings": 0.0}
+        )
 
         if servings > 0:
             record["servings"] = servings

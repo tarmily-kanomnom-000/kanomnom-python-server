@@ -6,7 +6,6 @@ import logging
 
 import flet as ft
 from flet.core.control_event import ControlEvent
-
 from shared.tandoor_service import get_tandoor_service
 
 from .calculation_service import IngredientsCalculationService
@@ -73,7 +72,11 @@ class IngredientsCalculatorContent(ft.Container):
         return ft.Column(
             controls=[
                 ft.Text("📋 Raw Ingredients", size=24, weight=ft.FontWeight.BOLD),
-                ft.Text("👆 Enter quantities on the left to see raw ingredients", size=14, color=ft.Colors.GREY),
+                ft.Text(
+                    "👆 Enter quantities on the left to see raw ingredients",
+                    size=14,
+                    color=ft.Colors.GREY,
+                ),
             ],
             expand=1,
             scroll=ft.ScrollMode.AUTO,
@@ -84,10 +87,14 @@ class IngredientsCalculatorContent(ft.Container):
         assert self.products_column is not None
         assert self.ingredients_column is not None
 
-        products_container = self.ui_builder.create_styled_container(self.products_column)
+        products_container = self.ui_builder.create_styled_container(
+            self.products_column
+        )
         products_container.expand = 1  # Takes up 1/3 of space
 
-        ingredients_container = self.ui_builder.create_styled_container(self.ingredients_column)
+        ingredients_container = self.ui_builder.create_styled_container(
+            self.ingredients_column
+        )
         ingredients_container.expand = 2  # Takes up 2/3 of space
 
         main_row = ft.Row(
@@ -97,7 +104,10 @@ class IngredientsCalculatorContent(ft.Container):
         )
 
         return ft.Column(
-            controls=[ft.Row([self.loading_indicator], alignment=ft.MainAxisAlignment.CENTER), main_row],
+            controls=[
+                ft.Row([self.loading_indicator], alignment=ft.MainAxisAlignment.CENTER),
+                main_row,
+            ],
             expand=True,
             spacing=COLUMN_SPACING,
         )
@@ -140,14 +150,20 @@ class IngredientsCalculatorContent(ft.Container):
         """Setup the products UI with recipe input fields and action buttons."""
         assert self.products_column is not None
 
-        product_controls: list[ft.Control] = [ft.Text("🍰 Products", size=24, weight=ft.FontWeight.BOLD)]
+        product_controls: list[ft.Control] = [
+            ft.Text("🍰 Products", size=24, weight=ft.FontWeight.BOLD)
+        ]
 
         # Add recipe input rows
-        recipe_rows = self.ui_builder.create_recipe_input_rows(self.state.product_recipes, self.on_quantity_change)
+        recipe_rows = self.ui_builder.create_recipe_input_rows(
+            self.state.product_recipes, self.on_quantity_change
+        )
         product_controls.extend(recipe_rows)
 
         # Add action buttons
-        action_buttons = self.ui_builder.create_action_buttons(self.update_ingredients, self.clear_all)
+        action_buttons = self.ui_builder.create_action_buttons(
+            self.update_ingredients, self.clear_all
+        )
         product_controls.append(action_buttons)
 
         self.products_column.controls = product_controls
@@ -165,10 +181,14 @@ class IngredientsCalculatorContent(ft.Container):
         """Update ingredients based on current quantities."""
         try:
             # Get selected quantities > 0
-            selected_quantities = {name: qty for name, qty in self.state.quantities.items() if qty > 0}
+            selected_quantities = {
+                name: qty for name, qty in self.state.quantities.items() if qty > 0
+            }
 
             if not selected_quantities:
-                self.show_ingredients_info("👆 Enter quantities above to see raw ingredients")
+                self.show_ingredients_info(
+                    "👆 Enter quantities above to see raw ingredients"
+                )
                 return
 
             # Use the calculation service with filtered quantities
@@ -177,7 +197,9 @@ class IngredientsCalculatorContent(ft.Container):
                 return
 
             if not self.state.raw_ingredients:
-                self.show_ingredients_info("👆 Enter quantities above to see raw ingredients")
+                self.show_ingredients_info(
+                    "👆 Enter quantities above to see raw ingredients"
+                )
                 return
 
             self.show_ingredients_results()
@@ -186,7 +208,9 @@ class IngredientsCalculatorContent(ft.Container):
             logger.exception("Error calculating raw ingredients")
             self.ingredients_column.controls = [
                 ft.Text("📋 Raw Ingredients", size=24, weight=ft.FontWeight.BOLD),
-                ft.Text("Error occurred during calculation", size=14, color=ft.Colors.RED),
+                ft.Text(
+                    "Error occurred during calculation", size=14, color=ft.Colors.RED
+                ),
             ]
             self.update()
 
@@ -194,7 +218,9 @@ class IngredientsCalculatorContent(ft.Container):
         """Display the calculated ingredients results."""
         assert self.ingredients_column is not None
 
-        ingredients_controls: list[ft.Control] = [ft.Text("📋 Raw Ingredients", size=24, weight=ft.FontWeight.BOLD)]
+        ingredients_controls: list[ft.Control] = [
+            ft.Text("📋 Raw Ingredients", size=24, weight=ft.FontWeight.BOLD)
+        ]
 
         # Add raw ingredients section
         ingredients_controls.extend(self._create_raw_ingredients_section())
@@ -210,12 +236,26 @@ class IngredientsCalculatorContent(ft.Container):
 
     def _create_raw_ingredients_section(self) -> list[ft.Control]:
         """Create the raw ingredients display section."""
-        ingredients_table = self.ui_builder.create_ingredients_table(self.state.raw_ingredients)
-        copy_section = self.ui_builder.create_ingredients_copy_section(self.state.raw_ingredients)
+        ingredients_table = self.ui_builder.create_ingredients_table(
+            self.state.raw_ingredients
+        )
+        copy_section = self.ui_builder.create_ingredients_copy_section(
+            self.state.raw_ingredients
+        )
 
         return [
-            ft.Text("📋 Required Raw Ingredients:", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.PRIMARY),
-            ft.Container(content=ingredients_table, border=ft.border.all(1, ft.Colors.GREY), border_radius=5, padding=10),
+            ft.Text(
+                "📋 Required Raw Ingredients:",
+                size=18,
+                weight=ft.FontWeight.BOLD,
+                color=ft.Colors.PRIMARY,
+            ),
+            ft.Container(
+                content=ingredients_table,
+                border=ft.border.all(1, ft.Colors.GREY),
+                border_radius=5,
+                padding=10,
+            ),
             copy_section,
         ]
 
@@ -224,27 +264,41 @@ class IngredientsCalculatorContent(ft.Container):
         # Initialize existing amounts for intermediate recipes
         for recipe_name in self.state.intermediate_servings.keys():
             if recipe_name not in self.state.existing_intermediate_amounts:
-                self.state.existing_intermediate_amounts[recipe_name] = {"weight": 0.0, "servings": 0.0}
+                self.state.existing_intermediate_amounts[recipe_name] = {
+                    "weight": 0.0,
+                    "servings": 0.0,
+                }
 
         remaining_servings = self.calculation_service._calculate_remaining_servings()
 
-        intermediate_recipe_controls = self.ui_builder.create_intermediate_recipe_controls(
-            self.state.intermediate_servings,
-            self.state.existing_intermediate_amounts,
-            remaining_servings,
-            self.on_existing_weight_change,
-            self.on_existing_servings_change,
+        intermediate_recipe_controls = (
+            self.ui_builder.create_intermediate_recipe_controls(
+                self.state.intermediate_servings,
+                self.state.existing_intermediate_amounts,
+                remaining_servings,
+                self.on_existing_weight_change,
+                self.on_existing_servings_change,
+            )
         )
 
         if not intermediate_recipe_controls:
             return []
 
         # Add action button and copy section
-        intermediate_recipe_controls.append(self.ui_builder.create_recalculate_button(self.recalculate_with_existing))
-        servings_copy_section = self.ui_builder.create_servings_copy_section(self.state.intermediate_servings, remaining_servings)
+        intermediate_recipe_controls.append(
+            self.ui_builder.create_recalculate_button(self.recalculate_with_existing)
+        )
+        servings_copy_section = self.ui_builder.create_servings_copy_section(
+            self.state.intermediate_servings, remaining_servings
+        )
 
         return [
-            ft.Text("🔧 Intermediate Recipe Servings:", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.PRIMARY),
+            ft.Text(
+                "🔧 Intermediate Recipe Servings:",
+                size=18,
+                weight=ft.FontWeight.BOLD,
+                color=ft.Colors.PRIMARY,
+            ),
             ft.Container(
                 content=ft.Column(intermediate_recipe_controls),
                 border=ft.border.all(1, ft.Colors.GREY),

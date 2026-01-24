@@ -6,7 +6,6 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 import requests
-
 from core.cache.medusa_token_cache import MedusaTokenCacheManager
 from core.medusa.config import MedusaConfig
 from core.medusa.models import MedusaAuthToken
@@ -17,22 +16,31 @@ logger = logging.getLogger(__name__)
 class MedusaAuthProvider:
     """Handles Medusa authentication and token caching."""
 
-    def __init__(self, config: MedusaConfig, token_cache: MedusaTokenCacheManager) -> None:
+    def __init__(
+        self, config: MedusaConfig, token_cache: MedusaTokenCacheManager
+    ) -> None:
         self.config = config
         self.token_cache = token_cache
 
     def get_token(self) -> str:
         """Return a cached token or fetch a new one from Medusa."""
-        cached = self.token_cache.get_token(self.config.instance_key, self.config.token_leeway_seconds)
+        cached = self.token_cache.get_token(
+            self.config.instance_key, self.config.token_leeway_seconds
+        )
         if cached:
             return cached
         auth_token = self._request_new_token()
-        self.token_cache.save_token(self.config.instance_key, auth_token.token, auth_token.expires_at)
+        self.token_cache.save_token(
+            self.config.instance_key, auth_token.token, auth_token.expires_at
+        )
         return auth_token.token
 
     def _request_new_token(self) -> MedusaAuthToken:
         url = f"{self.config.base_url}/auth/user/emailpass"
-        payload = {"email": self.config.admin_email, "password": self.config.admin_password}
+        payload = {
+            "email": self.config.admin_email,
+            "password": self.config.admin_password,
+        }
         logger.info("Requesting Medusa auth token for %s", self.config.instance_key)
         response = requests.post(
             url=url,
@@ -53,8 +61,14 @@ class MedusaAuthProvider:
         token_raw = response_payload.get("token")
         if not isinstance(token_raw, str) or not token_raw:
             raise ValueError("Medusa auth response missing token")
-        expires_at = _resolve_token_expiry(token_raw, self.config.token_fallback_ttl_seconds)
+        expires_at = _resolve_token_expiry(
+            token_raw, self.config.token_fallback_ttl_seconds
+        )
         return MedusaAuthToken(token=token_raw, expires_at=expires_at)
+
+    def clear_token(self) -> None:
+        """Clear cached token for the configured instance."""
+        self.token_cache.clear_cache(self.config.instance_key)
 
 
 def _resolve_token_expiry(token: str, fallback_ttl_seconds: int) -> datetime:

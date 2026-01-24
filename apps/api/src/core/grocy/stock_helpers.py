@@ -18,7 +18,9 @@ def map_last_update(stock_log_entries: list[GrocyStockLogEntry]) -> dict[int, da
     return last_update
 
 
-def latest_entry_timestamp(entries: list[GrocyStockEntry], fallback: datetime) -> datetime:
+def latest_entry_timestamp(
+    entries: list[GrocyStockEntry], fallback: datetime
+) -> datetime:
     latest = fallback
     for entry in entries:
         if entry.row_created_timestamp > latest:
@@ -26,7 +28,9 @@ def latest_entry_timestamp(entries: list[GrocyStockEntry], fallback: datetime) -
     return latest
 
 
-def group_stock_entries(entries: list[GrocyStockEntry]) -> dict[int, list[GrocyStockEntry]]:
+def group_stock_entries(
+    entries: list[GrocyStockEntry],
+) -> dict[int, list[GrocyStockEntry]]:
     grouped: dict[int, list[GrocyStockEntry]] = {}
     for entry in entries:
         grouped.setdefault(entry.product_id, []).append(entry)

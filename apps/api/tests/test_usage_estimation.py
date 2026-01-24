@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import optuna
 import polars as pl
 import pytest
-
 from pages.material_purchase_runs.analysis_service import (
     AdaptiveUsageConfig,
     MaterialPurchaseAnalyticsService,
@@ -31,7 +30,9 @@ OPTUNA_TRIALS = 100
 OPTUNA_SEED = 42
 
 
-def _build_constant_usage_intervals(units_per_purchase: float, interval_days: int, count: int) -> list[UsageInterval]:
+def _build_constant_usage_intervals(
+    units_per_purchase: float, interval_days: int, count: int
+) -> list[UsageInterval]:
     start = datetime(2024, 1, 1)
     intervals: list[UsageInterval] = []
     for index in range(count):
@@ -97,7 +98,9 @@ def test_analysis_produces_probabilistic_supply_window() -> None:
     dataframe = pl.DataFrame(history_rows)
 
     estimator = KalmanUsageEstimator(config=load_kalman_parameters(KALMAN_CONFIG_PATH))
-    service = MaterialPurchaseAnalyticsService(AdaptiveUsageConfig(), SupplyRunConfig(), usage_estimator=estimator)
+    service = MaterialPurchaseAnalyticsService(
+        AdaptiveUsageConfig(), SupplyRunConfig(), usage_estimator=estimator
+    )
 
     reference_date = history_rows[-1]["Purchase_Date"]
     result = service.analyze(
@@ -106,7 +109,9 @@ def test_analysis_produces_probabilistic_supply_window() -> None:
         reference_date=reference_date,
     )
 
-    projection = next((item for item in result.projections if item.material == "Test Material"), None)
+    projection = next(
+        (item for item in result.projections if item.material == "Test Material"), None
+    )
     assert projection is not None
 
     window = projection.remaining_supply_window
@@ -122,7 +127,11 @@ def test_analysis_produces_probabilistic_supply_window() -> None:
     assert result.run_interval_days == 14
     assert any(run.assignments for run in result.cadence_schedule)
     today_run = result.cadence_schedule[0]
-    assignment = next(item for item in today_run.assignments if item.projection.material == "Test Material")
+    assignment = next(
+        item
+        for item in today_run.assignments
+        if item.projection.material == "Test Material"
+    )
     assert assignment.recommended_purchase_units is not None
     assert assignment.recommended_purchase_units > 0
     assert assignment.recommended_purchase_cost is not None
@@ -131,7 +140,9 @@ def test_analysis_produces_probabilistic_supply_window() -> None:
 def test_kalman_estimator_tracks_constant_usage() -> None:
     config = load_kalman_parameters(KALMAN_CONFIG_PATH)
     estimator = KalmanUsageEstimator(config=config)
-    intervals = _build_constant_usage_intervals(units_per_purchase=50.0, interval_days=10, count=6)
+    intervals = _build_constant_usage_intervals(
+        units_per_purchase=50.0, interval_days=10, count=6
+    )
 
     estimate = estimator.estimate(intervals)
 
@@ -148,7 +159,9 @@ def test_cadence_schedule_highlights_short_lived_materials() -> None:
     config = load_kalman_parameters(KALMAN_CONFIG_PATH)
     estimator = KalmanUsageEstimator(config=config)
     run_config = SupplyRunConfig(target_run_interval_days=14)
-    service = MaterialPurchaseAnalyticsService(AdaptiveUsageConfig(), run_config, usage_estimator=estimator)
+    service = MaterialPurchaseAnalyticsService(
+        AdaptiveUsageConfig(), run_config, usage_estimator=estimator
+    )
 
     reference_date = history_rows[-1]["Purchase_Date"]
     result = service.analyze(
@@ -158,7 +171,11 @@ def test_cadence_schedule_highlights_short_lived_materials() -> None:
     )
 
     assert result.cadence_schedule
-    warnings = [assignment for assignment in result.cadence_warnings if assignment.projection.material == "Test Material"]
+    warnings = [
+        assignment
+        for assignment in result.cadence_warnings
+        if assignment.projection.material == "Test Material"
+    ]
     assert warnings
     assert warnings[0].violates_cadence
     assert warnings[0].lower_days_available is not None
@@ -167,7 +184,9 @@ def test_cadence_schedule_highlights_short_lived_materials() -> None:
     assert warnings[0].recommended_purchase_units > 0
 
 
-def _generate_purchase_rows(purchase_count: int, interval_days: int) -> list[dict[str, object]]:
+def _generate_purchase_rows(
+    purchase_count: int, interval_days: int
+) -> list[dict[str, object]]:
     """Create synthetic purchase history with an additional future purchase for evaluation."""
 
     anchor = datetime.now().replace(microsecond=0)
@@ -211,7 +230,9 @@ def _evaluate_prediction_accuracy(
 
         dataframe = pl.DataFrame(history_rows)
         estimator = KalmanUsageEstimator(config=config)
-        service = MaterialPurchaseAnalyticsService(usage_config, run_config, usage_estimator=estimator)
+        service = MaterialPurchaseAnalyticsService(
+            usage_config, run_config, usage_estimator=estimator
+        )
 
         reference_date = history_rows[-1]["Purchase_Date"]
         if not isinstance(reference_date, datetime):
@@ -222,7 +243,10 @@ def _evaluate_prediction_accuracy(
             min_purchases=minimum_history,
             reference_date=reference_date,
         )
-        projection = next((proj for proj in result.projections if proj.material == "Test Material"), None)
+        projection = next(
+            (proj for proj in result.projections if proj.material == "Test Material"),
+            None,
+        )
 
         predicted_runout = projection.estimated_runout_date if projection else None
         confidence = projection.usage_confidence if projection else None
@@ -230,7 +254,9 @@ def _evaluate_prediction_accuracy(
 
         abs_error_days = None
         if predicted_runout is not None:
-            abs_error_days = abs((predicted_runout - actual_next_purchase).total_seconds()) / 86400.0
+            abs_error_days = (
+                abs((predicted_runout - actual_next_purchase).total_seconds()) / 86400.0
+            )
 
         metrics.append(
             {
@@ -251,12 +277,17 @@ def _persist_accuracy_report(metrics: pl.DataFrame, *, stem: str) -> None:
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
     csv_frame = metrics.with_columns(
-        pl.col("predicted_next_purchase").dt.strftime("%Y-%m-%d %H:%M:%S").alias("predicted_next_purchase"),
-        pl.col("actual_next_purchase").dt.strftime("%Y-%m-%d %H:%M:%S").alias("actual_next_purchase"),
+        pl.col("predicted_next_purchase")
+        .dt.strftime("%Y-%m-%d %H:%M:%S")
+        .alias("predicted_next_purchase"),
+        pl.col("actual_next_purchase")
+        .dt.strftime("%Y-%m-%d %H:%M:%S")
+        .alias("actual_next_purchase"),
         *(
             pl.col(column).dt.strftime("%Y-%m-%d %H:%M:%S").alias(column)
             for column, dtype in zip(metrics.columns, metrics.dtypes)
-            if dtype == pl.Datetime and column not in {"predicted_next_purchase", "actual_next_purchase"}
+            if dtype == pl.Datetime
+            and column not in {"predicted_next_purchase", "actual_next_purchase"}
         ),
     )
     csv_path = artifact_dir / f"{stem}.csv"
@@ -356,7 +387,9 @@ def _evaluate_real_materials(
     metrics: list[dict[str, object]] = []
 
     for material in materials:
-        material_df = dataframe.filter(pl.col(material_col) == material).sort(purchase_col)
+        material_df = dataframe.filter(pl.col(material_col) == material).sort(
+            purchase_col
+        )
         if material_df.height <= min_purchases:
             continue
 
@@ -397,7 +430,10 @@ def _evaluate_real_materials(
             predicted_runout = projection.estimated_runout_date
             abs_error_days = None
             if predicted_runout is not None:
-                abs_error_days = abs((predicted_runout - actual_next_purchase).total_seconds()) / 86400.0
+                abs_error_days = (
+                    abs((predicted_runout - actual_next_purchase).total_seconds())
+                    / 86400.0
+                )
 
             metrics.append(
                 {
@@ -425,15 +461,21 @@ def _run_optuna_parameter_search(
     run_config: SupplyRunConfig,
 ) -> tuple[pl.DataFrame, dict[str, float | int], dict[str, object]]:
     if optuna is None:
-        pytest.skip("Optuna not installed. Install via `pip install optuna` to run the parameter sweep.")
+        pytest.skip(
+            "Optuna not installed. Install via `pip install optuna` to run the parameter sweep."
+        )
 
     trial_records: list[dict[str, object]] = []
 
     base_config = load_kalman_parameters(KALMAN_CONFIG_PATH)
 
     def objective(trial: optuna.Trial) -> float:
-        process_var = trial.suggest_float("initial_process_variance", 0.01, 0.2, log=True)
-        measurement_var = trial.suggest_float("initial_measurement_variance", 0.05, 0.2, log=True)
+        process_var = trial.suggest_float(
+            "initial_process_variance", 0.01, 0.2, log=True
+        )
+        measurement_var = trial.suggest_float(
+            "initial_measurement_variance", 0.05, 0.2, log=True
+        )
         sample_target = trial.suggest_int("target_sample_size", 3, 10)
         max_em = trial.suggest_int("max_em_iterations", 4, 16)
 
@@ -446,7 +488,9 @@ def _run_optuna_parameter_search(
         config_mapping = {**base_config.to_dict(), **overrides}
         estimator_config = KalmanFilterConfig.from_mapping(config_mapping)
 
-        def estimator_factory(config: KalmanFilterConfig = estimator_config) -> KalmanUsageEstimator:
+        def estimator_factory(
+            config: KalmanFilterConfig = estimator_config,
+        ) -> KalmanUsageEstimator:
             return KalmanUsageEstimator(config=config)
 
         metrics = _evaluate_real_materials(
@@ -471,7 +515,11 @@ def _run_optuna_parameter_search(
         p90_error = valid_metrics.select(pl.col("abs_error_days").quantile(0.9)).item()
 
         high_conf = valid_metrics.filter(pl.col("usage_confidence") >= 0.6)
-        high_conf_mae = high_conf.get_column("abs_error_days").mean() if not high_conf.is_empty() else None
+        high_conf_mae = (
+            high_conf.get_column("abs_error_days").mean()
+            if not high_conf.is_empty()
+            else None
+        )
 
         record = {
             "trial": trial.number,
@@ -483,7 +531,9 @@ def _run_optuna_parameter_search(
             "mae_days": mae if mae is not None else float("nan"),
             "median_days": median_error if median_error is not None else float("nan"),
             "p90_days": p90_error if p90_error is not None else float("nan"),
-            "high_conf_mae_days": high_conf_mae if high_conf_mae is not None else float("nan"),
+            "high_conf_mae_days": (
+                high_conf_mae if high_conf_mae is not None else float("nan")
+            ),
             "high_conf_runs": high_conf.height if not high_conf.is_empty() else 0,
         }
         trial.set_user_attr("record", record)
@@ -510,7 +560,9 @@ def _run_optuna_parameter_search(
 
     best_overrides = {
         "initial_process_variance": best_trial.params["initial_process_variance"],
-        "initial_measurement_variance": best_trial.params["initial_measurement_variance"],
+        "initial_measurement_variance": best_trial.params[
+            "initial_measurement_variance"
+        ],
         "target_sample_size": int(best_trial.params["target_sample_size"]),
         "max_em_iterations": int(best_trial.params["max_em_iterations"]),
     }

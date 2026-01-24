@@ -23,7 +23,9 @@ class QuantityUnitConversionDefinition:
         )
 
 
-def load_quantity_unit_conversions(path: Path) -> list[QuantityUnitConversionDefinition]:
+def load_quantity_unit_conversions(
+    path: Path,
+) -> list[QuantityUnitConversionDefinition]:
     if not path.exists():
         raise FileNotFoundError(f"Missing quantity unit conversion manifest: {path}")
     with path.open("r", encoding="utf-8") as handle:
@@ -45,7 +47,9 @@ def build_conversion_graph(
         from_key = _normalize_unit_name(conversion.from_qu_name)
         to_key = _normalize_unit_name(conversion.to_qu_name)
         if not from_key or not to_key:
-            raise ValueError("Quantity unit conversions must include from_qu_name and to_qu_name.")
+            raise ValueError(
+                "Quantity unit conversions must include from_qu_name and to_qu_name."
+            )
         if from_key not in unit_name_lookup:
             missing_units.add(conversion.from_qu_name)
             continue
@@ -58,7 +62,9 @@ def build_conversion_graph(
         graph.setdefault(to_key, []).append((from_key, 1 / conversion.factor))
     if missing_units:
         missing_list = ", ".join(sorted(missing_units))
-        raise ValueError(f"Unknown quantity unit names in conversions manifest: {missing_list}.")
+        raise ValueError(
+            f"Unknown quantity unit names in conversions manifest: {missing_list}."
+        )
     return graph
 
 

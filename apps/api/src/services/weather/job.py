@@ -89,7 +89,9 @@ class WeatherIngestJob:
 
         for location in self.locations:
             if not location.active:
-                print(f"⏭️ Skipping inactive location {location.name} ({location.city}, {location.state})")
+                print(
+                    f"⏭️ Skipping inactive location {location.name} ({location.city}, {location.state})"
+                )
                 continue
 
             open_days = [day for day in requested_days if location.is_open_on(day)]
@@ -100,7 +102,10 @@ class WeatherIngestJob:
                 )
                 continue
 
-            friendly_open_days = ", ".join(f"{day.isoformat()} ({_weekday_name(day.weekday())})" for day in open_days)
+            friendly_open_days = ", ".join(
+                f"{day.isoformat()} ({_weekday_name(day.weekday())})"
+                for day in open_days
+            )
             print(
                 "📅 Fetching hourly weather for open days "
                 f"{friendly_open_days} "
@@ -108,9 +113,13 @@ class WeatherIngestJob:
             )
 
             location_key = (location.name, location.address)
-            location_db_id = location_ids.get(location_key) if conn is not None else None
+            location_db_id = (
+                location_ids.get(location_key) if conn is not None else None
+            )
             if conn is not None and location_db_id is None:
-                raise RuntimeError(f"No database id found for location {location.name} ({location.address})")
+                raise RuntimeError(
+                    f"No database id found for location {location.name} ({location.address})"
+                )
 
             location_hourly_rows: List[Dict[str, Any]] = []
             location_window_rows: List[Dict[str, Any]] = []
@@ -119,9 +128,13 @@ class WeatherIngestJob:
                 day_iso = target_day.isoformat()
                 print(f"   ↻ Fetching weather for {day_iso}")
                 forecast = fetch_weather_forecast(day_iso, day_iso, location)
-                hourly_rows = transform_hourly_weather(forecast["hourly"], location, location_db_id)
+                hourly_rows = transform_hourly_weather(
+                    forecast["hourly"], location, location_db_id
+                )
                 daily_context = build_daily_context(forecast["daily"])
-                window_rows = build_window_metrics(hourly_rows, location, daily_context, location_db_id)
+                window_rows = build_window_metrics(
+                    hourly_rows, location, daily_context, location_db_id
+                )
                 location_hourly_rows.extend(hourly_rows)
                 location_window_rows.extend(window_rows)
 
@@ -138,7 +151,9 @@ class WeatherIngestJob:
                 print("🔎 Dry run – showing first few hourly rows:")
                 for row in location_hourly_rows[:5]:
                     print(row)
-                print(f"Total hourly rows for {location.name}: {len(location_hourly_rows)}")
+                print(
+                    f"Total hourly rows for {location.name}: {len(location_hourly_rows)}"
+                )
                 print("🔎 Derived window metrics:")
                 for row in location_window_rows:
                     print(row)
@@ -151,8 +166,13 @@ class WeatherIngestJob:
             upsert_hourly_weather_rows(conn, location_hourly_rows)
             upsert_window_metrics_rows(conn, location_window_rows)
 
-            print(f"✅ Inserted/updated {len(location_hourly_rows)} rows into weather_hourly for {location.name}.")
-            print("✅ Inserted/updated " f"{len(location_window_rows)} rows into weather_window_metrics for {location.name}.")
+            print(
+                f"✅ Inserted/updated {len(location_hourly_rows)} rows into weather_hourly for {location.name}."
+            )
+            print(
+                "✅ Inserted/updated "
+                f"{len(location_window_rows)} rows into weather_window_metrics for {location.name}."
+            )
 
         if conn:
             conn.close()

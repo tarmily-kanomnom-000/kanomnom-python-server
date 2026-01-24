@@ -8,7 +8,6 @@ from typing import Optional
 
 import flet as ft
 from flet.core.control_event import ControlEvent
-
 from shared.grist_service import DataFilterManager
 from shared.ingredient_calculator import IngredientCalculator
 from shared.tandoor_service import get_tandoor_service
@@ -93,7 +92,9 @@ class ProductCostsCalculatorContent(ft.Container):
             controls=[
                 ft.Text("🍰 Products", size=TITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD),
                 self._create_date_range_section(),
-                ft.Text("Loading recipes...", size=BODY_TEXT_SIZE, color=ft.Colors.GREY),
+                ft.Text(
+                    "Loading recipes...", size=BODY_TEXT_SIZE, color=ft.Colors.GREY
+                ),
             ],
             expand=1,
             scroll=ft.ScrollMode.AUTO,
@@ -104,8 +105,14 @@ class ProductCostsCalculatorContent(ft.Container):
 
         return ft.Column(
             controls=[
-                ft.Text("📊 Cost Over Time", size=TITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD),
-                ft.Text("👆 Click on a product to see its cost graph", size=BODY_TEXT_SIZE, color=ft.Colors.GREY),
+                ft.Text(
+                    "📊 Cost Over Time", size=TITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD
+                ),
+                ft.Text(
+                    "👆 Click on a product to see its cost graph",
+                    size=BODY_TEXT_SIZE,
+                    color=ft.Colors.GREY,
+                ),
             ],
             expand=1,
             scroll=ft.ScrollMode.AUTO,
@@ -132,7 +139,10 @@ class ProductCostsCalculatorContent(ft.Container):
         )
 
         return ft.Column(
-            controls=[ft.Row([loading_indicator], alignment=ft.MainAxisAlignment.CENTER), main_row],
+            controls=[
+                ft.Row([loading_indicator], alignment=ft.MainAxisAlignment.CENTER),
+                main_row,
+            ],
             expand=True,
             spacing=COLUMN_SPACING,
         )
@@ -156,7 +166,9 @@ class ProductCostsCalculatorContent(ft.Container):
                 self.apply_date_filter,
             )
 
-        return ft.Text("Date range controls loading...", size=BODY_TEXT_SIZE, color=ft.Colors.GREY)
+        return ft.Text(
+            "Date range controls loading...", size=BODY_TEXT_SIZE, color=ft.Colors.GREY
+        )
 
     def load_recipes(self) -> None:
         """Load product recipes and initialise ingredient calculations."""
@@ -196,12 +208,18 @@ class ProductCostsCalculatorContent(ft.Container):
             return
 
         if self.ui_builder is None:
-            self.ui_builder = UIComponentBuilder(self.cost_calculator, self.cost_calculator.material_cost_basis)
+            self.ui_builder = UIComponentBuilder(
+                self.cost_calculator, self.cost_calculator.material_cost_basis
+            )
 
         product_controls: list[ft.Control] = [
             ft.Text("🍰 Products", size=TITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD),
             self._create_date_range_section(),
-            ft.Text("Click on a product to see its raw ingredients:", size=BODY_TEXT_SIZE, color=ft.Colors.GREY),
+            ft.Text(
+                "Click on a product to see its raw ingredients:",
+                size=BODY_TEXT_SIZE,
+                color=ft.Colors.GREY,
+            ),
         ]
         product_controls.extend(self._create_clickable_recipe_buttons())
 
@@ -215,14 +233,20 @@ class ProductCostsCalculatorContent(ft.Container):
         for recipe in self.state.product_recipes:
             is_selected = self.state.selected_product == recipe.name
             current_cost = self._calculate_current_product_cost(recipe.name)
-            cost_text = f"${current_cost:.{COST_DISPLAY_PRECISION}f}" if current_cost is not None else "Cost N/A"
+            cost_text = (
+                f"${current_cost:.{COST_DISPLAY_PRECISION}f}"
+                if current_cost is not None
+                else "Cost N/A"
+            )
 
             button = ft.ElevatedButton(
                 text=recipe.name,
                 width=PRODUCT_BUTTON_WIDTH,
                 height=PRODUCT_BUTTON_HEIGHT,
                 style=ft.ButtonStyle(
-                    bgcolor=ft.Colors.PRIMARY if is_selected else ft.Colors.BLUE_GREY_100,
+                    bgcolor=(
+                        ft.Colors.PRIMARY if is_selected else ft.Colors.BLUE_GREY_100
+                    ),
                     color=ft.Colors.WHITE if is_selected else ft.Colors.BLACK,
                 ),
                 on_click=lambda event, name=recipe.name: self.on_product_click(name),
@@ -233,7 +257,9 @@ class ProductCostsCalculatorContent(ft.Container):
                     cost_text,
                     size=COST_TEXT_SIZE,
                     weight=ft.FontWeight.BOLD,
-                    color=ft.Colors.GREEN if current_cost is not None else ft.Colors.RED,
+                    color=(
+                        ft.Colors.GREEN if current_cost is not None else ft.Colors.RED
+                    ),
                 ),
                 padding=ft.padding.only(left=COST_TEXT_PADDING_LEFT),
                 alignment=ft.alignment.center_left,
@@ -258,7 +284,9 @@ class ProductCostsCalculatorContent(ft.Container):
                 logger.warning("No ingredients found for %s", recipe_name)
                 return None
 
-            _, total_cost = self.cost_calculator.calculate_ingredient_costs(ingredients, self.cost_calculator.material_cost_basis)
+            _, total_cost = self.cost_calculator.calculate_ingredient_costs(
+                ingredients, self.cost_calculator.material_cost_basis
+            )
             return total_cost
         except Exception:  # noqa: BLE001 - surfaced via log
             logger.exception("Error calculating current cost for %s", recipe_name)
@@ -277,7 +305,9 @@ class ProductCostsCalculatorContent(ft.Container):
 
         value = event.control.value or ""
         try:
-            self.data_manager.start_date = datetime.strptime(value, "%Y-%m-%d") if value else None
+            self.data_manager.start_date = (
+                datetime.strptime(value, "%Y-%m-%d") if value else None
+            )
             logger.debug("Start date changed to: %s", self.data_manager.start_date)
         except ValueError:
             logger.warning("Invalid start date format: %s", value)
@@ -288,7 +318,9 @@ class ProductCostsCalculatorContent(ft.Container):
 
         value = event.control.value or ""
         try:
-            self.data_manager.end_date = datetime.strptime(value, "%Y-%m-%d") if value else None
+            self.data_manager.end_date = (
+                datetime.strptime(value, "%Y-%m-%d") if value else None
+            )
             logger.debug("End date changed to: %s", self.data_manager.end_date)
         except ValueError:
             logger.warning("Invalid end date format: %s", value)
@@ -304,13 +336,19 @@ class ProductCostsCalculatorContent(ft.Container):
         self.cost_calculator.calculate_material_cost_basis(filtered_data)
 
         if self.ui_builder:
-            self.ui_builder.material_cost_basis = self.cost_calculator.material_cost_basis
+            self.ui_builder.material_cost_basis = (
+                self.cost_calculator.material_cost_basis
+            )
 
         if filtered_data is None or filtered_data.is_empty():
             logger.warning("No data available after filtering")
             return
 
-        total_records = self.data_manager.grist_dataframe.height if self.data_manager.grist_dataframe is not None else 0
+        total_records = (
+            self.data_manager.grist_dataframe.height
+            if self.data_manager.grist_dataframe is not None
+            else 0
+        )
         filtered_records = filtered_data.height
 
         if self.data_manager.start_date and self.data_manager.end_date:
@@ -320,9 +358,15 @@ class ProductCostsCalculatorContent(ft.Container):
                 self.data_manager.end_date.strftime("%Y-%m-%d"),
             )
         elif self.data_manager.start_date:
-            logger.info("Filter applied from %s", self.data_manager.start_date.strftime("%Y-%m-%d"))
+            logger.info(
+                "Filter applied from %s",
+                self.data_manager.start_date.strftime("%Y-%m-%d"),
+            )
         elif self.data_manager.end_date:
-            logger.info("Filter applied until %s", self.data_manager.end_date.strftime("%Y-%m-%d"))
+            logger.info(
+                "Filter applied until %s",
+                self.data_manager.end_date.strftime("%Y-%m-%d"),
+            )
         else:
             logger.info("No date filter applied - showing all records")
 
@@ -350,9 +394,13 @@ class ProductCostsCalculatorContent(ft.Container):
             self.cost_calculator.set_data_manager(self.data_manager)
 
             if self.ui_builder is None:
-                self.ui_builder = UIComponentBuilder(self.cost_calculator, self.cost_calculator.material_cost_basis)
+                self.ui_builder = UIComponentBuilder(
+                    self.cost_calculator, self.cost_calculator.material_cost_basis
+                )
             else:
-                self.ui_builder.material_cost_basis = self.cost_calculator.material_cost_basis
+                self.ui_builder.material_cost_basis = (
+                    self.cost_calculator.material_cost_basis
+                )
 
             if self.state.has_product_recipes():
                 self.setup_products_ui()
@@ -397,7 +445,9 @@ class ProductCostsCalculatorContent(ft.Container):
         if self.chart_column is None:
             return
 
-        header = ft.Text("📊 Cost Over Time", size=TITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD)
+        header = ft.Text(
+            "📊 Cost Over Time", size=TITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD
+        )
         body = ft.Text(error_message, size=BODY_TEXT_SIZE, color=ft.Colors.RED)
 
         if self.chart_column.controls:
@@ -412,7 +462,9 @@ class ProductCostsCalculatorContent(ft.Container):
         if self.chart_column is None:
             return
 
-        header = ft.Text("📊 Cost Over Time", size=TITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD)
+        header = ft.Text(
+            "📊 Cost Over Time", size=TITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD
+        )
         message = ft.Text(
             f"Analyzing cost trends for {recipe_name}...",
             size=BODY_TEXT_SIZE,
@@ -461,12 +513,20 @@ class ProductCostsCalculatorContent(ft.Container):
             return
 
         chart_controls: list[ft.Control] = [
-            ft.Text("📊 Cost Over Time", size=TITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD),
-            self.chart_component.create_trailing_window_input(self.on_trailing_window_change),
-            self.chart_component.create_cost_chart(recipe_name, cost_data, self.on_chart_click),
+            ft.Text(
+                "📊 Cost Over Time", size=TITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD
+            ),
+            self.chart_component.create_trailing_window_input(
+                self.on_trailing_window_change
+            ),
+            self.chart_component.create_cost_chart(
+                recipe_name, cost_data, self.on_chart_click
+            ),
             self.chart_component.create_cost_summary(cost_data),
             ft.Divider(),
-            ft.Text("📋 Cost Breakdown", size=SUBTITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD),
+            ft.Text(
+                "📋 Cost Breakdown", size=SUBTITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD
+            ),
             ft.Text(
                 "Click on a point in the graph to see ingredient costs at that time",
                 size=12,
@@ -491,7 +551,9 @@ class ProductCostsCalculatorContent(ft.Container):
         except ValueError:
             logger.warning("Invalid trailing window value: %s", value)
 
-    def on_chart_click(self, selected_date: datetime, _selected_cost: float, _spot_index: int) -> None:
+    def on_chart_click(
+        self, selected_date: datetime, _selected_cost: float, _spot_index: int
+    ) -> None:
         """Display ingredient breakdown for the clicked time point."""
 
         if not self.state.selected_product:
@@ -502,8 +564,10 @@ class ProductCostsCalculatorContent(ft.Container):
             logger.warning("No current recipe ingredients available")
             return
 
-        selected_cost_basis = self.cost_calculator.calculate_cost_basis_for_window_at_date(
-            selected_date, self.chart_component.trailing_months
+        selected_cost_basis = (
+            self.cost_calculator.calculate_cost_basis_for_window_at_date(
+                selected_date, self.chart_component.trailing_months
+            )
         )
 
         if not selected_cost_basis:
@@ -530,13 +594,17 @@ class ProductCostsCalculatorContent(ft.Container):
             return
 
         try:
-            new_breakdown = self.ui_builder.create_ingredient_breakdown(recipe_name, ingredients, selected_date, cost_basis)
+            new_breakdown = self.ui_builder.create_ingredient_breakdown(
+                recipe_name, ingredients, selected_date, cost_basis
+            )
 
             if not self.state.current_cost_data:
                 logger.warning("No cached cost data available for chart refresh")
                 return
 
-            self._render_chart_column(recipe_name, self.state.current_cost_data, new_breakdown)
+            self._render_chart_column(
+                recipe_name, self.state.current_cost_data, new_breakdown
+            )
         except Exception:  # noqa: BLE001 - surfaced via log
             logger.exception("Error updating ingredient breakdown display")
 
@@ -546,7 +614,9 @@ class ProductCostsCalculatorContent(ft.Container):
         logger.error("Error: %s", error_message)
 
         if self.products_column is not None:
-            header = ft.Text("🍰 Products", size=TITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD)
+            header = ft.Text(
+                "🍰 Products", size=TITLE_TEXT_SIZE, weight=ft.FontWeight.BOLD
+            )
             message = ft.Text(error_message, size=BODY_TEXT_SIZE, color=ft.Colors.RED)
             if self.products_column.controls:
                 self.products_column.controls.clear()

@@ -22,7 +22,9 @@ class APIBackend(Enum):
 class OpenAICompatibleClient:
     """OpenAI-compatible API client for various providers."""
 
-    def __init__(self, base_url: str, api_key: str, model: str, backend: APIBackend = None):
+    def __init__(
+        self, base_url: str, api_key: str, model: str, backend: APIBackend = None
+    ):
         """
         Initialize API client.
 
@@ -53,7 +55,9 @@ class OpenAICompatibleClient:
         else:
             return self._call_openai_compatible(messages, max_tokens)
 
-    def _call_anthropic(self, messages: list[dict[str, str]], max_tokens: int = 1024) -> str:
+    def _call_anthropic(
+        self, messages: list[dict[str, str]], max_tokens: int = 1024
+    ) -> str:
         """Call Anthropic API with its specific format."""
         # Convert OpenAI format to Anthropic format
         system_message = ""
@@ -65,17 +69,28 @@ class OpenAICompatibleClient:
             else:
                 user_messages.append(msg)
 
-        payload = {"model": self.model, "max_tokens": max_tokens, "temperature": 0.1, "messages": user_messages}
+        payload = {
+            "model": self.model,
+            "max_tokens": max_tokens,
+            "temperature": 0.1,
+            "messages": user_messages,
+        }
 
         if system_message:
             payload["system"] = system_message
 
-        headers = {"Content-Type": "application/json", "x-api-key": self.api_key, "anthropic-version": "2023-06-01"}
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-key": self.api_key,
+            "anthropic-version": "2023-06-01",
+        }
 
         try:
             endpoint = f"{self.base_url}/messages"
 
-            response = requests.post(endpoint, headers=headers, json=payload, timeout=120)
+            response = requests.post(
+                endpoint, headers=headers, json=payload, timeout=120
+            )
 
             if response.status_code == 200:
                 result = response.json()
@@ -85,14 +100,18 @@ class OpenAICompatibleClient:
                     logger.error(f"Unexpected Anthropic response format: {result}")
                     return ""
             else:
-                logger.error(f"Anthropic API error: {response.status_code} - {response.text}")
+                logger.error(
+                    f"Anthropic API error: {response.status_code} - {response.text}"
+                )
                 return ""
 
         except Exception as e:
             logger.error(f"Error calling Anthropic API: {e}")
             return ""
 
-    def _call_openai_compatible(self, messages: list[dict[str, str]], max_tokens: int = 1024) -> str:
+    def _call_openai_compatible(
+        self, messages: list[dict[str, str]], max_tokens: int = 1024
+    ) -> str:
         """Call OpenAI-compatible APIs."""
         payload = {
             "model": self.model,
@@ -102,7 +121,10 @@ class OpenAICompatibleClient:
             "stream": False,
         }
 
-        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+        }
 
         try:
             # Use different endpoints for different providers
@@ -111,7 +133,9 @@ class OpenAICompatibleClient:
             else:
                 endpoint = f"{self.base_url}/api/chat/completions"
 
-            response = requests.post(endpoint, headers=headers, json=payload, timeout=120)
+            response = requests.post(
+                endpoint, headers=headers, json=payload, timeout=120
+            )
 
             if response.status_code == 200:
                 result = response.json()
@@ -136,7 +160,10 @@ class OpenAICompatibleClient:
 
 
 def create_openai_client(
-    backend: APIBackend = None, base_url: str = None, api_key: str = None, model: str = None
+    backend: APIBackend = None,
+    base_url: str = None,
+    api_key: str = None,
+    model: str = None,
 ) -> OpenAICompatibleClient:
     """
     Create an OpenAI-compatible API client with backend selection.
@@ -178,8 +205,12 @@ def create_openai_client(
             model = "claude-3-5-haiku-20241022"
 
     if not api_key:
-        logger.warning(f"No API key provided for {backend.value}. Set appropriate environment variable.")
+        logger.warning(
+            f"No API key provided for {backend.value}. Set appropriate environment variable."
+        )
 
-    logger.info(f"Creating {backend.value} client with base_url: {base_url}, model: {model}")
+    logger.info(
+        f"Creating {backend.value} client with base_url: {base_url}, model: {model}"
+    )
 
     return OpenAICompatibleClient(base_url, api_key, model, backend)

@@ -12,9 +12,8 @@ from typing import Optional
 
 import polars as pl
 from cachetools import LRUCache, cachedmethod
-from dateutil.relativedelta import relativedelta
-
 from core.cache.cache_dependency_manager import get_cache_dependency_manager
+from dateutil.relativedelta import relativedelta
 from shared.grist_material_transformer import normalize_material_purchase_dataframe
 from shared.grist_schema import MaterialPurchaseSchema
 from shared.unit_converter import get_liquid_density, get_special_conversion_factor
@@ -36,7 +35,9 @@ class MaterialCostCalculator:
         self._semantic_matching_enabled = False
         self._schema = MaterialPurchaseSchema.default()
 
-    def calculate_material_cost_basis(self, filtered_grist_dataframe: pl.DataFrame | None) -> dict[str, dict[str, float]]:
+    def calculate_material_cost_basis(
+        self, filtered_grist_dataframe: pl.DataFrame | None
+    ) -> dict[str, dict[str, float]]:
         """
         Calculate cost basis per unit for each material from filtered Grist data.
         Groups by material and unit, then calculates weighted average cost per unit.
@@ -52,7 +53,9 @@ class MaterialCostCalculator:
         self.material_cost_basis = cost_basis
         return cost_basis
 
-    def _try_unit_conversion(self, material_name: str, target_unit: str, material_costs: dict[str, float]) -> Optional[float]:
+    def _try_unit_conversion(
+        self, material_name: str, target_unit: str, material_costs: dict[str, float]
+    ) -> Optional[float]:
         """
         Try to convert between units using special conversions first, then density.
 
@@ -65,19 +68,31 @@ class MaterialCostCalculator:
             float: Converted cost, or None if conversion not possible
         """
         for available_unit, cost in material_costs.items():
-            special_factor = get_special_conversion_factor(material_name, available_unit, target_unit)
+            special_factor = get_special_conversion_factor(
+                material_name, available_unit, target_unit
+            )
             if special_factor:
                 return cost / special_factor
 
-        if target_unit.lower() == "g" and any(u.lower() == "ml" for u in material_costs):
-            cost_per_ml = next((cost for unit, cost in material_costs.items() if unit.lower() == "ml"), None)
+        if target_unit.lower() == "g" and any(
+            u.lower() == "ml" for u in material_costs
+        ):
+            cost_per_ml = next(
+                (cost for unit, cost in material_costs.items() if unit.lower() == "ml"),
+                None,
+            )
             if cost_per_ml is not None:
                 density = get_liquid_density(material_name)
                 if density is not None:
                     return cost_per_ml / density
 
-        if target_unit.lower() == "ml" and any(u.lower() == "g" for u in material_costs):
-            cost_per_g = next((cost for unit, cost in material_costs.items() if unit.lower() == "g"), None)
+        if target_unit.lower() == "ml" and any(
+            u.lower() == "g" for u in material_costs
+        ):
+            cost_per_g = next(
+                (cost for unit, cost in material_costs.items() if unit.lower() == "g"),
+                None,
+            )
             if cost_per_g is not None:
                 density = get_liquid_density(material_name)
                 if density is not None:
@@ -102,7 +117,9 @@ class MaterialCostCalculator:
         api_client = self._get_api_client()
         return get_semantic_matcher(api_client)
 
-    def find_cost_in_basis(self, material_name: str, unit: str, cost_basis: dict) -> Optional[float]:
+    def find_cost_in_basis(
+        self, material_name: str, unit: str, cost_basis: dict
+    ) -> Optional[float]:
         """Find cost for a material and unit in the cost basis, with unit conversion if needed."""
         material_costs = cost_basis.get(material_name, {})
 
@@ -119,7 +136,9 @@ class MaterialCostCalculator:
 
         return None
 
-    def calculate_ingredient_costs(self, ingredients: dict, cost_basis: dict) -> tuple[list[tuple], float]:
+    def calculate_ingredient_costs(
+        self, ingredients: dict, cost_basis: dict
+    ) -> tuple[list[tuple], float]:
         """
         Calculate ingredient costs with complete breakdown using semantic matching.
 
@@ -141,7 +160,9 @@ class MaterialCostCalculator:
 
             try:
                 semantic_matcher = self._get_semantic_matcher()
-                match_results = semantic_matcher.find_best_matches(ingredient_list, available_materials)
+                match_results = semantic_matcher.find_best_matches(
+                    ingredient_list, available_materials
+                )
                 match_lookup = {result.ingredient: result for result in match_results}
             except Exception:  # noqa: BLE001
                 self._semantic_matching_enabled = False
@@ -151,7 +172,10 @@ class MaterialCostCalculator:
             match_result = match_lookup.get(ingredient)
             if match_result and match_result.matched_material:
                 matched_material = match_result.matched_material
-                match_info = {"matched_material": matched_material, "match_type": match_result.match_type}
+                match_info = {
+                    "matched_material": matched_material,
+                    "match_type": match_result.match_type,
+                }
             else:
                 matched_material = ingredient
                 match_info = {"matched_material": ingredient, "match_type": "exact"}
@@ -164,9 +188,13 @@ class MaterialCostCalculator:
             else:
                 ingredient_cost = 0.0
 
-            ingredient_costs.append((ingredient, amount, unit, cost_per_unit, ingredient_cost, match_info))
+            ingredient_costs.append(
+                (ingredient, amount, unit, cost_per_unit, ingredient_cost, match_info)
+            )
 
-        sorted_ingredients = sorted(ingredient_costs, key=lambda item: item[4], reverse=True)
+        sorted_ingredients = sorted(
+            ingredient_costs, key=lambda item: item[4], reverse=True
+        )
         return sorted_ingredients, total_product_cost
 
     def calculate_cost_time_series(
@@ -191,12 +219,18 @@ class MaterialCostCalculator:
             return validation_result
 
         time_points = self._get_time_series_points()
-        cost_series = self._calculate_costs_for_time_points(time_points, product_ingredients, trailing_months)
+        cost_series = self._calculate_costs_for_time_points(
+            time_points, product_ingredients, trailing_months
+        )
         return cost_series
 
     def _validate_time_series_prerequisites(self) -> Optional[list]:
         """Validate that prerequisites for time series calculation are met."""
-        if self.data_manager is None or self.data_manager.grist_dataframe is None or self.data_manager.grist_dataframe.is_empty():
+        if (
+            self.data_manager is None
+            or self.data_manager.grist_dataframe is None
+            or self.data_manager.grist_dataframe.is_empty()
+        ):
             logger.warning("No Grist data available for time series calculation")
             return []
         return None
@@ -207,7 +241,9 @@ class MaterialCostCalculator:
         resolved = self._schema.resolve(df)
         purchase_date_col = resolved.get("purchase_date", "Purchase_Date")
         if purchase_date_col not in df.columns:
-            logger.warning("%s column not found when building time series", purchase_date_col)
+            logger.warning(
+                "%s column not found when building time series", purchase_date_col
+            )
             return []
 
         date_series = df.get_column(purchase_date_col)
@@ -229,7 +265,9 @@ class MaterialCostCalculator:
         resolved = self._schema.resolve(df)
 
         for time_point in time_points:
-            cost = self._calculate_cost_at_time_point(time_point, df, resolved, product_ingredients, trailing_months)
+            cost = self._calculate_cost_at_time_point(
+                time_point, df, resolved, product_ingredients, trailing_months
+            )
             if cost is not None:
                 cost_series.append((time_point, cost))
                 logger.debug("Cost at %s: $%.4f", time_point, cost)
@@ -247,23 +285,32 @@ class MaterialCostCalculator:
         """Calculate product cost at a specific time point."""
         purchase_date_col = resolved.get("purchase_date", "Purchase_Date")
         if purchase_date_col not in dataframe.columns:
-            logger.warning("%s column not found when calculating time point", purchase_date_col)
+            logger.warning(
+                "%s column not found when calculating time point", purchase_date_col
+            )
             return None
 
         window_start = time_point - relativedelta(months=trailing_months)
 
-        window_data = dataframe.filter((pl.col(purchase_date_col) >= window_start) & (pl.col(purchase_date_col) <= time_point))
+        window_data = dataframe.filter(
+            (pl.col(purchase_date_col) >= window_start)
+            & (pl.col(purchase_date_col) <= time_point)
+        )
 
         if window_data.is_empty():
             logger.debug("No data for window ending %s", time_point)
             return None
 
         temp_cost_basis = self._calculate_cost_basis_from_dataframe(window_data)
-        _, product_cost = self.calculate_ingredient_costs(product_ingredients, temp_cost_basis)
+        _, product_cost = self.calculate_ingredient_costs(
+            product_ingredients, temp_cost_basis
+        )
 
         return product_cost
 
-    def _generate_monthly_time_points(self, start_date: datetime, end_date: datetime) -> list[datetime]:
+    def _generate_monthly_time_points(
+        self, start_date: datetime, end_date: datetime
+    ) -> list[datetime]:
         """Generate monthly time points between start and end dates."""
         if start_date is None or end_date is None:
             return []
@@ -277,16 +324,24 @@ class MaterialCostCalculator:
 
         return time_points
 
-    def _calculate_cost_basis_from_dataframe(self, dataframe: pl.DataFrame) -> dict[str, dict[str, float]]:
+    def _calculate_cost_basis_from_dataframe(
+        self, dataframe: pl.DataFrame
+    ) -> dict[str, dict[str, float]]:
         """Calculate cost basis from any Polars DataFrame with purchase data."""
         if dataframe is None or dataframe.is_empty():
             logger.warning("No data available for cost basis calculation")
             return {}
 
-        logger.debug("Cost basis start: %d rows with columns %s", dataframe.height, sorted(dataframe.columns))
+        logger.debug(
+            "Cost basis start: %d rows with columns %s",
+            dataframe.height,
+            sorted(dataframe.columns),
+        )
 
         try:
-            normalized = normalize_material_purchase_dataframe(dataframe.clone(), self._schema)
+            normalized = normalize_material_purchase_dataframe(
+                dataframe.clone(), self._schema
+            )
         except KeyError:
             logger.exception("Unable to resolve Grist schema columns")
             return {}
@@ -302,7 +357,9 @@ class MaterialCostCalculator:
                 pl.col("total_cost").fill_null(0.0).alias("total_cost"),
             ]
         ).filter(
-            (pl.col("material").str.len_chars() > 0) & (pl.col("unit").str.len_chars() > 0) & (pl.col("units_purchased") > 0)
+            (pl.col("material").str.len_chars() > 0)
+            & (pl.col("unit").str.len_chars() > 0)
+            & (pl.col("units_purchased") > 0)
         )
 
         logger.debug(
@@ -312,7 +369,9 @@ class MaterialCostCalculator:
         )
 
         if filtered.is_empty():
-            logger.warning("No valid rows available for cost basis calculation after filtering")
+            logger.warning(
+                "No valid rows available for cost basis calculation after filtering"
+            )
             return {}
 
         grouped = (
@@ -336,7 +395,9 @@ class MaterialCostCalculator:
             problematic = grouped.filter(pl.col("cost_per_unit").is_null()).select(
                 ["material", "unit", "total_cost", "total_amount_bought"]
             )
-            logger.warning("NaN cost_per_unit detected for rows: %s", problematic.to_dicts())
+            logger.warning(
+                "NaN cost_per_unit detected for rows: %s", problematic.to_dicts()
+            )
             grouped = grouped.filter(pl.col("cost_per_unit").is_not_null())
 
         cost_basis: dict[str, dict[str, float]] = {}
@@ -359,11 +420,17 @@ class MaterialCostCalculator:
         resolved = self._schema.resolve(df)
         purchase_date_col = resolved.get("purchase_date", "Purchase_Date")
         if purchase_date_col not in df.columns:
-            logger.warning("%s column not found when calculating window cost basis", purchase_date_col)
+            logger.warning(
+                "%s column not found when calculating window cost basis",
+                purchase_date_col,
+            )
             return {}
 
         window_start = selected_date - relativedelta(months=trailing_months)
-        window_data = df.filter((pl.col(purchase_date_col) >= window_start) & (pl.col(purchase_date_col) <= selected_date))
+        window_data = df.filter(
+            (pl.col(purchase_date_col) >= window_start)
+            & (pl.col(purchase_date_col) <= selected_date)
+        )
 
         if window_data.is_empty():
             logger.warning("No data available for time point %s", selected_date)

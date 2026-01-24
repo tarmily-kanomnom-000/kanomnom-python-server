@@ -46,7 +46,9 @@ def run_local_level_em(
 
     iterations = max(1, max_iterations)
     for _ in range(iterations):
-        result = _run_kalman_smoother(obs, dur, process_var, measurement_var, min_process_variance)
+        result = _run_kalman_smoother(
+            obs, dur, process_var, measurement_var, min_process_variance
+        )
         if result is None:
             break
 
@@ -179,7 +181,10 @@ def _run_kalman_smoother(
         filtered_means[index] = filtered_mean
         filtered_variances[index] = max(filtered_variance, _EPS)
 
-        log_likelihood += -0.5 * (math.log(2 * math.pi * innovation_variance) + (resid**2) / innovation_variance)
+        log_likelihood += -0.5 * (
+            math.log(2 * math.pi * innovation_variance)
+            + (resid**2) / innovation_variance
+        )
 
     smoothed_means = filtered_means.copy()
     smoothed_variances = filtered_variances.copy()
@@ -221,7 +226,9 @@ def _em_update(
     if n == 0:
         return (None, None, None)
 
-    measurement_terms = (observations - result.smoothed_means) ** 2 + result.smoothed_variances
+    measurement_terms = (
+        observations - result.smoothed_means
+    ) ** 2 + result.smoothed_variances
     measurement_var_new = float(np.mean(measurement_terms))
     measurement_var_new = max(measurement_var_new, min_measurement_variance)
 
@@ -229,7 +236,11 @@ def _em_update(
         return (None, measurement_var_new, result.log_likelihood)
 
     diffs = result.smoothed_means[1:] - result.smoothed_means[:-1]
-    var_sum = result.smoothed_variances[1:] + result.smoothed_variances[:-1] - 2 * result.cross_covariances
+    var_sum = (
+        result.smoothed_variances[1:]
+        + result.smoothed_variances[:-1]
+        - 2 * result.cross_covariances
+    )
     safe_durations = np.maximum(durations[1:], 1.0)
     process_terms = (diffs**2 + var_sum) / safe_durations
     process_var_new = float(np.mean(process_terms))

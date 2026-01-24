@@ -43,7 +43,13 @@ class MaterialPurchaseSchema:
                     "purchase_price_per_item2_USD",
                 ],
             },
-            required_roles={"material_name", "unit", "package_size", "quantity", "total_cost"},
+            required_roles={
+                "material_name",
+                "unit",
+                "package_size",
+                "quantity",
+                "total_cost",
+            },
         )
 
     def resolve(self, dataframe: pl.DataFrame) -> dict[str, str]:
@@ -60,7 +66,10 @@ class MaterialPurchaseSchema:
             resolved[role] = column
 
         if missing_required:
-            raise KeyError("Missing required Grist columns for roles: " + ", ".join(sorted(missing_required)))
+            raise KeyError(
+                "Missing required Grist columns for roles: "
+                + ", ".join(sorted(missing_required))
+            )
 
         logger.debug("Resolved Grist roles: %s", resolved)
         return resolved

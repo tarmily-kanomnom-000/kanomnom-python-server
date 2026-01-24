@@ -112,17 +112,27 @@ def _resolve_event_start(
 
 
 def _format_customer_name(inquiry: Inquiry) -> str:
-    customer_names = [name for name in (inquiry.customer_first_name, inquiry.customer_last_name) if name]
+    customer_names = [
+        name
+        for name in (inquiry.customer_first_name, inquiry.customer_last_name)
+        if name
+    ]
     if not customer_names:
         return ""
     return " ".join(customer_names)
 
 
-def _build_order_description(inquiry: Inquiry, order_response: MedusaOrderResponse) -> str:
+def _build_order_description(
+    inquiry: Inquiry, order_response: MedusaOrderResponse
+) -> str:
     order = order_response.order
     lines: list[str] = []
     contact_lines: list[str] = []
-    preferred_contact = inquiry.preferred_contact_method.value if inquiry.preferred_contact_method else None
+    preferred_contact = (
+        inquiry.preferred_contact_method.value
+        if inquiry.preferred_contact_method
+        else None
+    )
     if inquiry.preferred_contact_method:
         preferred_contact = inquiry.preferred_contact_method.value
     if inquiry.email:
@@ -191,18 +201,30 @@ def _format_ical_datetime(value: datetime) -> str:
 
 
 def _escape_ical_text(value: str) -> str:
-    escaped = value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r\n", "\\n").replace("\n", "\\n")
+    escaped = (
+        value.replace("\\", "\\\\")
+        .replace(";", "\\;")
+        .replace(",", "\\,")
+        .replace("\r\n", "\\n")
+        .replace("\n", "\\n")
+    )
     return escaped
 
 
-def _resolve_calendar_for_tag(tag: str, config: NextcloudConfig) -> NextcloudCalendarMetadata:
+def _resolve_calendar_for_tag(
+    tag: str, config: NextcloudConfig
+) -> NextcloudCalendarMetadata:
     matches = [calendar for calendar in config.calendars if tag in calendar.tags]
     if len(matches) == 1:
         return matches[0]
     if len(matches) == 0:
         available = ", ".join(sorted(_collect_tags(config))) or "none"
-        raise ValueError(f"Unknown Nextcloud calendar tag '{tag}'. Available: {available}")
-    raise ValueError(f"Multiple Nextcloud calendars match tag '{tag}': {', '.join(calendar.name for calendar in matches)}")
+        raise ValueError(
+            f"Unknown Nextcloud calendar tag '{tag}'. Available: {available}"
+        )
+    raise ValueError(
+        f"Multiple Nextcloud calendars match tag '{tag}': {', '.join(calendar.name for calendar in matches)}"
+    )
 
 
 def _resolve_calendar_item_kind(metadata: NextcloudCalendarMetadata) -> str:

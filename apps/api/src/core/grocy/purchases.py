@@ -69,8 +69,14 @@ class PurchaseEntryDefaults:
     conversion_rate: float | None = None
 
 
-def resolve_purchase_entry(product: GrocyProduct, entry: PurchaseEntryDraft, current_stock_amount: float) -> PurchaseEntry:
-    tare_weight = product.tare_weight if product.enable_tare_weight_handling and product.tare_weight > 0 else 0
+def resolve_purchase_entry(
+    product: GrocyProduct, entry: PurchaseEntryDraft, current_stock_amount: float
+) -> PurchaseEntry:
+    tare_weight = (
+        product.tare_weight
+        if product.enable_tare_weight_handling and product.tare_weight > 0
+        else 0
+    )
     if tare_weight > 0:
         amount = entry.amount + current_stock_amount + tare_weight
     else:
@@ -79,8 +85,14 @@ def resolve_purchase_entry(product: GrocyProduct, entry: PurchaseEntryDraft, cur
     if best_before_date is None:
         best_before_date = default_best_before_date(product)
     purchased_date = entry.purchased_date or date.today()
-    location_id = entry.location_id if entry.location_id is not None else product.location_id
-    shopping_location_id = entry.shopping_location_id if entry.shopping_location_id is not None else product.shopping_location_id
+    location_id = (
+        entry.location_id if entry.location_id is not None else product.location_id
+    )
+    shopping_location_id = (
+        entry.shopping_location_id
+        if entry.shopping_location_id is not None
+        else product.shopping_location_id
+    )
     rounded_price = round_price(entry.price_per_unit)
     note_payload = encode_structured_note(entry.note, entry.metadata)
     return PurchaseEntry(

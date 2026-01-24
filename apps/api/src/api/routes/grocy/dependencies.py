@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter
-
 from core.grocy import (
     GrocyGovernor,
     InstanceCredentialsRepository,
     InstanceMetadataRepository,
 )
+from fastapi import APIRouter
 
 router = APIRouter(prefix="/grocy", tags=["grocy"])
 

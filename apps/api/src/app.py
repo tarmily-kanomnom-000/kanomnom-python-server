@@ -8,15 +8,9 @@ from pathlib import Path
 from typing import AsyncIterator
 
 import uvicorn
-from cachetools import TTLCache
-from fastapi import FastAPI, Request, status
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, RedirectResponse
-from flet.fastapi import app as flet_fastapi
-from telegram.ext import Application
-
 from api.routes import grist, grocy, medusa
 from bot import BOT_ENABLED, TELEGRAM_INQURY_GROUP_CHAT_ID, telegram_app
+from cachetools import TTLCache
 from core.cache.cache_service import get_cache_service
 from core.cache.grist_cache_refresher import (
     GristCacheRefresher,
@@ -27,6 +21,16 @@ from core.cache.tandoor_cache_refresher import (
     TandoorCacheRefresherConfig,
     default_tandoor_service_factory,
 )
+from core.nextcloud.credentials import NextcloudCredentialsRepository
+from core.nextcloud.metadata import NextcloudMetadataRepository
+from core.nextcloud.validation import (
+    NextcloudManifestValidationConfig,
+    validate_nextcloud_manifests,
+)
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, RedirectResponse
+from flet.fastapi import app as flet_fastapi
 from flet_app import main as flet_main
 from services.weather.config import (
     DEFAULT_DATABASE_CONFIG,
@@ -37,6 +41,7 @@ from services.weather.config import (
 from services.weather.job import WeatherIngestJob
 from services.weather.utils import seconds_until_next_run
 from setup import initialize_server
+from telegram.ext import Application
 
 initialize_server()
 
@@ -48,11 +53,21 @@ logging.basicConfig(
 
 DEV_MODE: bool = os.getenv("FASTAPI_ENV", "").lower() in {"dev", "development"}
 
+SERVICE_ROOT = Path(__file__).resolve().parents[1]
+
 
 def _require_telegram_app() -> Application:
     if telegram_app is None:
         raise RuntimeError("Telegram bot is enabled but failed to initialize.")
     return telegram_app
+
+
+def _validate_nextcloud_manifests() -> None:
+    manifest_root = SERVICE_ROOT / "nextcloud_manifest"
+    metadata_repository = NextcloudMetadataRepository(manifest_root)
+    credentials_repository = NextcloudCredentialsRepository(manifest_root)
+    config = NextcloudManifestValidationConfig(required_order_tag="orders")
+    validate_nextcloud_manifests(metadata_repository, credentials_repository, config)
 
 
 # Start and Stop the Telegram Bot
@@ -61,6 +76,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Handles startup and shutdown tasks."""
     bot_started = False
     bot_task: asyncio.Task[None] | None = None
+
+    _validate_nextcloud_manifests()
 
     if not BOT_ENABLED or DEV_MODE:
         logging.info("FASTAPI_ENV indicates dev; skipping Telegram bot startup.")
@@ -165,7 +182,9 @@ async def _weather_ingest_loop(stop_event: asyncio.Event) -> None:
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     """Handles validation errors, ensures one Telegram alert per request, and dumps request info to file."""
 
     exc_str = f"{exc}".replace("\n", " ").replace("   ", " ")
@@ -194,7 +213,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         logging.exception("Failed to dump request data")
 
     # Send alert via Telegram if not already done
-    if BOT_ENABLED and request.url.path.startswith("/grist") and request_id not in validation_error_cache:
+    if (
+        BOT_ENABLED
+        and request.url.path.startswith("/grist")
+        and request_id not in validation_error_cache
+    ):
         validation_error_cache[request_id] = True
 
         error_message = (
@@ -211,7 +234,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         )
 
     content = {"status_code": 10422, "message": exc_str, "data": None}
-    return JSONResponse(content=content, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
+    return JSONResponse(
+        content=content, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
+    )
 
 
 # Mount Flet app to FastAPI

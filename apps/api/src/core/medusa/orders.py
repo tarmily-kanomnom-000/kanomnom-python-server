@@ -6,7 +6,9 @@ from core.medusa.client import MedusaClient
 from models.medusa.order_response import MedusaOrderResponse
 
 
-def fetch_orders(client: MedusaClient, order_ids: Iterable[str]) -> dict[str, MedusaOrderResponse]:
+def fetch_orders(
+    client: MedusaClient, order_ids: Iterable[str]
+) -> dict[str, MedusaOrderResponse]:
     """Fetch Medusa order details keyed by order id."""
     results: dict[str, MedusaOrderResponse] = {}
     for order_id in order_ids:

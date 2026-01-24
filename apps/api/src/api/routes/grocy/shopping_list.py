@@ -4,13 +4,12 @@ import logging
 import uuid
 from datetime import datetime
 
-from fastapi import HTTPException
-from fastapi.concurrency import run_in_threadpool
-
 from core.cache.grocy_shopping_locations_cache import get_grocy_shopping_locations_cache
 from core.grocy.price_analyzer import PriceAnalyzer
 from core.grocy.shopping_list_generator import ShoppingListGenerator
 from core.grocy.shopping_list_manager import ShoppingListManager
+from fastapi import HTTPException
+from fastapi.concurrency import run_in_threadpool
 from models.shopping_list import (
     AddItemRequest,
     BulkItemUpdate,
@@ -34,7 +33,9 @@ def _get_manager() -> ShoppingListManager:
     return ShoppingListManager(SHOPPING_LISTS_ROOT)
 
 
-async def _get_generator(instance_index: str, with_price_analyzer: bool = False) -> ShoppingListGenerator:
+async def _get_generator(
+    instance_index: str, with_price_analyzer: bool = False
+) -> ShoppingListGenerator:
     """Get shopping list generator instance"""
     try:
         manager = await get_manager(instance_index)
@@ -45,9 +46,13 @@ async def _get_generator(instance_index: str, with_price_analyzer: bool = False)
         if with_price_analyzer:
             price_analyzer = build_price_analyzer(instance_index)
 
-        return ShoppingListGenerator(inventory_service, shopping_locations_cache, price_analyzer)
+        return ShoppingListGenerator(
+            inventory_service, shopping_locations_cache, price_analyzer
+        )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to initialize generator: {exc!s}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Failed to initialize generator: {exc!s}"
+        ) from exc
 
 
 async def _get_price_analyzer(instance_index: str) -> PriceAnalyzer:
@@ -55,7 +60,9 @@ async def _get_price_analyzer(instance_index: str) -> PriceAnalyzer:
     return build_price_analyzer(instance_index)
 
 
-async def _build_items_data(instance_index: str, requests: list[AddItemRequest]) -> list[dict]:
+async def _build_items_data(
+    instance_index: str, requests: list[AddItemRequest]
+) -> list[dict]:
     """Build shopping list item payloads with shared enrichment for batch adds."""
     if not requests:
         raise HTTPException(status_code=400, detail="No items provided")
@@ -63,17 +70,23 @@ async def _build_items_data(instance_index: str, requests: list[AddItemRequest])
     grocy_manager = await get_manager(instance_index)
     inventory_service = grocy_manager._inventory
 
-    products_with_inv = await run_in_threadpool(inventory_service.list_products_with_inventory, instance_index)
+    products_with_inv = await run_in_threadpool(
+        inventory_service.list_products_with_inventory, instance_index
+    )
     product_map = {p.product.id: p for p in products_with_inv}
 
     requested_product_ids = [req.product_id for req in requests]
     if len(set(requested_product_ids)) != len(requested_product_ids):
-        raise HTTPException(status_code=400, detail="Duplicate product_ids in add request")
+        raise HTTPException(
+            status_code=400, detail="Duplicate product_ids in add request"
+        )
 
     missing_products = [pid for pid in requested_product_ids if pid not in product_map]
     if missing_products:
         missing_str = ", ".join(str(pid) for pid in sorted(missing_products))
-        raise HTTPException(status_code=404, detail=f"Products not found in Grocy: {missing_str}")
+        raise HTTPException(
+            status_code=404, detail=f"Products not found in Grocy: {missing_str}"
+        )
 
     shopping_locations = await load_shopping_locations(instance_index)
     location_names = {}
@@ -96,7 +109,9 @@ async def _build_items_data(instance_index: str, requests: list[AddItemRequest])
         if location_id is not None:
             location_name = location_names.get(location_id, f"Location {location_id}")
 
-        last_price = await run_in_threadpool(analyzer.get_last_purchase_price, req.product_id)
+        last_price = await run_in_threadpool(
+            analyzer.get_last_purchase_price, req.product_id
+        )
 
         items.append(
             {
@@ -122,7 +137,9 @@ async def _build_items_data(instance_index: str, requests: list[AddItemRequest])
 
 
 @router.post("/{instance_index}/shopping-list/generate", response_model=ShoppingList)
-async def generate_shopping_list(instance_index: str, request: GenerateListRequest) -> ShoppingList:
+async def generate_shopping_list(
+    instance_index: str, request: GenerateListRequest
+) -> ShoppingList:
     """Generate shopping list with Phase 2 features (price, merge support)"""
     manager = _get_manager()
 
@@ -133,9 +150,13 @@ async def generate_shopping_list(instance_index: str, request: GenerateListReque
                 detail="Active shopping list exists. Set merge_with_existing=true to merge, or complete current list first.",
             )
 
-        existing_list = await run_in_threadpool(manager.load_active_list, instance_index)
+        existing_list = await run_in_threadpool(
+            manager.load_active_list, instance_index
+        )
         generator = await _get_generator(instance_index, with_price_analyzer=True)
-        merged_list = await run_in_threadpool(generator.merge_with_existing, existing_list, instance_index)
+        merged_list = await run_in_threadpool(
+            generator.merge_with_existing, existing_list, instance_index
+        )
         await run_in_threadpool(manager.save_active_list, instance_index, merged_list)
         return ShoppingList(**merged_list)
 
@@ -147,7 +168,9 @@ async def generate_shopping_list(instance_index: str, request: GenerateListReque
     return ShoppingList(**list_data)
 
 
-@router.get("/{instance_index}/shopping-list/active", response_model=ShoppingList | None)
+@router.get(
+    "/{instance_index}/shopping-list/active", response_model=ShoppingList | None
+)
 async def get_active_list(instance_index: str) -> ShoppingList | None:
     """Get the current active shopping list, or null if none exists"""
     manager = _get_manager()
@@ -165,7 +188,9 @@ async def complete_shopping_list(instance_index: str) -> dict[str, str]:
     manager = _get_manager()
 
     try:
-        archived_path = await run_in_threadpool(manager.archive_active_list, instance_index)
+        archived_path = await run_in_threadpool(
+            manager.archive_active_list, instance_index
+        )
         return {
             "archived_to": archived_path,
             "message": "Shopping list completed and archived",
@@ -191,7 +216,9 @@ async def add_item(
 
     try:
         items_data = await _build_items_data(instance_index, [request])
-        added_items = await run_in_threadpool(manager.add_items_bulk, instance_index, items_data)
+        added_items = await run_in_threadpool(
+            manager.add_items_bulk, instance_index, items_data
+        )
         return ShoppingListItem(**added_items[0])
     except FileNotFoundError as exc:
         raise HTTPException(
@@ -278,7 +305,9 @@ async def bulk_add_items(
 
     try:
         item_payloads = await _build_items_data(instance_index, requests)
-        added_items = await run_in_threadpool(manager.add_items_bulk, instance_index, item_payloads)
+        added_items = await run_in_threadpool(
+            manager.add_items_bulk, instance_index, item_payloads
+        )
         shopping_list_items = [ShoppingListItem(**item) for item in added_items]
 
         logger.info(
@@ -308,7 +337,9 @@ async def bulk_remove_items(
     manager = _get_manager()
 
     try:
-        removed = await run_in_threadpool(manager.bulk_remove_items, instance_index, request)
+        removed = await run_in_threadpool(
+            manager.bulk_remove_items, instance_index, request
+        )
         logger.info(
             "shopping_list_bulk_remove",
             extra={"instance_index": instance_index, "count": len(removed)},

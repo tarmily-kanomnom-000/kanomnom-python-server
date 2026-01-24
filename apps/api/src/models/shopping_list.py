@@ -43,7 +43,9 @@ class ShoppingList(BaseModel):
     last_modified_at: str
     items: list[ShoppingListItem]
     location_order: list[str | int]
-    deleted_product_ids: list[int] = Field(default_factory=list)  # Track manually deleted products to exclude from merge
+    deleted_product_ids: list[int] = Field(
+        default_factory=list
+    )  # Track manually deleted products to exclude from merge
 
 
 class AddItemRequest(BaseModel):

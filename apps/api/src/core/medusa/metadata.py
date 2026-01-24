@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
 from core.medusa.exceptions import MedusaMetadataNotFoundError
 from core.medusa.models import MedusaInstanceMetadata
 
@@ -28,7 +27,9 @@ class MedusaMetadataRepository:
         """Load the metadata.yaml file for a specific Medusa instance."""
         metadata_path = self.manifest_root / instance_key / "metadata.yaml"
         if not metadata_path.exists():
-            raise MedusaMetadataNotFoundError(f"Missing metadata for instance {instance_key}: {metadata_path}")
+            raise MedusaMetadataNotFoundError(
+                f"Missing metadata for instance {instance_key}: {metadata_path}"
+            )
         parsed = _parse_metadata_file(metadata_path)
         base_url = _require_string(parsed.get("medusa_url"), "medusa_url")
         return MedusaInstanceMetadata(instance_key=instance_key, base_url=base_url)

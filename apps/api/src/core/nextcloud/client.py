@@ -4,7 +4,6 @@ import logging
 from typing import Iterable
 
 import caldav
-
 from core.nextcloud.config import NextcloudConfig
 from core.nextcloud.events import NextcloudCalendarEvent, build_ical_event
 
@@ -42,9 +41,13 @@ class NextcloudCalendarClient:
             if name and _normalize_calendar_name(name) == target_name:
                 self._calendars[calendar_name] = calendar
                 return calendar
-        calendar_names = [name for name in (_resolve_calendar_name(cal) for cal in calendars) if name]
+        calendar_names = [
+            name for name in (_resolve_calendar_name(cal) for cal in calendars) if name
+        ]
         available_names = ", ".join(calendar_names) if calendar_names else "none"
-        raise ValueError(f"Calendar not found. Requested '{calendar_name}', available: {available_names}")
+        raise ValueError(
+            f"Calendar not found. Requested '{calendar_name}', available: {available_names}"
+        )
 
     def create_events(self, events: Iterable[NextcloudCalendarEvent]) -> list[str]:
         """Create one or more calendar events and return their URLs when available."""

@@ -9,9 +9,6 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import HTTPException, Request
-from fastapi.concurrency import run_in_threadpool
-
 from core.grocy.exceptions import ManifestNotFoundError, MetadataNotFoundError
 from core.grocy.note_metadata import (
     PurchaseEntryNoteMetadata,
@@ -20,6 +17,8 @@ from core.grocy.note_metadata import (
 )
 from core.grocy.purchases import PurchaseEntry, PurchaseEntryDraft
 from core.grocy.responses import GrocyStockEntry
+from fastapi import HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from models.grocy import (
     GrocyProductInventoryEntry,
     GrocyStockEntryPayload,
@@ -54,7 +53,9 @@ def _parse_purchase_defaults_query(request: Request) -> PurchaseDefaultsQuery:
     try:
         return PurchaseDefaultsQuery(shopping_location_id=int(trimmed))
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="shopping_location_id must be an integer.") from exc
+        raise HTTPException(
+            status_code=400, detail="shopping_location_id must be an integer."
+        ) from exc
 
 
 def _schema_root() -> Path:
@@ -74,10 +75,14 @@ def _ensure_schema_alignment(schema: dict[str, Any]) -> None:
     model_properties = set(model_schema.get("properties", {}).keys())
     shared_properties = set(schema.get("properties", {}).keys())
     if model_properties != shared_properties:
-        raise RuntimeError("Shared purchase entry schema properties do not match PurchaseEntryRequest definition.")
+        raise RuntimeError(
+            "Shared purchase entry schema properties do not match PurchaseEntryRequest definition."
+        )
 
 
-def _resolve_package_batch(metadata: PurchaseEntryNoteMetadata | None) -> tuple[int, float] | None:
+def _resolve_package_batch(
+    metadata: PurchaseEntryNoteMetadata | None,
+) -> tuple[int, float] | None:
     if metadata is None:
         return None
     if metadata.package_quantity is None or metadata.package_size is None:
@@ -92,7 +97,9 @@ def _resolve_package_batch(metadata: PurchaseEntryNoteMetadata | None) -> tuple[
     return None
 
 
-def _serialize_stock_entries(entries: list[GrocyStockEntry]) -> list[GrocyStockEntryPayload]:
+def _serialize_stock_entries(
+    entries: list[GrocyStockEntry],
+) -> list[GrocyStockEntryPayload]:
     serialized: list[GrocyStockEntryPayload] = []
     for entry in entries:
         decoded_note = decode_structured_note(entry.note)
@@ -170,7 +177,9 @@ async def get_purchase_entry_defaults(
 
     def _load_defaults():
         manager = governor.manager_for(instance_index)
-        return manager.get_purchase_entry_defaults(product_id, query.shopping_location_id)
+        return manager.get_purchase_entry_defaults(
+            product_id, query.shopping_location_id
+        )
 
     try:
         defaults = await run_in_threadpool(_load_defaults)
@@ -207,11 +216,15 @@ async def get_purchase_entry_defaults_batch(
 ) -> PurchaseEntryDefaultsBatchResponse:
     """Return default metadata suggestions for multiple products."""
     if not payload.product_ids:
-        raise HTTPException(status_code=400, detail="product_ids must include at least one entry.")
+        raise HTTPException(
+            status_code=400, detail="product_ids must include at least one entry."
+        )
 
     def _load_defaults():
         manager = governor.manager_for(instance_index)
-        return manager.get_purchase_entry_defaults_batch(payload.product_ids, payload.shopping_location_id)
+        return manager.get_purchase_entry_defaults_batch(
+            payload.product_ids, payload.shopping_location_id
+        )
 
     try:
         defaults = await run_in_threadpool(_load_defaults)
@@ -289,7 +302,9 @@ async def record_purchase_entry(
                 conversion_rate=purchase.metadata.conversion_rate,
                 on_sale=purchase.metadata.on_sale,
             )
-            derived_amount, derived_unit_price, _ = _derive_purchase_amount_and_price(candidate)
+            derived_amount, derived_unit_price, _ = _derive_purchase_amount_and_price(
+                candidate
+            )
             if candidate.to_attrs():
                 metadata = candidate
             logger.info(
@@ -303,14 +318,21 @@ async def record_purchase_entry(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     resolved_amount = derived_amount if derived_amount is not None else purchase.amount
-    resolved_price = derived_unit_price if derived_unit_price is not None else purchase.price
+    resolved_price = (
+        derived_unit_price if derived_unit_price is not None else purchase.price
+    )
     if resolved_amount is None or resolved_price is None:
-        raise HTTPException(status_code=400, detail="amount and price must be provided or derivable from metadata.")
+        raise HTTPException(
+            status_code=400,
+            detail="amount and price must be provided or derivable from metadata.",
+        )
 
     shopping_location_id = await _ensure_shopping_location_id(instance_index, purchase)
 
     try:
-        drafts = _build_purchase_drafts(purchase, metadata, resolved_amount, resolved_price, shopping_location_id)
+        drafts = _build_purchase_drafts(
+            purchase, metadata, resolved_amount, resolved_price, shopping_location_id
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -325,13 +347,19 @@ async def record_purchase_entry(
             resolved_entry, _ = manager.record_purchase_entry(product_id, payload)
             recorded_entries.append(resolved_entry)
 
-    updated_product = await execute_product_mutation(instance_index, product_id, _record_purchase, drafts)
+    updated_product = await execute_product_mutation(
+        instance_index, product_id, _record_purchase, drafts
+    )
 
     if not recorded_entries:
-        raise HTTPException(status_code=500, detail="Failed to persist purchase entries.")
+        raise HTTPException(
+            status_code=500, detail="Failed to persist purchase entries."
+        )
 
     expected_entries = len(drafts)
-    new_entries = [entry for entry in updated_product.stocks if entry.id not in baseline_entry_ids]
+    new_entries = [
+        entry for entry in updated_product.stocks if entry.id not in baseline_entry_ids
+    ]
     new_entries.sort(key=lambda entry: entry.row_created_timestamp)
     if len(new_entries) < expected_entries:
         logger.warning(
@@ -339,13 +367,19 @@ async def record_purchase_entry(
             expected_entries,
             len(new_entries),
         )
-        newest = sorted(updated_product.stocks, key=lambda entry: entry.row_created_timestamp)
+        newest = sorted(
+            updated_product.stocks, key=lambda entry: entry.row_created_timestamp
+        )
         new_entries = newest[-expected_entries:]
     if len(new_entries) > expected_entries:
         new_entries = new_entries[-expected_entries:]
 
-    purchase_epoch = _compose_purchase_timestamp(recorded_entries[0].purchased_date, instance_index)
-    shopping_location_name = await _resolve_shopping_location_name(instance_index, recorded_entries[0].shopping_location_id)
+    purchase_epoch = _compose_purchase_timestamp(
+        recorded_entries[0].purchased_date, instance_index
+    )
+    shopping_location_name = await _resolve_shopping_location_name(
+        instance_index, recorded_entries[0].shopping_location_id
+    )
     serialized_product = serialize_inventory_view(updated_product)
     grist_fields = _build_grist_record_fields(
         product=serialized_product,
@@ -363,7 +397,9 @@ async def record_purchase_entry(
     try:
         await create_grist_purchase_record(grist_fields)
     except Exception:  # noqa: BLE001
-        logger.exception("Failed to post purchase '%s' to Grist", updated_product.product.name)
+        logger.exception(
+            "Failed to post purchase '%s' to Grist", updated_product.product.name
+        )
 
     return _serialize_stock_entries(new_entries)
 
@@ -391,7 +427,9 @@ async def derive_purchase_entry(
             conversion_rate=payload.metadata.conversion_rate,
             on_sale=payload.metadata.on_sale,
         )
-        derived_amount, derived_unit_price, total_usd = _derive_purchase_amount_and_price(candidate)
+        derived_amount, derived_unit_price, total_usd = (
+            _derive_purchase_amount_and_price(candidate)
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if derived_amount is None or derived_unit_price is None or total_usd is None:
@@ -399,7 +437,9 @@ async def derive_purchase_entry(
             status_code=400,
             detail="Metadata must include package_size, package_quantity, package_price, and conversion_rate values.",
         )
-    return PurchaseEntryCalculationResponse(amount=derived_amount, unit_price=derived_unit_price, total_usd=total_usd)
+    return PurchaseEntryCalculationResponse(
+        amount=derived_amount, unit_price=derived_unit_price, total_usd=total_usd
+    )
 
 
 def _derive_purchase_amount_and_price(
@@ -416,13 +456,17 @@ def _derive_purchase_amount_and_price(
         return None, None, None
     amount = metadata.package_size * metadata.package_quantity
     if amount <= 0:
-        raise ValueError("package_size and quantity must produce a positive purchase amount.")
+        raise ValueError(
+            "package_size and quantity must produce a positive purchase amount."
+        )
     shipping_cost = metadata.shipping_cost or 0.0
     tax_rate = metadata.tax_rate or 0.0
     subtotal = metadata.package_price * metadata.package_quantity + shipping_cost
     total_usd = subtotal * (1 + tax_rate) * metadata.conversion_rate
     if total_usd <= 0:
-        raise ValueError("Conversion rate and pricing must produce a positive USD total.")
+        raise ValueError(
+            "Conversion rate and pricing must produce a positive USD total."
+        )
     unit_price = total_usd / amount
     return amount, unit_price, total_usd
 
@@ -505,13 +549,18 @@ def _instance_timezone(instance_index: str) -> ZoneInfo:
     try:
         metadata = governor.metadata_repository.load(instance_index)
     except ManifestNotFoundError:
-        logger.warning("No metadata found for Grocy instance %s when resolving timezone.", instance_index)
+        logger.warning(
+            "No metadata found for Grocy instance %s when resolving timezone.",
+            instance_index,
+        )
     tz_name = metadata.instance_timezone if metadata else None
     if tz_name:
         try:
             return ZoneInfo(tz_name)
         except ZoneInfoNotFoundError:
-            logger.warning("Unknown timezone '%s' for instance %s", tz_name, instance_index)
+            logger.warning(
+                "Unknown timezone '%s' for instance %s", tz_name, instance_index
+            )
     local_tz = datetime.now().astimezone().tzinfo
     if isinstance(local_tz, ZoneInfo):
         return local_tz
@@ -523,7 +572,9 @@ def _instance_timezone(instance_index: str) -> ZoneInfo:
     return ZoneInfo("UTC")
 
 
-async def _ensure_shopping_location_id(instance_index: str, purchase: PurchaseEntryRequest) -> int | None:
+async def _ensure_shopping_location_id(
+    instance_index: str, purchase: PurchaseEntryRequest
+) -> int | None:
     if purchase.shopping_location_id is not None:
         return purchase.shopping_location_id
 
@@ -543,21 +594,31 @@ async def _ensure_shopping_location_id(instance_index: str, purchase: PurchaseEn
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:  # noqa: BLE001
-        logger.exception("Failed to ensure shopping location for instance %s", instance_index)
-        raise HTTPException(status_code=500, detail="Unable to resolve shopping location.") from error
+        logger.exception(
+            "Failed to ensure shopping location for instance %s", instance_index
+        )
+        raise HTTPException(
+            status_code=500, detail="Unable to resolve shopping location."
+        ) from error
 
 
-async def _resolve_shopping_location_name(instance_index: str, shopping_location_id: int | None) -> str | None:
+async def _resolve_shopping_location_name(
+    instance_index: str, shopping_location_id: int | None
+) -> str | None:
     if shopping_location_id is None:
         return None
 
     def _fetch_locations() -> dict[int, str]:
         manager = governor.manager_for(instance_index)
-        return {location.id: location.name for location in manager.list_shopping_locations()}
+        return {
+            location.id: location.name for location in manager.list_shopping_locations()
+        }
 
     try:
         lookup = await run_in_threadpool(_fetch_locations)
     except Exception:  # noqa: BLE001
-        logger.exception("Failed to load shopping locations for instance %s", instance_index)
+        logger.exception(
+            "Failed to load shopping locations for instance %s", instance_index
+        )
         return None
     return lookup.get(shopping_location_id)

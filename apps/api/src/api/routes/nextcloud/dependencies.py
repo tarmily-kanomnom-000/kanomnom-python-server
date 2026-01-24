@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter
-
 from core.nextcloud import (
     NextcloudCredentialsRepository,
     NextcloudGovernor,
     NextcloudMetadataRepository,
 )
+from fastapi import APIRouter
 
 router = APIRouter(prefix="/nextcloud", tags=["nextcloud"])
 

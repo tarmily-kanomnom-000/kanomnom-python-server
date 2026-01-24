@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+from core.grocy.exceptions import ManifestNotFoundError, MetadataNotFoundError
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
-
-from core.grocy.exceptions import ManifestNotFoundError, MetadataNotFoundError
 from models.grocy import (
     CreatedProductGroup,
     CreatedQuantityUnit,
@@ -25,15 +24,21 @@ async def initialize_instance(instance_index: str) -> InitializeInstanceResponse
         return groups, units, shopping_locations
 
     try:
-        groups_result, units_result, shopping_location_result = await run_in_threadpool(_sync_manifest)
+        groups_result, units_result, shopping_location_result = await run_in_threadpool(
+            _sync_manifest
+        )
     except MetadataNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ManifestNotFoundError as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
 
-    created_units = [CreatedQuantityUnit(name=item.definition.name, identifier=item.identifier) for item in units_result.created]
+    created_units = [
+        CreatedQuantityUnit(name=item.definition.name, identifier=item.identifier)
+        for item in units_result.created
+    ]
     created_groups = [
-        CreatedProductGroup(name=item.definition.name, identifier=item.identifier) for item in groups_result.created
+        CreatedProductGroup(name=item.definition.name, identifier=item.identifier)
+        for item in groups_result.created
     ]
     created_shopping_locations = [
         CreatedShoppingLocation(name=item.definition.name, identifier=item.identifier)

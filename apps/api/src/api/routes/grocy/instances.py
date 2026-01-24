@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from fastapi.concurrency import run_in_threadpool
-
 from models.grocy import (
     GrocyLocationPayload,
     GrocyShoppingLocationPayload,

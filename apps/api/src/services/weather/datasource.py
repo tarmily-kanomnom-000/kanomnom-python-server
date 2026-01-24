@@ -49,7 +49,9 @@ WINDOWS = [
 ]
 
 
-def fetch_weather_forecast(start_date: str, end_date: str, location: LocationConfig) -> Dict[str, Any]:
+def fetch_weather_forecast(
+    start_date: str, end_date: str, location: LocationConfig
+) -> Dict[str, Any]:
     hourly_params = ",".join(HOURLY_VARIABLES)
     daily_params = ",".join(DAILY_VARIABLES)
     url = (
@@ -66,9 +68,13 @@ def fetch_weather_forecast(start_date: str, end_date: str, location: LocationCon
     resp.raise_for_status()
     data = resp.json()
     if "hourly" not in data or "time" not in data["hourly"]:
-        raise RuntimeError(f"Unexpected Open-Meteo response: {json.dumps(data, indent=2)}")
+        raise RuntimeError(
+            f"Unexpected Open-Meteo response: {json.dumps(data, indent=2)}"
+        )
     if "daily" not in data or "time" not in data["daily"]:
-        raise RuntimeError(f"Missing daily block in Open-Meteo response: {json.dumps(data, indent=2)}")
+        raise RuntimeError(
+            f"Missing daily block in Open-Meteo response: {json.dumps(data, indent=2)}"
+        )
     return data
 
 
@@ -121,9 +127,13 @@ def transform_hourly_weather(
                 "location_timezone": location.timezone,
                 "observed_at": observed_at,
                 "temp_f": None if temp_c is None else (temp_c * 9 / 5) + 32,
-                "apparent_temp_f": None if apparent_c is None else (apparent_c * 9 / 5) + 32,
+                "apparent_temp_f": (
+                    None if apparent_c is None else (apparent_c * 9 / 5) + 32
+                ),
                 "relative_humidity_percent": _safe_item(humidity, i),
-                "dew_point_f": None if dew_point_c is None else (dew_point_c * 9 / 5) + 32,
+                "dew_point_f": (
+                    None if dew_point_c is None else (dew_point_c * 9 / 5) + 32
+                ),
                 "precip_mm": _safe_item(precipitation, i),
                 "rain_mm": _safe_item(rain, i),
                 "snowfall_mm": _safe_item(snowfall, i),
@@ -164,10 +174,18 @@ def build_daily_context(daily: Dict[str, Any]) -> Dict[date, Dict[str, Any]]:
             "sunrise": sunrise_dt,
             "sunset": sunset_dt,
             "daylight_minutes": _daylight_minutes(sunrise_dt, sunset_dt),
-            "temperature_max_f": None if temp_max_c is None else (temp_max_c * 9 / 5) + 32,
-            "temperature_min_f": None if temp_min_c is None else (temp_min_c * 9 / 5) + 32,
-            "apparent_temperature_max_f": None if apparent_max_c is None else (apparent_max_c * 9 / 5) + 32,
-            "apparent_temperature_min_f": None if apparent_min_c is None else (apparent_min_c * 9 / 5) + 32,
+            "temperature_max_f": (
+                None if temp_max_c is None else (temp_max_c * 9 / 5) + 32
+            ),
+            "temperature_min_f": (
+                None if temp_min_c is None else (temp_min_c * 9 / 5) + 32
+            ),
+            "apparent_temperature_max_f": (
+                None if apparent_max_c is None else (apparent_max_c * 9 / 5) + 32
+            ),
+            "apparent_temperature_min_f": (
+                None if apparent_min_c is None else (apparent_min_c * 9 / 5) + 32
+            ),
         }
     return context
 
@@ -185,7 +203,9 @@ def build_window_metrics(
     for row in hourly_rows:
         observed_at: datetime = row["observed_at"]
         local_dt = observed_at.astimezone(tz)
-        by_date.setdefault(local_dt.date(), []).append({**row, "observed_local": local_dt})
+        by_date.setdefault(local_dt.date(), []).append(
+            {**row, "observed_local": local_dt}
+        )
 
     window_rows: List[Dict[str, Any]] = []
     for day, rows_for_day in by_date.items():
@@ -193,7 +213,9 @@ def build_window_metrics(
         for window in WINDOWS:
             start = datetime.combine(day, time(hour=window["start_hour"], tzinfo=tz))
             end = datetime.combine(day, time(hour=window["end_hour"], tzinfo=tz))
-            window_slice = [r for r in rows_for_day if start <= r["observed_local"] < end]
+            window_slice = [
+                r for r in rows_for_day if start <= r["observed_local"] < end
+            ]
             if not window_slice:
                 continue
             temp_values = [r["temp_f"] for r in window_slice]
@@ -206,8 +228,12 @@ def build_window_metrics(
             wind_gust_values = [r["wind_gusts_10m_mps"] for r in window_slice]
             wind_dir_values = [r["wind_direction_10m_deg"] for r in window_slice]
             uv_values = [r["uv_index"] for r in window_slice]
-            precip_probability_values = [r["precip_probability_percent"] for r in window_slice]
-            weather_codes = [r["weather_code"] for r in window_slice if r["weather_code"] is not None]
+            precip_probability_values = [
+                r["precip_probability_percent"] for r in window_slice
+            ]
+            weather_codes = [
+                r["weather_code"] for r in window_slice if r["weather_code"] is not None
+            ]
 
             temp_avg = _mean_or_none(temp_values)
             apparent_avg = _mean_or_none(apparent_values)
@@ -252,12 +278,18 @@ def build_window_metrics(
                     "daylight_minutes": day_ctx.get("daylight_minutes"),
                     "day_temp_min_f": day_ctx.get("temperature_min_f"),
                     "day_temp_max_f": day_ctx.get("temperature_max_f"),
-                    "day_apparent_temp_min_f": day_ctx.get("apparent_temperature_min_f"),
-                    "day_apparent_temp_max_f": day_ctx.get("apparent_temperature_max_f"),
+                    "day_apparent_temp_min_f": day_ctx.get(
+                        "apparent_temperature_min_f"
+                    ),
+                    "day_apparent_temp_max_f": day_ctx.get(
+                        "apparent_temperature_max_f"
+                    ),
                     "sample_count": len(window_slice),
                     "raw_json": json.dumps(
                         {
-                            "hours": [r["observed_local"].isoformat() for r in window_slice],
+                            "hours": [
+                                r["observed_local"].isoformat() for r in window_slice
+                            ],
                             "window": window,
                             "_location": {
                                 "name": location.name,
@@ -283,7 +315,10 @@ def dump_dry_run_results(
 ) -> Path:
     dump_dir.mkdir(exist_ok=True)
     timestamp = datetime.now(tz=ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%S")
-    filename = f"weather_dry_run_{_sanitize_location_name(location.name)}_" f"{start_date}_{end_date}_{timestamp}.json"
+    filename = (
+        f"weather_dry_run_{_sanitize_location_name(location.name)}_"
+        f"{start_date}_{end_date}_{timestamp}.json"
+    )
     payload = {
         "metadata": {
             "start_date": start_date,
@@ -356,7 +391,9 @@ def _parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
     return datetime.fromisoformat(value)
 
 
-def _daylight_minutes(sunrise: Optional[datetime], sunset: Optional[datetime]) -> Optional[int]:
+def _daylight_minutes(
+    sunrise: Optional[datetime], sunset: Optional[datetime]
+) -> Optional[int]:
     if sunrise is None or sunset is None:
         return None
     delta = sunset - sunrise

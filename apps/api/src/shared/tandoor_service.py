@@ -8,7 +8,6 @@ import os
 from typing import Optional
 
 import requests
-
 from core.cache.cache_service import get_cache_service
 from shared.models import Ingredient, Recipe, Unit
 
@@ -38,7 +37,10 @@ class TandoorService:
             self.token = self._get_tandoor_token()
 
         if self.token:
-            return {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
+            return {
+                "Authorization": f"Bearer {self.token}",
+                "Content-Type": "application/json",
+            }
         else:
             logger.error("No token available for authentication")
             return {"Content-Type": "application/json"}
@@ -63,7 +65,9 @@ class TandoorService:
         password = os.getenv("TANDOOR_PASSWORD")
 
         if not username or not password:
-            logger.error("TANDOOR_USERNAME or TANDOOR_PASSWORD environment variables not set")
+            logger.error(
+                "TANDOOR_USERNAME or TANDOOR_PASSWORD environment variables not set"
+            )
             return None
 
         payload = {
@@ -73,7 +77,9 @@ class TandoorService:
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         auth_url = f"{self.base_url}/api-token-auth/"
 
-        logger.info(f"Attempting authentication to {auth_url} with username: {username}")
+        logger.info(
+            f"Attempting authentication to {auth_url} with username: {username}"
+        )
 
         try:
             auth_response = requests.post(url=auth_url, data=payload, headers=headers)
@@ -157,7 +163,10 @@ class TandoorService:
                 logger.info("Checking recipe cache...")
                 cached_recipes_data = self.cache_service.recipe_cache.load_recipes()
                 if cached_recipes_data:
-                    self._recipes = [Recipe.from_cache_dict(recipe_data) for recipe_data in cached_recipes_data]
+                    self._recipes = [
+                        Recipe.from_cache_dict(recipe_data)
+                        for recipe_data in cached_recipes_data
+                    ]
 
             if not self._recipes or force_refresh:
                 # Test token validity before making API calls
@@ -203,9 +212,13 @@ class TandoorService:
             return self._product_recipes
 
         all_recipes = self.get_recipes(force_refresh)
-        self._product_recipes = [recipe for recipe in all_recipes if "product" in recipe.keywords]
+        self._product_recipes = [
+            recipe for recipe in all_recipes if "product" in recipe.keywords
+        ]
 
-        logger.info(f"Found {len(self._product_recipes)} product recipes out of {len(all_recipes)} total")
+        logger.info(
+            f"Found {len(self._product_recipes)} product recipes out of {len(all_recipes)} total"
+        )
         return self._product_recipes
 
     def get_recipe_by_name(self, name: str) -> Optional[Recipe]:
@@ -239,7 +252,9 @@ class TandoorService:
 
         matching_recipes = []
         for recipe in recipes:
-            if keyword_lower in recipe.name.lower() or any(keyword_lower in kw for kw in recipe.keywords):
+            if keyword_lower in recipe.name.lower() or any(
+                keyword_lower in kw for kw in recipe.keywords
+            ):
                 matching_recipes.append(recipe)
 
         logger.info(f"Found {len(matching_recipes)} recipes matching '{keyword}'")
@@ -268,13 +283,20 @@ class TandoorService:
                 next_url = data.get("next")
                 results_count = len(data.get("results", []))
 
-                logger.info(f"📊 API response: total={total_count}, results={results_count}, has_next={bool(next_url)}")
+                logger.info(
+                    f"📊 API response: total={total_count}, results={results_count}, has_next={bool(next_url)}"
+                )
 
                 # Parse basic recipes from this page
-                page_recipes = [self._parse_recipe(recipe_data) for recipe_data in data.get("results", [])]
+                page_recipes = [
+                    self._parse_recipe(recipe_data)
+                    for recipe_data in data.get("results", [])
+                ]
                 recipes.extend(page_recipes)
 
-                logger.info(f"Fetched {len(page_recipes)} recipe stubs from page {page_num} (total so far: {len(recipes)})")
+                logger.info(
+                    f"Fetched {len(page_recipes)} recipe stubs from page {page_num} (total so far: {len(recipes)})"
+                )
 
                 # Use the next URL provided by Tandoor
                 url = next_url
@@ -294,7 +316,9 @@ class TandoorService:
                 if (i + 1) % 50 == 0:  # Log progress every 50 recipes
                     logger.info(f"Populated details for {i + 1}/{len(recipes)} recipes")
             except Exception as e:
-                logger.error(f"Error populating details for recipe {recipe.id} ({recipe.name}): {e}")
+                logger.error(
+                    f"Error populating details for recipe {recipe.id} ({recipe.name}): {e}"
+                )
 
         logger.info(f"Total recipes fully populated: {len(recipes)}")
         return recipes

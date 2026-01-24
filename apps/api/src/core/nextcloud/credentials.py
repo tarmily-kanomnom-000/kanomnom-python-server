@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
 from core.nextcloud.models import NextcloudInstanceCredentials
 
 
@@ -18,7 +17,9 @@ class NextcloudCredentialsRepository:
         """Load the credentials.yaml file for a specific Nextcloud instance."""
         credentials_path = self.manifest_root / instance_key / "credentials.yaml"
         if not credentials_path.exists():
-            raise FileNotFoundError(f"Missing credentials for instance {instance_key}: {credentials_path}")
+            raise FileNotFoundError(
+                f"Missing credentials for instance {instance_key}: {credentials_path}"
+            )
         parsed = _parse_credentials_file(credentials_path)
         return _resolve_credentials(parsed, credentials_path)
 
@@ -35,7 +36,9 @@ def _parse_credentials_file(path: Path) -> dict[str, Any]:
     return parsed
 
 
-def _resolve_credentials(parsed: dict[str, Any], path: Path) -> NextcloudInstanceCredentials:
+def _resolve_credentials(
+    parsed: dict[str, Any], path: Path
+) -> NextcloudInstanceCredentials:
     credentials_list = parsed.get("credentials")
     if credentials_list is None:
         raise ValueError(f"Missing credentials data in {path}")

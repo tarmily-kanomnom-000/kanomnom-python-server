@@ -43,7 +43,10 @@ class EntitySyncer(Generic[DefinitionT]):
         self,
         specification: EntitySyncSpecification[DefinitionT, ExistingT],
     ) -> EntitySyncResult[DefinitionT]:
-        lookup = {specification.existing_key(item): _get_identifier(item) for item in specification.existing_items}
+        lookup = {
+            specification.existing_key(item): _get_identifier(item)
+            for item in specification.existing_items
+        }
         created: list[CreatedEntity[DefinitionT]] = []
         next_identifier = _max_identifier(specification.existing_items)
         for manifest_item in specification.manifest_items:
@@ -74,7 +77,9 @@ def _max_identifier(items: Sequence[ExistingT]) -> int:
     return max(identifiers)
 
 
-def _extract_identifier(payload: dict[str, Any] | list[dict[str, Any]] | None) -> int | None:
+def _extract_identifier(
+    payload: dict[str, Any] | list[dict[str, Any]] | None,
+) -> int | None:
     """Extract an id from Grocy's response payload when it returns one."""
     if not payload:
         return None
@@ -82,7 +87,9 @@ def _extract_identifier(payload: dict[str, Any] | list[dict[str, Any]] | None) -
         return int(payload["id"])
     if isinstance(payload, list):
         identifiers = [
-            int(item["id"]) for item in payload if isinstance(item, dict) and "id" in item and str(item["id"]).isdigit()
+            int(item["id"])
+            for item in payload
+            if isinstance(item, dict) and "id" in item and str(item["id"]).isdigit()
         ]
         if identifiers:
             return identifiers[0]

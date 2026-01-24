@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from fastapi import HTTPException
-
 from core.grocy.inventory import InventoryAdjustment, InventoryCorrection
 from core.grocy.note_metadata import InventoryCorrectionNoteMetadata, validate_note_text
+from fastapi import HTTPException
 from models.grocy import (
     GrocyProductInventoryEntry,
     InventoryAdjustmentRequest,
@@ -28,7 +27,10 @@ async def correct_product_inventory(
     metadata: InventoryCorrectionNoteMetadata | None = None
     try:
         if correction.metadata is not None:
-            loss_entries = [{"reason": detail.reason, "note": detail.note} for detail in (correction.metadata.losses or [])]
+            loss_entries = [
+                {"reason": detail.reason, "note": detail.note}
+                for detail in (correction.metadata.losses or [])
+            ]
             if loss_entries:
                 metadata = InventoryCorrectionNoteMetadata(losses=loss_entries)
         validate_note_text(correction.note)
@@ -65,7 +67,10 @@ async def adjust_product_inventory(
     metadata: InventoryCorrectionNoteMetadata | None = None
     try:
         if adjustment.metadata is not None:
-            loss_entries = [{"reason": detail.reason, "note": detail.note} for detail in (adjustment.metadata.losses or [])]
+            loss_entries = [
+                {"reason": detail.reason, "note": detail.note}
+                for detail in (adjustment.metadata.losses or [])
+            ]
             if loss_entries:
                 metadata = InventoryCorrectionNoteMetadata(losses=loss_entries)
         validate_note_text(adjustment.note)
@@ -83,7 +88,9 @@ async def adjust_product_inventory(
         updated_product = await execute_product_mutation(
             instance_index,
             product_id,
-            lambda manager, payload: manager.adjust_product_inventory(product_id, payload),
+            lambda manager, payload: manager.adjust_product_inventory(
+                product_id, payload
+            ),
             mutation,
         )
     except ValueError as exc:

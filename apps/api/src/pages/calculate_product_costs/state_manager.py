@@ -47,8 +47,12 @@ class ProductCostsState:
         """Set the recipes and extract product recipes."""
 
         self.recipes = recipes
-        self.product_recipes = [recipe for recipe in recipes if "product" in recipe.keywords]
-        logger.info("Set %d recipes, %d are products", len(recipes), len(self.product_recipes))
+        self.product_recipes = [
+            recipe for recipe in recipes if "product" in recipe.keywords
+        ]
+        logger.info(
+            "Set %d recipes, %d are products", len(recipes), len(self.product_recipes)
+        )
 
     def set_selected_product(self, product_name: str) -> None:
         """Set the currently selected product."""
@@ -56,11 +60,15 @@ class ProductCostsState:
         self.selected_product = product_name
         logger.debug("Selected product: %s", product_name)
 
-    def set_product_ingredients(self, product_name: str, ingredients: ProductIngredientBreakdown) -> None:
+    def set_product_ingredients(
+        self, product_name: str, ingredients: ProductIngredientBreakdown
+    ) -> None:
         """Store ingredient breakdown for a product."""
 
         self.product_ingredients[product_name] = ingredients
-        logger.debug("Stored ingredients for %s: %d ingredients", product_name, len(ingredients))
+        logger.debug(
+            "Stored ingredients for %s: %d ingredients", product_name, len(ingredients)
+        )
 
     def get_product_ingredients(self, product_name: str) -> ProductIngredientBreakdown:
         """Get ingredient breakdown for a product."""
@@ -73,7 +81,9 @@ class ProductCostsState:
         self.current_cost_data = cost_data
         logger.debug("Set cost data with %d points", len(cost_data))
 
-    def set_current_recipe_ingredients(self, ingredients: ProductIngredientBreakdown) -> None:
+    def set_current_recipe_ingredients(
+        self, ingredients: ProductIngredientBreakdown
+    ) -> None:
         """Set the current recipe ingredients."""
 
         self.current_recipe_ingredients = ingredients
@@ -122,7 +132,11 @@ class ProductCostsState:
     def get_state_summary(self) -> dict[str, object]:
         """Get a summary of current state for debugging."""
 
-        date_range = f"{self.start_date} to {self.end_date}" if self.start_date and self.end_date else None
+        date_range = (
+            f"{self.start_date} to {self.end_date}"
+            if self.start_date and self.end_date
+            else None
+        )
         return {
             "total_recipes": len(self.recipes),
             "product_recipes": len(self.product_recipes),

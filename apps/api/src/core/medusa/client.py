@@ -5,11 +5,11 @@ from time import perf_counter
 from typing import Any
 
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util import Retry
-
 from core.medusa.auth import MedusaAuthProvider
 from core.medusa.config import MedusaConfig
+from requests import HTTPError
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,36 @@ class MedusaClient:
     ) -> dict[str, Any] | list[dict[str, Any]]:
         """Issue an HTTP request and raise with contextual details when Medusa rejects it."""
         url = f"{self.base_url}{path}"
+        response = self._request_with_auth(method, url, json_body, query_params)
+        if not response.content:
+            return {}
+        return response.json()
+
+    def _request_with_auth(
+        self,
+        method: str,
+        url: str,
+        json_body: dict[str, Any] | None,
+        query_params: dict[str, Any] | None,
+    ) -> requests.Response:
+        try:
+            return self._send_request(method, url, json_body, query_params)
+        except HTTPError as error:
+            if error.response is not None and error.response.status_code == 401:
+                logger.info(
+                    "Medusa auth failed; clearing cached token and retrying once."
+                )
+                self.auth_provider.clear_token()
+                return self._send_request(method, url, json_body, query_params)
+            raise
+
+    def _send_request(
+        self,
+        method: str,
+        url: str,
+        json_body: dict[str, Any] | None,
+        query_params: dict[str, Any] | None,
+    ) -> requests.Response:
         token = self.auth_provider.get_token()
         headers = {"Authorization": f"Bearer {token}"}
         start = perf_counter()
@@ -61,7 +91,7 @@ class MedusaClient:
                 "medusa_request_error",
                 extra={
                     "method": method,
-                    "path": path,
+                    "path": url,
                     "status_code": response.status_code,
                     "elapsed_ms": round(elapsed_ms, 2),
                 },
@@ -75,14 +105,12 @@ class MedusaClient:
             "medusa_request",
             extra={
                 "method": method,
-                "path": path,
+                "path": url,
                 "status_code": response.status_code,
                 "elapsed_ms": round(elapsed_ms, 2),
             },
         )
-        if not response.content:
-            return {}
-        return response.json()
+        return response
 
 
 def _build_retry_strategy() -> Retry:

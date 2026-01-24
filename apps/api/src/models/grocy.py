@@ -3,9 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
-
 from core.grocy.note_metadata import InventoryLossReason
+from pydantic import BaseModel, Field
 
 
 class CreatedQuantityUnit(BaseModel):

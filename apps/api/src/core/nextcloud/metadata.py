@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
 from core.nextcloud.models import NextcloudCalendarMetadata, NextcloudInstanceMetadata
 
 
@@ -27,7 +26,9 @@ class NextcloudMetadataRepository:
         """Load the metadata.yaml file for a specific Nextcloud instance."""
         metadata_path = self.manifest_root / instance_key / "metadata.yaml"
         if not metadata_path.exists():
-            raise FileNotFoundError(f"Missing metadata for instance {instance_key}: {metadata_path}")
+            raise FileNotFoundError(
+                f"Missing metadata for instance {instance_key}: {metadata_path}"
+            )
         parsed = _parse_metadata_file(metadata_path)
         dav_url = _require_string(parsed.get("dav_url"), "dav_url")
         calendars_raw = parsed.get("calendars")

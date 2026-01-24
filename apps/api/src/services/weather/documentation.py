@@ -252,11 +252,15 @@ def describe_metric_table(table_name: str) -> None:
     normalized = table_name.strip().lower()
     docs = TABLE_METRIC_DOCS.get(normalized)
     if docs is None:
-        raise ValueError(f"Unknown table '{table_name}'. Known tables: {', '.join(TABLE_METRIC_DOCS.keys())}")
+        raise ValueError(
+            f"Unknown table '{table_name}'. Known tables: {', '.join(TABLE_METRIC_DOCS.keys())}"
+        )
     print(f"Column documentation for {normalized}:")
     for column, doc in docs.items():
         units_display = doc.units or "unitless"
-        print(f" - {column}: {doc.description} [units={units_display}; source={doc.source}]")
+        print(
+            f" - {column}: {doc.description} [units={units_display}; source={doc.source}]"
+        )
     if "weather_code" in docs:
         print(" Weather code legend (WMO):")
         for code, description in sorted(WEATHER_CODE_DESCRIPTIONS.items()):
@@ -272,7 +276,9 @@ def _format_metric_doc_comment(doc: MetricDocumentation) -> str:
     return f"{doc.description} ({extras_str})"
 
 
-def apply_column_comments(conn: PgConnection, table_name: str, docs: Dict[str, MetricDocumentation]) -> None:
+def apply_column_comments(
+    conn: PgConnection, table_name: str, docs: Dict[str, MetricDocumentation]
+) -> None:
     with conn.cursor() as cur:
         for column, doc in docs.items():
             cur.execute(

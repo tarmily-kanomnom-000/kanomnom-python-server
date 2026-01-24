@@ -9,7 +9,6 @@ from collections.abc import Callable, Iterable, Sequence
 from typing import Final
 
 import flet as ft
-
 from shared.models import Recipe
 from shared.ui.layout import default_layout_config, styled_container
 
@@ -42,7 +41,9 @@ class IngredientUIBuilder:
                         width=TEXT_FIELD_WIDTH,
                         text_align=ft.TextAlign.RIGHT,
                         keyboard_type=ft.KeyboardType.NUMBER,
-                        on_change=lambda event, name=recipe.name: on_quantity_change(name, event.control.value or "0"),
+                        on_change=lambda event, name=recipe.name: on_quantity_change(
+                            name, event.control.value or "0"
+                        ),
                     ),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -62,12 +63,16 @@ class IngredientUIBuilder:
                 ft.ElevatedButton(
                     "🔄 Update Ingredients",
                     on_click=on_update,
-                    style=ft.ButtonStyle(bgcolor=ft.Colors.PRIMARY, color=ft.Colors.WHITE),
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.Colors.PRIMARY, color=ft.Colors.WHITE
+                    ),
                 ),
                 ft.ElevatedButton(
                     "🗑️ Clear All",
                     on_click=on_clear,
-                    style=ft.ButtonStyle(bgcolor=ft.Colors.ERROR, color=ft.Colors.WHITE),
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.Colors.ERROR, color=ft.Colors.WHITE
+                    ),
                 ),
             ],
             spacing=BUTTON_SPACING,
@@ -89,7 +94,12 @@ class IngredientUIBuilder:
                 ft.Row(
                     [
                         ft.Text(ingredient, expand=True, selectable=True),
-                        ft.Text(f"{amount:.2f}", width=80, text_align=ft.TextAlign.RIGHT, selectable=True),
+                        ft.Text(
+                            f"{amount:.2f}",
+                            width=80,
+                            text_align=ft.TextAlign.RIGHT,
+                            selectable=True,
+                        ),
                         ft.Text(unit, width=60, selectable=True),
                     ]
                 )
@@ -97,7 +107,9 @@ class IngredientUIBuilder:
 
         return ft.Column(ingredient_rows)
 
-    def create_ingredients_copy_section(self, raw_ingredients: RawIngredients) -> ft.ExpansionTile:
+    def create_ingredients_copy_section(
+        self, raw_ingredients: RawIngredients
+    ) -> ft.ExpansionTile:
         """Create the copy-friendly ingredients section."""
 
         lines = ["Ingredient\tAmount\tUnit"]
@@ -121,7 +133,9 @@ class IngredientUIBuilder:
         """Create controls for each intermediate recipe."""
 
         controls: list[ft.Container] = []
-        for recipe_name, total_servings in self._sort_by_servings(intermediate_servings):
+        for recipe_name, total_servings in self._sort_by_servings(
+            intermediate_servings
+        ):
             if self._should_skip_recipe(recipe_name):
                 continue
 
@@ -139,7 +153,9 @@ class IngredientUIBuilder:
 
         return controls
 
-    def create_recalculate_button(self, on_recalculate: Callable[[ft.ControlEvent], None]) -> ft.ElevatedButton:
+    def create_recalculate_button(
+        self, on_recalculate: Callable[[ft.ControlEvent], None]
+    ) -> ft.ElevatedButton:
         """Create the recalculate button."""
 
         return ft.ElevatedButton(
@@ -174,7 +190,12 @@ class IngredientUIBuilder:
 
         return ft.Row(
             [
-                ft.Text(_HEADER_TITLES[0], weight=ft.FontWeight.BOLD, expand=True, selectable=True),
+                ft.Text(
+                    _HEADER_TITLES[0],
+                    weight=ft.FontWeight.BOLD,
+                    expand=True,
+                    selectable=True,
+                ),
                 ft.Text(
                     _HEADER_TITLES[1],
                     weight=ft.FontWeight.BOLD,
@@ -182,11 +203,18 @@ class IngredientUIBuilder:
                     text_align=ft.TextAlign.RIGHT,
                     selectable=True,
                 ),
-                ft.Text(_HEADER_TITLES[2], weight=ft.FontWeight.BOLD, width=60, selectable=True),
+                ft.Text(
+                    _HEADER_TITLES[2],
+                    weight=ft.FontWeight.BOLD,
+                    width=60,
+                    selectable=True,
+                ),
             ]
         )
 
-    def _create_copy_text_field(self, lines: Iterable[str], *, min_lines: int, max_lines: int) -> ft.Container:
+    def _create_copy_text_field(
+        self, lines: Iterable[str], *, min_lines: int, max_lines: int
+    ) -> ft.Container:
         """Return a styled, read-only text field for copyable content."""
 
         return ft.Container(
@@ -262,7 +290,9 @@ class IngredientUIBuilder:
                     value=str(existing.get("weight", 0.0)),
                     width=TEXT_FIELD_WIDTH,
                     keyboard_type=ft.KeyboardType.NUMBER,
-                    on_change=lambda event, name=recipe_name: on_weight_change(name, event.control.value or "0"),
+                    on_change=lambda event, name=recipe_name: on_weight_change(
+                        name, event.control.value or "0"
+                    ),
                 ),
                 ft.Text("OR", size=12, width=30),
                 ft.TextField(
@@ -270,7 +300,9 @@ class IngredientUIBuilder:
                     value=str(existing.get("servings", 0.0)),
                     width=TEXT_FIELD_WIDTH,
                     keyboard_type=ft.KeyboardType.NUMBER,
-                    on_change=lambda event, name=recipe_name: on_servings_change(name, event.control.value or "0"),
+                    on_change=lambda event, name=recipe_name: on_servings_change(
+                        name, event.control.value or "0"
+                    ),
                 ),
                 ft.Text(
                     f"→ Still need: {max(0.0, remaining):.4f} servings",
@@ -281,12 +313,18 @@ class IngredientUIBuilder:
             ]
         )
 
-    def _sort_ingredients(self, raw_ingredients: RawIngredients) -> list[tuple[str, tuple[float, str]]]:
+    def _sort_ingredients(
+        self, raw_ingredients: RawIngredients
+    ) -> list[tuple[str, tuple[float, str]]]:
         """Return ingredients sorted by amount descending."""
 
-        return sorted(raw_ingredients.items(), key=lambda item: item[1][0], reverse=True)
+        return sorted(
+            raw_ingredients.items(), key=lambda item: item[1][0], reverse=True
+        )
 
-    def _sort_by_servings(self, servings: IntermediateServings) -> list[tuple[str, float]]:
+    def _sort_by_servings(
+        self, servings: IntermediateServings
+    ) -> list[tuple[str, float]]:
         """Return servings sorted by value descending."""
 
         return sorted(servings.items(), key=lambda item: item[1], reverse=True)

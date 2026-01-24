@@ -37,7 +37,9 @@ class ShoppingListGenerator:
         """
         products = self.inventory_service.list_products_with_inventory(instance_index)
 
-        shopping_locations = self.shopping_locations_cache.load_shopping_locations(instance_index)
+        shopping_locations = self.shopping_locations_cache.load_shopping_locations(
+            instance_index
+        )
         location_names = {}
         if shopping_locations:
             location_names = {loc.id: loc.name for loc in shopping_locations}
@@ -86,7 +88,9 @@ class ShoppingListGenerator:
             total += stock.amount
         return total
 
-    def _create_list_item(self, product_view, location_names: dict[int, str], use_phase2: bool = False) -> dict:
+    def _create_list_item(
+        self, product_view, location_names: dict[int, str], use_phase2: bool = False
+    ) -> dict:
         """Create a shopping list item from product view"""
         current_stock = self._get_current_stock(product_view)
         min_stock = product_view.product.min_stock_amount
@@ -122,7 +126,9 @@ class ShoppingListGenerator:
 
             last_price = None
             if self.price_analyzer:
-                last_price = self.price_analyzer.get_last_purchase_price(product_view.product.id)
+                last_price = self.price_analyzer.get_last_purchase_price(
+                    product_view.product.id
+                )
             item["last_price"] = last_price
 
         return item
@@ -144,10 +150,18 @@ class ShoppingListGenerator:
         """
         fresh_list = self.generate_list(instance_index, use_phase2=True)
 
-        checked_items = [item for item in existing_list["items"] if item["status"] in ["purchased", "unavailable"]]
+        checked_items = [
+            item
+            for item in existing_list["items"]
+            if item["status"] in ["purchased", "unavailable"]
+        ]
         checked_product_ids = {item["product_id"] for item in checked_items}
 
-        existing_unchecked = {item["product_id"]: item for item in existing_list["items"] if item["status"] == "pending"}
+        existing_unchecked = {
+            item["product_id"]: item
+            for item in existing_list["items"]
+            if item["status"] == "pending"
+        }
 
         fresh_items_map = {item["product_id"]: item for item in fresh_list["items"]}
 

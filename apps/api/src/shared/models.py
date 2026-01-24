@@ -37,7 +37,9 @@ class Recipe:
         self._parse_produced_amount()
 
     def parse_recipe_details(self, full_recipe_details: dict):
-        self.keywords: list[str] = [keyword["label"] for keyword in full_recipe_details["keywords"]]
+        self.keywords: list[str] = [
+            keyword["label"] for keyword in full_recipe_details["keywords"]
+        ]
         ingredient_map = {}
 
         for step in full_recipe_details.get("steps", []):
@@ -75,17 +77,30 @@ class Recipe:
                                 f"Ingredient '{food_name}' has conflicting units in recipe '{self.name}': existing {ingredient_map[key].unit.value}, new {unit_enum.value}. Using the non-zero entry."
                             )
                             # Keep the new entry since we already filtered out zero amounts
-                            ingredient_map[key] = Ingredient(id=food_id, name=food_name, quantity=amount, unit=unit_enum)
+                            ingredient_map[key] = Ingredient(
+                                id=food_id,
+                                name=food_name,
+                                quantity=amount,
+                                unit=unit_enum,
+                            )
                     else:
-                        ingredient_map[key] = Ingredient(id=food_id, name=food_name, quantity=amount, unit=unit_enum)
+                        ingredient_map[key] = Ingredient(
+                            id=food_id, name=food_name, quantity=amount, unit=unit_enum
+                        )
                 except Exception as e:
-                    print(f"Error processing ingredient: {e}, ingredient data: {ingredient}")
+                    print(
+                        f"Error processing ingredient: {e}, ingredient data: {ingredient}"
+                    )
                     continue
 
         self.ingredients = ingredient_map
 
         if self.produced_amount is None:
-            gram_total = sum(ingredient.quantity for ingredient in ingredient_map.values() if ingredient.unit == Unit.GRAM)
+            gram_total = sum(
+                ingredient.quantity
+                for ingredient in ingredient_map.values()
+                if ingredient.unit == Unit.GRAM
+            )
             if gram_total > 0:
                 self.produced_amount = gram_total
                 self.produced_unit = Unit.GRAM
@@ -115,7 +130,12 @@ class Recipe:
             "description": self.description,
             "keywords": self.keywords,
             "ingredients": {
-                f"{k[0]}_{k[1]}": {"id": v.id, "name": v.name, "quantity": v.quantity, "unit": v.unit.value}
+                f"{k[0]}_{k[1]}": {
+                    "id": v.id,
+                    "name": v.name,
+                    "quantity": v.quantity,
+                    "unit": v.unit.value,
+                }
                 for k, v in self.ingredients.items()
             },
             "produced_amount": self.produced_amount,
@@ -125,16 +145,25 @@ class Recipe:
     @classmethod
     def from_cache_dict(cls, cache_dict: dict):
         """Create recipe from cached dictionary."""
-        recipe_stub = {"id": cache_dict["id"], "name": cache_dict["name"], "description": cache_dict["description"]}
+        recipe_stub = {
+            "id": cache_dict["id"],
+            "name": cache_dict["name"],
+            "description": cache_dict["description"],
+        }
         recipe = cls(recipe_stub)
         recipe.keywords = cache_dict["keywords"]
 
         for key, ing_data in cache_dict["ingredients"].items():
             food_id, food_name = key.split("_", 1)
             recipe.ingredients[(int(food_id), food_name)] = Ingredient(
-                id=ing_data["id"], name=ing_data["name"], quantity=ing_data["quantity"], unit=Unit(ing_data["unit"])
+                id=ing_data["id"],
+                name=ing_data["name"],
+                quantity=ing_data["quantity"],
+                unit=Unit(ing_data["unit"]),
             )
 
         recipe.produced_amount = cache_dict["produced_amount"]
-        recipe.produced_unit = Unit(cache_dict["produced_unit"]) if cache_dict["produced_unit"] else None
+        recipe.produced_unit = (
+            Unit(cache_dict["produced_unit"]) if cache_dict["produced_unit"] else None
+        )
         return recipe

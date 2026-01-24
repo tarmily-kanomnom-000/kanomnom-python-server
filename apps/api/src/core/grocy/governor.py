@@ -40,7 +40,9 @@ class GrocyGovernor:
             return self._managers[instance_index]
         metadata = self.metadata_repository.load(instance_index)
         credentials = self.credentials_repository.load(instance_index)
-        client = GrocyClient(metadata.grocy_url, credentials.api_key, metadata.instance_timezone)
+        client = GrocyClient(
+            metadata.grocy_url, credentials.api_key, metadata.instance_timezone
+        )
         manager = GrocyManager(instance_index, client)
         self._managers[instance_index] = manager
         return manager
@@ -70,7 +72,9 @@ class GrocyGovernor:
         manager = self.manager_for(instance_index)
         return manager.ensure_product_groups(manifest)
 
-    def ensure_shopping_locations(self, instance_index: str) -> ShoppingLocationSyncResult:
+    def ensure_shopping_locations(
+        self, instance_index: str
+    ) -> ShoppingLocationSyncResult:
         """Ensure an instance has every shopping location defined in the universal manifest."""
         manifest = self._load_universal_manifest()
         manager = self.manager_for(instance_index)
@@ -79,5 +83,7 @@ class GrocyGovernor:
     def _load_universal_manifest(self) -> UniversalManifest:
         universal_dir = self.manifest_root / "universal"
         if not universal_dir.exists():
-            raise ManifestNotFoundError(f"Missing universal manifest directory: {universal_dir}")
+            raise ManifestNotFoundError(
+                f"Missing universal manifest directory: {universal_dir}"
+            )
         return UniversalManifest.load(universal_dir)

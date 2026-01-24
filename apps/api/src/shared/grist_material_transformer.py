@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Iterable
 
 import polars as pl
-
 from shared.grist_schema import MaterialPurchaseSchema
 from shared.polars_cleaners import sanitize_numeric_columns, sanitize_string_columns
 
@@ -71,10 +70,14 @@ def normalize_material_purchase_dataframe(
     normalized = _add_unit_cost(normalized)
     normalized = _ensure_optional_columns(normalized)
 
-    return normalized.select([column for column in _CANONICAL_COLUMN_ORDER if column in normalized.columns])
+    return normalized.select(
+        [column for column in _CANONICAL_COLUMN_ORDER if column in normalized.columns]
+    )
 
 
-def _collect_existing_columns(resolved: dict[str, str], roles: Iterable[str]) -> list[str]:
+def _collect_existing_columns(
+    resolved: dict[str, str], roles: Iterable[str]
+) -> list[str]:
     columns: list[str] = []
     for role in roles:
         column = resolved.get(role)
@@ -106,13 +109,18 @@ def _ensure_numeric_columns(dataframe: pl.DataFrame) -> pl.DataFrame:
     if not available:
         return dataframe
 
-    casts = [pl.col(column).cast(pl.Float64, strict=False).alias(column) for column in available]
+    casts = [
+        pl.col(column).cast(pl.Float64, strict=False).alias(column)
+        for column in available
+    ]
     return dataframe.with_columns(casts)
 
 
 def _add_units_purchased(dataframe: pl.DataFrame) -> pl.DataFrame:
     if "package_size" not in dataframe.columns or "quantity" not in dataframe.columns:
-        return dataframe.with_columns(pl.lit(0.0).cast(pl.Float64).alias("units_purchased"))
+        return dataframe.with_columns(
+            pl.lit(0.0).cast(pl.Float64).alias("units_purchased")
+        )
 
     package_expr = pl.col("package_size").fill_null(0.0)
     quantity_expr = pl.col("quantity").fill_null(0.0)
@@ -135,11 +143,15 @@ def _add_total_cost(dataframe: pl.DataFrame) -> pl.DataFrame:
     candidate_exprs: list[pl.Expr] = []
 
     if "total_cost" in dataframe.columns:
-        candidate_exprs.append(pl.when(pl.col("total_cost") > 0).then(pl.col("total_cost")).otherwise(None))
+        candidate_exprs.append(
+            pl.when(pl.col("total_cost") > 0).then(pl.col("total_cost")).otherwise(None)
+        )
 
     if "total_unit_cost" in dataframe.columns:
         candidate_exprs.append(
-            pl.when(pl.col("total_unit_cost") > 0).then(pl.col("total_unit_cost") * package_expr * quantity_expr).otherwise(None)
+            pl.when(pl.col("total_unit_cost") > 0)
+            .then(pl.col("total_unit_cost") * package_expr * quantity_expr)
+            .otherwise(None)
         )
 
     if "purchase_unit_price" in dataframe.columns:
@@ -151,7 +163,9 @@ def _add_total_cost(dataframe: pl.DataFrame) -> pl.DataFrame:
 
     if "purchase_price_per_item" in dataframe.columns:
         candidate_exprs.append(
-            pl.when(pl.col("purchase_price_per_item") > 0).then(pl.col("purchase_price_per_item") * quantity_expr).otherwise(None)
+            pl.when(pl.col("purchase_price_per_item") > 0)
+            .then(pl.col("purchase_price_per_item") * quantity_expr)
+            .otherwise(None)
         )
 
     if "purchase_price_per_item2" in dataframe.columns:
@@ -162,12 +176,17 @@ def _add_total_cost(dataframe: pl.DataFrame) -> pl.DataFrame:
         )
 
     if candidate_exprs:
-        dataframe = dataframe.with_columns(pl.coalesce(candidate_exprs).alias("__total_cost_candidate"))
+        dataframe = dataframe.with_columns(
+            pl.coalesce(candidate_exprs).alias("__total_cost_candidate")
+        )
     else:
         dataframe = dataframe.with_columns(pl.lit(0.0).alias("__total_cost_candidate"))
 
     return dataframe.with_columns(
-        pl.col("__total_cost_candidate").fill_null(0.0).cast(pl.Float64, strict=False).alias("total_cost")
+        pl.col("__total_cost_candidate")
+        .fill_null(0.0)
+        .cast(pl.Float64, strict=False)
+        .alias("total_cost")
     ).drop("__total_cost_candidate")
 
 
@@ -175,15 +194,27 @@ def _add_unit_cost(dataframe: pl.DataFrame) -> pl.DataFrame:
     unit_cost_candidates: list[pl.Expr] = []
 
     if "total_unit_cost" in dataframe.columns:
-        unit_cost_candidates.append(pl.when(pl.col("total_unit_cost") > 0).then(pl.col("total_unit_cost")).otherwise(None))
+        unit_cost_candidates.append(
+            pl.when(pl.col("total_unit_cost") > 0)
+            .then(pl.col("total_unit_cost"))
+            .otherwise(None)
+        )
 
     unit_cost_candidates.append(
-        pl.when((pl.col("units_purchased") > 0) & pl.col("total_cost").is_not_null() & (pl.col("total_cost") > 0))
+        pl.when(
+            (pl.col("units_purchased") > 0)
+            & pl.col("total_cost").is_not_null()
+            & (pl.col("total_cost") > 0)
+        )
         .then(pl.col("total_cost") / pl.col("units_purchased"))
         .otherwise(None)
     )
 
-    return dataframe.with_columns(pl.coalesce(unit_cost_candidates).cast(pl.Float64, strict=False).alias("unit_cost"))
+    return dataframe.with_columns(
+        pl.coalesce(unit_cost_candidates)
+        .cast(pl.Float64, strict=False)
+        .alias("unit_cost")
+    )
 
 
 def _ensure_optional_columns(dataframe: pl.DataFrame) -> pl.DataFrame:

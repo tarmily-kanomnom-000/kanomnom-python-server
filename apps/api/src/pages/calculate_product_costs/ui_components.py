@@ -8,7 +8,6 @@ from typing import Optional
 
 import flet as ft
 from flet.core.control_event import ControlEvent
-
 from shared.ui.layout import default_layout_config, styled_container
 
 from .constants import (
@@ -71,7 +70,9 @@ class UIComponentBuilder:
                             ft.ElevatedButton(
                                 "Apply Filter",
                                 on_click=on_apply_filter,
-                                style=ft.ButtonStyle(bgcolor=ft.Colors.SECONDARY, color=ft.Colors.WHITE),
+                                style=ft.ButtonStyle(
+                                    bgcolor=ft.Colors.SECONDARY, color=ft.Colors.WHITE
+                                ),
                             ),
                         ],
                         spacing=BUTTON_SPACING,
@@ -95,11 +96,16 @@ class UIComponentBuilder:
 
         if not cost_basis:
             return ft.Container(
-                content=ft.Text("No cost data available for selected time point", color=ft.Colors.RED),
+                content=ft.Text(
+                    "No cost data available for selected time point",
+                    color=ft.Colors.RED,
+                ),
                 padding=10,
             )
 
-        sorted_ingredients, total_cost = self.cost_calculator.calculate_ingredient_costs(ingredients, cost_basis)
+        sorted_ingredients, total_cost = (
+            self.cost_calculator.calculate_ingredient_costs(ingredients, cost_basis)
+        )
         ingredients_table = self._create_ingredients_table(sorted_ingredients)
         title_text = self._create_breakdown_title(recipe_name, selected_date)
 
@@ -122,7 +128,9 @@ class UIComponentBuilder:
                         padding=10,
                         bgcolor=ft.Colors.WHITE,
                     ),
-                    self.create_ingredient_copy_section(recipe_name, sorted_ingredients, total_cost),
+                    self.create_ingredient_copy_section(
+                        recipe_name, sorted_ingredients, total_cost
+                    ),
                 ]
             ),
             margin=ft.margin.only(top=10),
@@ -130,13 +138,26 @@ class UIComponentBuilder:
         )
 
     def create_ingredient_copy_section(
-        self, recipe_name: str, sorted_ingredients: list[SortedIngredient], total_cost: float
+        self,
+        recipe_name: str,
+        sorted_ingredients: list[SortedIngredient],
+        total_cost: float,
     ) -> ft.ExpansionTile:
         """Create copy-friendly section without calling semantic matching again."""
 
-        lines = [f"Ingredients for 1 × {recipe_name}:\n", "Ingredient\tAmount\tUnit\tCost Basis\tIngredient Cost"]
+        lines = [
+            f"Ingredients for 1 × {recipe_name}:\n",
+            "Ingredient\tAmount\tUnit\tCost Basis\tIngredient Cost",
+        ]
 
-        for ingredient, amount, unit, cost_per_unit, ingredient_cost, _ in sorted_ingredients:
+        for (
+            ingredient,
+            amount,
+            unit,
+            cost_per_unit,
+            ingredient_cost,
+            _,
+        ) in sorted_ingredients:
             cost_basis_text = self._format_cost_basis(cost_per_unit, unit)
             ingredient_cost_text = self._format_money(ingredient_cost)
             lines.append(
@@ -151,13 +172,20 @@ class UIComponentBuilder:
             initially_expanded=False,
         )
 
-    def _create_ingredients_table(self, sorted_ingredients: list[SortedIngredient]) -> ft.Column:
+    def _create_ingredients_table(
+        self, sorted_ingredients: list[SortedIngredient]
+    ) -> ft.Column:
         """Create the ingredients table with header and data rows."""
 
         ingredient_rows: list[ft.Control] = [
             ft.Row(
                 [
-                    ft.Text("Ingredient", weight=ft.FontWeight.BOLD, expand=True, selectable=True),
+                    ft.Text(
+                        "Ingredient",
+                        weight=ft.FontWeight.BOLD,
+                        expand=True,
+                        selectable=True,
+                    ),
                     ft.Text(
                         "Amount",
                         weight=ft.FontWeight.BOLD,
@@ -165,7 +193,9 @@ class UIComponentBuilder:
                         text_align=ft.TextAlign.RIGHT,
                         selectable=True,
                     ),
-                    ft.Text("Unit", weight=ft.FontWeight.BOLD, width=60, selectable=True),
+                    ft.Text(
+                        "Unit", weight=ft.FontWeight.BOLD, width=60, selectable=True
+                    ),
                     ft.Text(
                         "Cost Basis",
                         weight=ft.FontWeight.BOLD,
@@ -186,10 +216,20 @@ class UIComponentBuilder:
         ]
 
         total_cost = 0.0
-        for ingredient, amount, unit, cost_per_unit, ingredient_cost, _ in sorted_ingredients:
-            cost_basis_text, ingredient_cost_text, cost_basis_color, ingredient_cost_color = self._format_cost_data(
-                cost_per_unit, ingredient_cost, unit
-            )
+        for (
+            ingredient,
+            amount,
+            unit,
+            cost_per_unit,
+            ingredient_cost,
+            _,
+        ) in sorted_ingredients:
+            (
+                cost_basis_text,
+                ingredient_cost_text,
+                cost_basis_color,
+                ingredient_cost_color,
+            ) = self._format_cost_data(cost_per_unit, ingredient_cost, unit)
 
             ingredient_rows.append(
                 ft.Row(
@@ -226,7 +266,12 @@ class UIComponentBuilder:
                 ft.Divider(),
                 ft.Row(
                     [
-                        ft.Text("TOTAL COST", weight=ft.FontWeight.BOLD, expand=True, selectable=True),
+                        ft.Text(
+                            "TOTAL COST",
+                            weight=ft.FontWeight.BOLD,
+                            expand=True,
+                            selectable=True,
+                        ),
                         ft.Text("", width=80),
                         ft.Text("", width=60),
                         ft.Text("", width=100),
@@ -246,14 +291,24 @@ class UIComponentBuilder:
         return ft.Column(ingredient_rows)
 
     def _format_cost_data(
-        self, cost_per_unit: Optional[float], ingredient_cost: Optional[float], unit: str
+        self,
+        cost_per_unit: Optional[float],
+        ingredient_cost: Optional[float],
+        unit: str,
     ) -> tuple[str, str, str, str]:
         """Format cost data for display with appropriate colors."""
 
         if cost_per_unit is not None:
-            cost_basis_text = f"${cost_per_unit:.{INGREDIENT_DISPLAY_PRECISION}f}/{unit}"
+            cost_basis_text = (
+                f"${cost_per_unit:.{INGREDIENT_DISPLAY_PRECISION}f}/{unit}"
+            )
             ingredient_cost_text = self._format_money(ingredient_cost)
-            return cost_basis_text, ingredient_cost_text, ft.Colors.BLACK, ft.Colors.GREEN
+            return (
+                cost_basis_text,
+                ingredient_cost_text,
+                ft.Colors.BLACK,
+                ft.Colors.GREEN,
+            )
 
         return "not found", "not found", ft.Colors.RED, ft.Colors.RED
 
@@ -271,14 +326,18 @@ class UIComponentBuilder:
             return "not found"
         return f"${amount:.{INGREDIENT_DISPLAY_PRECISION}f}"
 
-    def _create_breakdown_title(self, recipe_name: str, selected_date: Optional[datetime]) -> str:
+    def _create_breakdown_title(
+        self, recipe_name: str, selected_date: Optional[datetime]
+    ) -> str:
         """Create title text for ingredient breakdown."""
 
         if selected_date:
             return f"Ingredients for 1 × {recipe_name} (at {selected_date.strftime('%B %Y')}):"
         return f"Ingredients for 1 × {recipe_name} (Current Prices):"
 
-    def _create_copy_text_field(self, lines: Iterable[str], *, min_lines: int, max_lines: int) -> ft.Container:
+    def _create_copy_text_field(
+        self, lines: Iterable[str], *, min_lines: int, max_lines: int
+    ) -> ft.Container:
         """Shared helper for read-only copy text fields."""
 
         return ft.Container(

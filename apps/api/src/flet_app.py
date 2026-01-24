@@ -1,13 +1,14 @@
 import logging
 
 import flet as ft
-
 from pages.calculate_ingredients.page import IngredientsCalculatorContent
 from pages.calculate_product_costs.page import ProductCostsCalculatorContent
 from pages.material_purchase_runs.page import MaterialPurchaseRunsContent
 
 # Configure logging for debugging
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -16,7 +17,9 @@ def home_view():
     return ft.View(
         route="/",
         controls=[
-            ft.AppBar(title=ft.Text("🧁 Ka-nom Nom Server"), bgcolor=ft.Colors.SURFACE_VARIANT),
+            ft.AppBar(
+                title=ft.Text("🧁 Ka-nom Nom Server"), bgcolor=ft.Colors.SURFACE_VARIANT
+            ),
             ft.Container(
                 content=ft.Column(
                     [
@@ -38,22 +41,52 @@ def home_view():
                                 content=ft.Column(
                                     [
                                         ft.ListTile(
-                                            leading=ft.Icon(ft.Icons.CALCULATE, size=40),
-                                            title=ft.Text("Raw Ingredients Calculator", size=18, weight=ft.FontWeight.BOLD),
-                                            subtitle=ft.Text("Calculate raw ingredients from product recipes"),
-                                            on_click=lambda e: e.page.go("/calculate_ingredients"),
+                                            leading=ft.Icon(
+                                                ft.Icons.CALCULATE, size=40
+                                            ),
+                                            title=ft.Text(
+                                                "Raw Ingredients Calculator",
+                                                size=18,
+                                                weight=ft.FontWeight.BOLD,
+                                            ),
+                                            subtitle=ft.Text(
+                                                "Calculate raw ingredients from product recipes"
+                                            ),
+                                            on_click=lambda e: e.page.go(
+                                                "/calculate_ingredients"
+                                            ),
                                         ),
                                         ft.ListTile(
-                                            leading=ft.Icon(ft.Icons.ATTACH_MONEY, size=40),
-                                            title=ft.Text("Product Cost Calculator", size=18, weight=ft.FontWeight.BOLD),
-                                            subtitle=ft.Text("Review material costs by recipe"),
-                                            on_click=lambda e: e.page.go("/calculate_product_costs"),
+                                            leading=ft.Icon(
+                                                ft.Icons.ATTACH_MONEY, size=40
+                                            ),
+                                            title=ft.Text(
+                                                "Product Cost Calculator",
+                                                size=18,
+                                                weight=ft.FontWeight.BOLD,
+                                            ),
+                                            subtitle=ft.Text(
+                                                "Review material costs by recipe"
+                                            ),
+                                            on_click=lambda e: e.page.go(
+                                                "/calculate_product_costs"
+                                            ),
                                         ),
                                         ft.ListTile(
-                                            leading=ft.Icon(ft.Icons.INVENTORY, size=40),
-                                            title=ft.Text("Material Purchase Runs", size=18, weight=ft.FontWeight.BOLD),
-                                            subtitle=ft.Text("Forecast upcoming supply runs"),
-                                            on_click=lambda e: e.page.go("/material_purchase_runs"),
+                                            leading=ft.Icon(
+                                                ft.Icons.INVENTORY, size=40
+                                            ),
+                                            title=ft.Text(
+                                                "Material Purchase Runs",
+                                                size=18,
+                                                weight=ft.FontWeight.BOLD,
+                                            ),
+                                            subtitle=ft.Text(
+                                                "Forecast upcoming supply runs"
+                                            ),
+                                            on_click=lambda e: e.page.go(
+                                                "/material_purchase_runs"
+                                            ),
                                         ),
                                     ]
                                 ),
@@ -104,28 +137,46 @@ def main(page: ft.Page):
             # Calculate ingredients page
             calculator = IngredientsCalculatorContent(page)
             calculator.build_content()
-            page.views.append(ft.View("/calculate_ingredients", [calculator], scroll=ft.ScrollMode.AUTO))
+            page.views.append(
+                ft.View(
+                    "/calculate_ingredients", [calculator], scroll=ft.ScrollMode.AUTO
+                )
+            )
         elif page.route == "/calculate_product_costs":
             # Calculate product costs page
             calculator = ProductCostsCalculatorContent(page)
             calculator.build_content()
-            page.views.append(ft.View("/calculate_product_costs", [calculator], scroll=ft.ScrollMode.AUTO))
+            page.views.append(
+                ft.View(
+                    "/calculate_product_costs", [calculator], scroll=ft.ScrollMode.AUTO
+                )
+            )
         elif page.route == "/material_purchase_runs":
             analysis = MaterialPurchaseRunsContent(page)
             analysis.build_content()
-            page.views.append(ft.View("/material_purchase_runs", [analysis], scroll=ft.ScrollMode.AUTO))
+            page.views.append(
+                ft.View(
+                    "/material_purchase_runs", [analysis], scroll=ft.ScrollMode.AUTO
+                )
+            )
         elif page.route == "/" or page.route == "":
             # Home page with navigation
             home_content = ft.Column(
                 controls=[
-                    ft.Text("Welcome to Ka-Nom Nom Tools", size=32, weight=ft.FontWeight.BOLD),
+                    ft.Text(
+                        "Welcome to Ka-Nom Nom Tools",
+                        size=32,
+                        weight=ft.FontWeight.BOLD,
+                    ),
                     ft.Text("Select a tool to get started:", size=18),
                     ft.Container(height=20),
                     ft.ElevatedButton(
                         "🧮 Calculate Ingredients",
                         on_click=lambda _: page.go("/calculate_ingredients"),
                         style=ft.ButtonStyle(
-                            bgcolor=ft.Colors.PRIMARY, color=ft.Colors.ON_PRIMARY, padding=ft.Padding(20, 15, 20, 15)
+                            bgcolor=ft.Colors.PRIMARY,
+                            color=ft.Colors.ON_PRIMARY,
+                            padding=ft.Padding(20, 15, 20, 15),
                         ),
                         width=300,
                         height=60,

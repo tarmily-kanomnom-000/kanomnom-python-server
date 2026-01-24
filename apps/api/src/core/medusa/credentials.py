@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
 from core.medusa.models import MedusaInstanceCredentials
 
 
@@ -18,7 +17,9 @@ class MedusaCredentialsRepository:
         """Load the credentials.yaml file for a specific Medusa instance."""
         credentials_path = self.manifest_root / instance_key / "credentials.yaml"
         if not credentials_path.exists():
-            raise FileNotFoundError(f"Missing credentials for instance {instance_key}: {credentials_path}")
+            raise FileNotFoundError(
+                f"Missing credentials for instance {instance_key}: {credentials_path}"
+            )
         parsed = _parse_credentials_file(credentials_path)
         return _resolve_credentials(parsed, credentials_path)
 
@@ -35,15 +36,23 @@ def _parse_credentials_file(path: Path) -> dict[str, Any]:
     return parsed
 
 
-def _resolve_credentials(parsed: dict[str, Any], path: Path) -> MedusaInstanceCredentials:
+def _resolve_credentials(
+    parsed: dict[str, Any], path: Path
+) -> MedusaInstanceCredentials:
     credentials_list = parsed.get("credentials")
     if credentials_list is None:
         raise ValueError(f"Missing credentials data in {path}")
     entries = _require_list(credentials_list, "credentials")
     resolved = _select_default_entry(entries, path)
-    admin_email = _require_string(resolved.get("admin_email"), "credentials.admin_email")
-    admin_password = _require_string(resolved.get("admin_password"), "credentials.admin_password")
-    return MedusaInstanceCredentials(admin_email=admin_email, admin_password=admin_password)
+    admin_email = _require_string(
+        resolved.get("admin_email"), "credentials.admin_email"
+    )
+    admin_password = _require_string(
+        resolved.get("admin_password"), "credentials.admin_password"
+    )
+    return MedusaInstanceCredentials(
+        admin_email=admin_email, admin_password=admin_password
+    )
 
 
 def _require_string(value: Any, field: str) -> str:

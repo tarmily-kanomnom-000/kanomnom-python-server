@@ -21,7 +21,9 @@ class MaterialPurchaseRunsUIBuilder:
     def __init__(self) -> None:
         self._max_table_rows = 300
 
-    def create_summary_section(self, analytics: MaterialPurchaseAnalyticsResult) -> ft.Container:
+    def create_summary_section(
+        self, analytics: MaterialPurchaseAnalyticsResult
+    ) -> ft.Container:
         total_materials = len(analytics.projections)
         generated = analytics.generated_at.strftime("%Y-%m-%d %H:%M")
         next_run_text = "-"
@@ -31,8 +33,12 @@ class MaterialPurchaseRunsUIBuilder:
 
         cards = ft.Row(
             controls=[
-                self._metric_card("Total Materials", f"{total_materials}", ft.Colors.PRIMARY),
-                self._metric_card("Cadence", f"Every {analytics.run_interval_days}d", ft.Colors.INDIGO),
+                self._metric_card(
+                    "Total Materials", f"{total_materials}", ft.Colors.PRIMARY
+                ),
+                self._metric_card(
+                    "Cadence", f"Every {analytics.run_interval_days}d", ft.Colors.INDIGO
+                ),
                 self._metric_card("Next Run Buy", next_run_text, ft.Colors.DEEP_ORANGE),
             ],
             spacing=16,
@@ -40,7 +46,9 @@ class MaterialPurchaseRunsUIBuilder:
             wrap=True,
         )
 
-        generated_label = ft.Text(f"Last refreshed: {generated}", size=12, color=ft.Colors.GREY)
+        generated_label = ft.Text(
+            f"Last refreshed: {generated}", size=12, color=ft.Colors.GREY
+        )
 
         return ft.Container(
             content=ft.Column([cards, generated_label], spacing=8),
@@ -49,12 +57,19 @@ class MaterialPurchaseRunsUIBuilder:
             border_radius=8,
         )
 
-    def create_low_supply_section(self, materials: Iterable[MaterialPurchaseProjection]) -> ft.Container:
+    def create_low_supply_section(
+        self, materials: Iterable[MaterialPurchaseProjection]
+    ) -> ft.Container:
         material_list = list(materials)
         if not material_list:
             return self._panel(
                 title="Materials Running Low",
-                controls=[ft.Text("All materials look healthy for the next week.", color=ft.Colors.GREEN)],
+                controls=[
+                    ft.Text(
+                        "All materials look healthy for the next week.",
+                        color=ft.Colors.GREEN,
+                    )
+                ],
             )
 
         tiles: list[ft.Control] = []
@@ -64,18 +79,33 @@ class MaterialPurchaseRunsUIBuilder:
             runout_date_text = self._format_date(projection.estimated_runout_date)
             source_value = self._format_source(projection)
             source_text = f"Source: {source_value}" if source_value else ""
-            confidence_text = f"Confidence: {self._format_percentage(projection.usage_confidence)}"
+            confidence_text = (
+                f"Confidence: {self._format_percentage(projection.usage_confidence)}"
+            )
             window_text = self._format_supply_window_long(projection)
             unit_value = self._format_unit(projection)
             unit_text = f"Unit: {unit_value}" if unit_value else ""
-            runout_text = f"Runout: {runout_date_text}" if runout_date_text != "-" else ""
+            runout_text = (
+                f"Runout: {runout_date_text}" if runout_date_text != "-" else ""
+            )
             subtitle_parts = [
-                part for part in [unit_text, days_text, window_text, runout_text, source_text, confidence_text] if part
+                part
+                for part in [
+                    unit_text,
+                    days_text,
+                    window_text,
+                    runout_text,
+                    source_text,
+                    confidence_text,
+                ]
+                if part
             ]
             subtitle = " • ".join(subtitle_parts)
             tiles.append(
                 ft.ListTile(
-                    leading=ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=ft.Colors.AMBER, size=28),
+                    leading=ft.Icon(
+                        ft.Icons.WARNING_AMBER_ROUNDED, color=ft.Colors.AMBER, size=28
+                    ),
                     title=ft.Text(projection.material, weight=ft.FontWeight.BOLD),
                     subtitle=ft.Text(subtitle),
                 )
@@ -94,7 +124,12 @@ class MaterialPurchaseRunsUIBuilder:
         if not schedule_list:
             return self._panel(
                 title="Cadence Supply Schedule",
-                controls=[ft.Text("No materials require ordering within the configured horizon.", color=ft.Colors.GREEN)],
+                controls=[
+                    ft.Text(
+                        "No materials require ordering within the configured horizon.",
+                        color=ft.Colors.GREEN,
+                    )
+                ],
             )
 
         tiles: list[ft.Control] = []
@@ -104,12 +139,16 @@ class MaterialPurchaseRunsUIBuilder:
                 weight=ft.FontWeight.BOLD,
                 size=14,
             )
-            summary = self._format_purchase_summary(run.assignments, prefix=f"{len(run.assignments)} materials")
+            summary = self._format_purchase_summary(
+                run.assignments, prefix=f"{len(run.assignments)} materials"
+            )
             subtitle = ft.Text(summary, size=12, color=ft.Colors.GREY)
 
             rows: list[ft.DataRow] = []
 
-            def _assignment_sort_key(item: SupplyRunAssignment) -> tuple[int, float, str]:
+            def _assignment_sort_key(
+                item: SupplyRunAssignment,
+            ) -> tuple[int, float, str]:
                 safe = item.lower_days_available
                 safe_value = safe if safe is not None else float("inf")
                 priority = 0
@@ -125,13 +164,19 @@ class MaterialPurchaseRunsUIBuilder:
 
             for assignment in sorted(run.assignments, key=_assignment_sort_key):
                 projection = assignment.projection
-                on_hand_text = self._format_quantity(assignment.projected_units_on_run_date, projection.unit)
-                purchase_text = self._format_quantity(assignment.recommended_purchase_units, projection.unit)
+                on_hand_text = self._format_quantity(
+                    assignment.projected_units_on_run_date, projection.unit
+                )
+                purchase_text = self._format_quantity(
+                    assignment.recommended_purchase_units, projection.unit
+                )
                 cost_text = self._format_currency(assignment.recommended_purchase_cost)
                 safe_text = self._format_days(assignment.lower_days_available) or "-"
                 buffer_text = self._format_days(assignment.buffer_days) or "-"
                 confidence_text = self._format_percentage(projection.usage_confidence)
-                icon_name, color, status_text = self._assignment_status_details(assignment, interval_days)
+                icon_name, color, status_text = self._assignment_status_details(
+                    assignment, interval_days
+                )
                 if projection.material in low_supply:
                     icon_name = ft.Icons.WARNING_AMBER_ROUNDED
                     color = ft.Colors.AMBER
@@ -139,7 +184,10 @@ class MaterialPurchaseRunsUIBuilder:
                 source_text = self._format_source(projection) or "-"
 
                 status_cell = ft.Row(
-                    controls=[ft.Icon(icon_name, color=color, size=18), ft.Text(status_text)],
+                    controls=[
+                        ft.Icon(icon_name, color=color, size=18),
+                        ft.Text(status_text),
+                    ],
                     spacing=6,
                     alignment=ft.MainAxisAlignment.START,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -202,14 +250,22 @@ class MaterialPurchaseRunsUIBuilder:
         if not warning_list:
             return self._panel(
                 title="Cadence Exceptions",
-                controls=[ft.Text(f"All materials fit the {interval_days} day cadence.", color=ft.Colors.GREEN)],
+                controls=[
+                    ft.Text(
+                        f"All materials fit the {interval_days} day cadence.",
+                        color=ft.Colors.GREEN,
+                    )
+                ],
             )
 
         schedule_lookup: dict[int, tuple[str, str | None]] = {}
         if schedule is not None:
             for run, assignment in self._flatten_schedule(schedule):
                 key = id(assignment)
-                schedule_lookup[key] = (run.label, run.scheduled_date.strftime("%Y-%m-%d"))
+                schedule_lookup[key] = (
+                    run.label,
+                    run.scheduled_date.strftime("%Y-%m-%d"),
+                )
 
         columns = [
             ft.DataColumn(ft.Text("Run")),
@@ -223,11 +279,17 @@ class MaterialPurchaseRunsUIBuilder:
         ]
 
         rows: list[ft.DataRow] = []
-        for assignment in sorted(warning_list, key=lambda item: item.projection.material.lower()):
+        for assignment in sorted(
+            warning_list, key=lambda item: item.projection.material.lower()
+        ):
             projection = assignment.projection
-            run_label, run_date = schedule_lookup.get(id(assignment), (f"Run @ {assignment.run_offset_days:.0f}d", None))
+            run_label, run_date = schedule_lookup.get(
+                id(assignment), (f"Run @ {assignment.run_offset_days:.0f}d", None)
+            )
             reason = self._format_assignment_warning(assignment, interval_days)
-            purchase_text = self._format_quantity(assignment.recommended_purchase_units, projection.unit)
+            purchase_text = self._format_quantity(
+                assignment.recommended_purchase_units, projection.unit
+            )
             cost_text = self._format_currency(assignment.recommended_purchase_cost)
             confidence_text = self._format_percentage(projection.usage_confidence)
 
@@ -267,12 +329,19 @@ class MaterialPurchaseRunsUIBuilder:
             border_radius=8,
         )
 
-    def create_projection_table(self, projections: Iterable[MaterialPurchaseProjection]) -> ft.Container:
+    def create_projection_table(
+        self, projections: Iterable[MaterialPurchaseProjection]
+    ) -> ft.Container:
         projection_list = list(projections)
         if not projection_list:
             return self._panel(
                 title="Material Projections",
-                controls=[ft.Text("No data available for the selected time range.", color=ft.Colors.RED)],
+                controls=[
+                    ft.Text(
+                        "No data available for the selected time range.",
+                        color=ft.Colors.RED,
+                    )
+                ],
             )
 
         table_rows: list[ft.DataRow] = []
@@ -283,14 +352,28 @@ class MaterialPurchaseRunsUIBuilder:
                 ft.DataCell(ft.Text(unit_label)),
                 ft.DataCell(ft.Text(self._format_source(projection) or "-")),
                 ft.DataCell(ft.Text(self._format_unit_cost(projection.best_unit_cost))),
-                ft.DataCell(ft.Text(self._format_usage_per_day(projection, projection.unit))),
-                ft.DataCell(ft.Text(self._format_days(projection.purchase_frequency_days) or "-")),
-                ft.DataCell(ft.Text(self._format_days(projection.days_until_runout) or "-")),
-                ft.DataCell(ft.Text(self._format_supply_window_short(projection) or "-")),
-                ft.DataCell(ft.Text(self._format_date(projection.estimated_runout_date))),
+                ft.DataCell(
+                    ft.Text(self._format_usage_per_day(projection, projection.unit))
+                ),
+                ft.DataCell(
+                    ft.Text(
+                        self._format_days(projection.purchase_frequency_days) or "-"
+                    )
+                ),
+                ft.DataCell(
+                    ft.Text(self._format_days(projection.days_until_runout) or "-")
+                ),
+                ft.DataCell(
+                    ft.Text(self._format_supply_window_short(projection) or "-")
+                ),
+                ft.DataCell(
+                    ft.Text(self._format_date(projection.estimated_runout_date))
+                ),
                 ft.DataCell(ft.Text(self._format_date(projection.last_purchase_date))),
                 ft.DataCell(ft.Text(str(projection.total_purchases))),
-                ft.DataCell(ft.Text(self._format_percentage(projection.usage_confidence))),
+                ft.DataCell(
+                    ft.Text(self._format_percentage(projection.usage_confidence))
+                ),
             ]
             table_rows.append(ft.DataRow(cells=row_cells))
 
@@ -360,7 +443,9 @@ class MaterialPurchaseRunsUIBuilder:
             border_radius=8,
         )
 
-    def _format_number(self, value: float | None, precision: int, suffix: str | None) -> str:
+    def _format_number(
+        self, value: float | None, precision: int, suffix: str | None
+    ) -> str:
         if value is None:
             return ""
         formatted = f"{value:,.{precision}f}"
@@ -384,7 +469,9 @@ class MaterialPurchaseRunsUIBuilder:
         formatted = formatted.rstrip("0").rstrip(".")
         return formatted
 
-    def _format_usage_per_day(self, projection: MaterialPurchaseProjection, unit_label: str) -> str:
+    def _format_usage_per_day(
+        self, projection: MaterialPurchaseProjection, unit_label: str
+    ) -> str:
         usage = projection.usage_per_day
         if usage is None:
             return "-"
@@ -439,7 +526,9 @@ class MaterialPurchaseRunsUIBuilder:
             "On cadence",
         )
 
-    def _format_assignment_warning(self, assignment: SupplyRunAssignment, interval_days: int) -> str:
+    def _format_assignment_warning(
+        self, assignment: SupplyRunAssignment, interval_days: int
+    ) -> str:
         parts: list[str] = []
         if assignment.violates_cadence:
             safe_text = self._format_days(assignment.lower_days_available) or "?"
@@ -451,7 +540,9 @@ class MaterialPurchaseRunsUIBuilder:
             return "Included for tracking"
         return " • ".join(parts)
 
-    def _supply_window_bounds(self, projection: MaterialPurchaseProjection) -> tuple[float, float, int] | None:
+    def _supply_window_bounds(
+        self, projection: MaterialPurchaseProjection
+    ) -> tuple[float, float, int] | None:
         window = projection.remaining_supply_window
         if window is None:
             return None
@@ -460,7 +551,9 @@ class MaterialPurchaseRunsUIBuilder:
         confidence = int(round(window.confidence * 100))
         return window.lower_days, window.upper_days, confidence
 
-    def _format_supply_window_long(self, projection: MaterialPurchaseProjection) -> str | None:
+    def _format_supply_window_long(
+        self, projection: MaterialPurchaseProjection
+    ) -> str | None:
         bounds = self._supply_window_bounds(projection)
         if bounds is None:
             return None
@@ -469,7 +562,9 @@ class MaterialPurchaseRunsUIBuilder:
         upper_text = self._format_number(upper, 1, None)
         return f"{confidence}% range: {lower_text}–{upper_text} d"
 
-    def _format_supply_window_short(self, projection: MaterialPurchaseProjection) -> str | None:
+    def _format_supply_window_short(
+        self, projection: MaterialPurchaseProjection
+    ) -> str | None:
         bounds = self._supply_window_bounds(projection)
         if bounds is None:
             return None

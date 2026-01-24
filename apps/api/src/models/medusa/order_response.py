@@ -277,6 +277,7 @@ class MedusaOrder(MedusaBaseModel):
     id: str
     display_id: int | None = None
     custom_display_id: str | None = None
+    email: str | None = None
     status: str | None = None
     version: int | None = None
     summary: MedusaOrderSummary | None = None
@@ -286,6 +287,7 @@ class MedusaOrder(MedusaBaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
     region_id: str | None = None
+    currency_code: str | None = None
     subtotal: float | None = None
     tax_total: float | None = None
     discount_total: float | None = None

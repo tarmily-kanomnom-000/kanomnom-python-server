@@ -39,11 +39,15 @@ class QuantityUnitSyncResult:
 class QuantityUnitService:
     """Service encapsulating quantity unit reconciliation logic."""
 
-    def __init__(self, client: GrocyClient, syncer: EntitySyncer[QuantityUnitDefinition]) -> None:
+    def __init__(
+        self, client: GrocyClient, syncer: EntitySyncer[QuantityUnitDefinition]
+    ) -> None:
         self.client = client
         self.syncer = syncer
 
-    def ensure_quantity_units(self, definitions: list[QuantityUnitDefinition]) -> QuantityUnitSyncResult:
+    def ensure_quantity_units(
+        self, definitions: list[QuantityUnitDefinition]
+    ) -> QuantityUnitSyncResult:
         """Ensure the universal quantity units exist and return their Grocy ids keyed by name."""
         existing_units = self.client.list_quantity_units()
         existing_lookup = {_existing_unit_key(unit): unit for unit in existing_units}
@@ -56,7 +60,9 @@ class QuantityUnitService:
             creator=self.client.create_quantity_unit,
         )
         sync_result = self.syncer.synchronize(specification)
-        lookup = _normalize_lookup(definitions, sync_result.identifier_by_key, "Quantity unit")
+        lookup = _normalize_lookup(
+            definitions, sync_result.identifier_by_key, "Quantity unit"
+        )
         for definition in definitions:
             existing = existing_lookup.get(definition.normalized_name())
             if existing is None:
@@ -64,9 +70,14 @@ class QuantityUnitService:
             identifier = lookup.get(definition.normalized_name())
             if identifier is None:
                 continue
-            desired_note, desired_is_discrete = _extract_unit_metadata(definition.description)
+            desired_note, desired_is_discrete = _extract_unit_metadata(
+                definition.description
+            )
             current_note = _normalized_description(existing.description)
-            if desired_note == current_note and desired_is_discrete == existing.is_discrete:
+            if (
+                desired_note == current_note
+                and desired_is_discrete == existing.is_discrete
+            ):
                 continue
             payload = definition.to_payload(identifier)
             payload["description"] = definition.description
@@ -88,14 +99,20 @@ class ProductGroupSyncResult:
 class ProductGroupService:
     """Service encapsulating product group reconciliation logic."""
 
-    def __init__(self, client: GrocyClient, syncer: EntitySyncer[ProductGroupDefinition]) -> None:
+    def __init__(
+        self, client: GrocyClient, syncer: EntitySyncer[ProductGroupDefinition]
+    ) -> None:
         self.client = client
         self.syncer = syncer
 
-    def ensure_product_groups(self, definitions: list[ProductGroupDefinition]) -> ProductGroupSyncResult:
+    def ensure_product_groups(
+        self, definitions: list[ProductGroupDefinition]
+    ) -> ProductGroupSyncResult:
         """Ensure the universal product groups exist and return their Grocy ids keyed by name."""
         existing_groups = self.client.list_product_groups()
-        existing_lookup = {_existing_product_group_key(group): group for group in existing_groups}
+        existing_lookup = {
+            _existing_product_group_key(group): group for group in existing_groups
+        }
         specification = EntitySyncSpecification(
             manifest_items=definitions,
             existing_items=existing_groups,
@@ -105,7 +122,9 @@ class ProductGroupService:
             creator=self.client.create_product_group,
         )
         sync_result = self.syncer.synchronize(specification)
-        lookup = _normalize_lookup(definitions, sync_result.identifier_by_key, "Product group")
+        lookup = _normalize_lookup(
+            definitions, sync_result.identifier_by_key, "Product group"
+        )
         for definition in definitions:
             existing = existing_lookup.get(definition.normalized_name())
             if existing is None:
@@ -113,10 +132,14 @@ class ProductGroupService:
             identifier = lookup.get(definition.normalized_name())
             if identifier is None:
                 continue
-            desired_note, desired_allergens = _extract_group_metadata(definition.description)
+            desired_note, desired_allergens = _extract_group_metadata(
+                definition.description
+            )
             current_note = _normalized_description(existing.description)
             current_allergens = getattr(existing, "allergens", ())
-            if desired_note == current_note and desired_allergens == tuple(current_allergens or ()):
+            if desired_note == current_note and desired_allergens == tuple(
+                current_allergens or ()
+            ):
                 continue
             payload = definition.to_payload(identifier)
             payload["description"] = definition.description
@@ -138,14 +161,21 @@ class ShoppingLocationSyncResult:
 class ShoppingLocationService:
     """Service encapsulating shopping location reconciliation logic."""
 
-    def __init__(self, client: GrocyClient, syncer: EntitySyncer[ShoppingLocationDefinition]) -> None:
+    def __init__(
+        self, client: GrocyClient, syncer: EntitySyncer[ShoppingLocationDefinition]
+    ) -> None:
         self.client = client
         self.syncer = syncer
 
-    def ensure_shopping_locations(self, definitions: list[ShoppingLocationDefinition]) -> ShoppingLocationSyncResult:
+    def ensure_shopping_locations(
+        self, definitions: list[ShoppingLocationDefinition]
+    ) -> ShoppingLocationSyncResult:
         """Ensure the universal shopping locations exist and return their Grocy ids keyed by name."""
         existing_locations = self.client.list_shopping_locations()
-        existing_lookup = {_existing_shopping_location_key(location): location for location in existing_locations}
+        existing_lookup = {
+            _existing_shopping_location_key(location): location
+            for location in existing_locations
+        }
         specification = EntitySyncSpecification(
             manifest_items=definitions,
             existing_items=existing_locations,
@@ -155,7 +185,9 @@ class ShoppingLocationService:
             creator=self.client.create_shopping_location,
         )
         sync_result = self.syncer.synchronize(specification)
-        lookup = _normalize_lookup(definitions, sync_result.identifier_by_key, "Shopping location")
+        lookup = _normalize_lookup(
+            definitions, sync_result.identifier_by_key, "Shopping location"
+        )
         for definition in definitions:
             existing = existing_lookup.get(definition.normalized_name())
             if existing is None:
@@ -167,7 +199,10 @@ class ShoppingLocationService:
             desired_active = bool(definition.active)
             current_description = _normalized_description(existing.description)
             current_active = bool(existing.active)
-            if desired_description == current_description and desired_active == current_active:
+            if (
+                desired_description == current_description
+                and desired_active == current_active
+            ):
                 continue
             payload = definition.to_payload(identifier)
             payload["description"] = definition.description
@@ -203,7 +238,9 @@ def _normalize_lookup(
     for definition in definitions:
         key = definition.normalized_name()
         if key not in lookup:
-            raise ValueError(f"{entity_label} '{definition.name}' is missing after synchronization")
+            raise ValueError(
+                f"{entity_label} '{definition.name}' is missing after synchronization"
+            )
         normalized_lookup[key] = lookup[key]
     return normalized_lookup
 
@@ -226,7 +263,9 @@ def _extract_unit_metadata(description: str | None) -> tuple[str | None, bool | 
     return (note, None)
 
 
-def _extract_group_metadata(description: str | None) -> tuple[str | None, tuple[str, ...]]:
+def _extract_group_metadata(
+    description: str | None,
+) -> tuple[str | None, tuple[str, ...]]:
     if description is None:
         return (None, ())
     decoded = decode_structured_note(description)

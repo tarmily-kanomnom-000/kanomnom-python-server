@@ -8,7 +8,9 @@ from email_validator import EmailNotValidError, ValidatedEmail, validate_email
 from phonenumbers import PhoneNumber, PhoneNumberFormat
 from pydantic import BaseModel, ConfigDict, RootModel, field_validator
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 

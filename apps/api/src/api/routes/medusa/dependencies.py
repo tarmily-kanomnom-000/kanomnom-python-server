@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter
-
 from core.medusa import MedusaGovernor, MedusaMetadataRepository
 from core.medusa.credentials import MedusaCredentialsRepository
+from fastapi import APIRouter
 
 router = APIRouter(prefix="/medusa", tags=["medusa"])
 
