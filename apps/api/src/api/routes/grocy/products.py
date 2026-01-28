@@ -3,12 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from core.grocy.exceptions import MetadataNotFoundError
-from core.grocy.inventory import ProductDescriptionMetadataUpdate
-from core.grocy.note_metadata import (
-    ProductDescriptionMetadata,
-    ProductUnitConversion,
-    validate_note_text,
-)
+from core.grocy.updates import build_product_metadata_updates
 from fastapi import HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from models.grocy import (
@@ -98,7 +93,7 @@ async def update_product_description_metadata(
         return with_grocy_manager(
             instance_index,
             lambda manager: manager.update_product_description_metadata(
-                _build_product_metadata_updates(payload)
+                build_product_metadata_updates(payload)
             ),
         )
 
@@ -113,33 +108,3 @@ async def update_product_description_metadata(
     return GrocyProductsResponse(
         instance_index=instance_index, products=shaped_products
     )
-
-
-def _build_product_metadata_updates(
-    payload: ProductDescriptionMetadataBatchRequest,
-) -> list[ProductDescriptionMetadataUpdate]:
-    updates: list[ProductDescriptionMetadataUpdate] = []
-    for update in payload.updates:
-        validate_note_text(update.description)
-        conversions = tuple(
-            ProductUnitConversion(
-                from_unit=conversion.from_unit,
-                to_unit=conversion.to_unit,
-                factor=conversion.factor,
-                tare=conversion.tare,
-            )
-            for conversion in update.description_metadata.unit_conversions
-        )
-        if not conversions and not (update.description or "").strip():
-            raise ValueError(
-                "description or unit conversions must include at least one entry."
-            )
-        metadata = ProductDescriptionMetadata(unit_conversions=conversions)
-        updates.append(
-            ProductDescriptionMetadataUpdate(
-                product_id=update.product_id,
-                description=update.description,
-                metadata=metadata,
-            )
-        )
-    return updates

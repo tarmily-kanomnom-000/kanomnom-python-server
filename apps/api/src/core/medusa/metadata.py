@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import yaml
+from core.manifests.yaml import load_yaml_mapping
 from core.medusa.exceptions import MedusaMetadataNotFoundError
 from core.medusa.models import MedusaInstanceMetadata
 
@@ -37,14 +37,7 @@ class MedusaMetadataRepository:
 
 def _parse_metadata_file(path: Path) -> dict[str, Any]:
     """Parse the metadata.yaml file using PyYAML for correctness and safety."""
-    with path.open("r", encoding="utf-8") as handle:
-        try:
-            parsed = yaml.safe_load(handle) or {}
-        except yaml.YAMLError as exc:
-            raise ValueError(f"Failed to parse metadata file {path}: {exc}") from exc
-    if not isinstance(parsed, dict):
-        raise ValueError(f"Expected mapping at root of {path}")
-    return parsed
+    return load_yaml_mapping(path)
 
 
 def _require_string(value: Any, field: str) -> str:

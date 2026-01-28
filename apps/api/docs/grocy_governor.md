@@ -8,7 +8,7 @@ This document explains how Grocy-related components are structured inside the Py
 apps/api/grocy_manifest/       # Source of truth on disk
 apps/api/src/core/grocy/
 ├── client.py                  # Low-level HTTP wrapper for Grocy
-├── manager.py                 # Per-instance orchestration (product groups + quantity units today)
+├── manager.py                 # Per-instance orchestration (inventory, purchases, manifests)
 ├── metadata.py                # Typed loader for metadata.yaml files
 ├── governor.py                # Governing entity that returns managers
 ├── models.py                  # Dataclasses for manifest payloads
@@ -22,7 +22,10 @@ apps/api/src/core/grocy/
 
 ### API Surface
 
-The HTTP layer now exposes a scaffold of Grocy routes (see `apps/api/src/api/routes/grocy/`). Each handler is intentionally thin and either delegates to the governor today (`/initialize`) or raises a `501` placeholder until the corresponding capability is built. Planned endpoints:
+The HTTP layer exposes Grocy routes that are fully implemented where noted in
+`apps/api/docs/grocy_route_semantics.md`. Handlers stay thin and delegate to the
+governor/manager/services for orchestration; routes that are not yet supported
+remain future work.
 
 | Route | Method | Purpose |
 |-------|--------|---------|
@@ -40,7 +43,12 @@ The HTTP layer now exposes a scaffold of Grocy routes (see `apps/api/src/api/rou
 | `/grocy/{instance_index}/inventory` | `GET` | Summarize inventory for the instance (future). |
 | `/grocy/{instance_index}/inventory/{product_sku}` | `GET` | Show product-level inventory details (future). |
 
-`/grocy/instances` now returns non-sensitive metadata for every instance, including their declared postal addresses, the live Grocy location list (cabinet/freezer definitions), and the shopping-location/vendor roster fetched through the manager layer.
+Implemented route behavior (including shopping list and purchase defaults endpoints)
+lives in `apps/api/docs/grocy_route_semantics.md`.
+
+`/grocy/instances` returns non-sensitive metadata for every instance, including their
+declared postal addresses, the live Grocy location list (cabinet/freezer definitions),
+and the shopping-location/vendor roster fetched through the manager layer.
 
 Routes never touch manifest files or metadata directly; they simply forward the requested instance id (and optional payloads) and translate the resulting domain objects into HTTP responses.
 

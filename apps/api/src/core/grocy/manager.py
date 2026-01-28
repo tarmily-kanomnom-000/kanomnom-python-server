@@ -107,6 +107,10 @@ class GrocyManager:
         """Return products merged with stock availability metadata."""
         return self._inventory.list_products_with_inventory(self.instance_index)
 
+    def inventory_service(self) -> ProductInventoryService:
+        """Expose the inventory service for internal orchestration helpers."""
+        return self._inventory
+
     def force_refresh_product_inventory(self) -> None:
         """Clear cached inventory artifacts so subsequent reads fetch fresh data."""
         self._inventory.force_refresh_inventory(self.instance_index)

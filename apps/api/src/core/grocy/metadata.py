@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-import yaml
 from core.grocy.exceptions import MetadataNotFoundError
 from core.grocy.models import InstanceAddress, InstanceMetadata
+from core.manifests.yaml import load_yaml_mapping
 
 
 class InstanceMetadataRepository:
@@ -47,14 +47,7 @@ class InstanceMetadataRepository:
 
 def _parse_metadata_file(path: Path) -> dict[str, Any]:
     """Parse the metadata.yaml file using PyYAML for correctness and safety."""
-    with path.open("r", encoding="utf-8") as handle:
-        try:
-            parsed = yaml.safe_load(handle) or {}
-        except yaml.YAMLError as exc:
-            raise ValueError(f"Failed to parse metadata file {path}: {exc}") from exc
-    if not isinstance(parsed, dict):
-        raise ValueError(f"Expected mapping at root of {path}")
-    return parsed
+    return load_yaml_mapping(path)
 
 
 def _hydrate_address(raw: Any) -> InstanceAddress | None:

@@ -3,9 +3,7 @@ from __future__ import annotations
 from typing import Callable, TypeVar
 
 import requests
-from core.cache.grocy_shopping_locations_cache import get_grocy_shopping_locations_cache
 from core.grocy.exceptions import MetadataNotFoundError
-from core.grocy.price_analyzer import PriceAnalyzer
 from fastapi import HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 
@@ -39,28 +37,6 @@ def parse_force_refresh(request: Request) -> bool:
         return False
     normalized = value.strip().lower()
     return normalized in {"1", "true", "t", "yes", "y", "on"}
-
-
-def build_price_analyzer(instance_index: str) -> PriceAnalyzer:
-    try:
-        manager = governor.manager_for(instance_index)
-        return PriceAnalyzer(manager.client)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to initialize price analyzer: {exc!s}"
-        ) from exc
-
-
-async def load_shopping_locations(instance_index: str) -> list:
-    try:
-        shopping_locations_cache = get_grocy_shopping_locations_cache()
-        return await run_in_threadpool(
-            shopping_locations_cache.load_shopping_locations, instance_index
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to load shopping locations: {exc!s}"
-        ) from exc
 
 
 async def get_manager(instance_index: str) -> object:

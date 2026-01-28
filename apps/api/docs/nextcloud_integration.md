@@ -57,6 +57,17 @@ credentials:
 
 - `NEXTCLOUD_DEFAULT_INSTANCE_KEY` (defaults to `000000` when unset)
 
+## Manifest Validation
+
+The API validates Nextcloud manifests at startup. Each instance must include
+exactly one calendar tagged with `orders`. Missing or duplicate tags raise
+startup errors. See `apps/api/src/core/nextcloud/validation.py` for the rules.
+
+## Runtime Defaults
+
+- Event duration: 15 minutes
+- Request timeout: 15 seconds
+
 ## Event Semantics
 
 ## Item Semantics
